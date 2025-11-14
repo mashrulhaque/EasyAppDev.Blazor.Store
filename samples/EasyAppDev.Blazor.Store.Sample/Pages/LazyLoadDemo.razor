@@ -1,0 +1,303 @@
+@page "/lazy-load-demo"
+@inherits StoreComponent<ProductCatalogState>
+@using EasyAppDev.Blazor.Store.Sample.State
+
+<PageTitle>LazyLoad Demo</PageTitle>
+
+<div class="container mt-4">
+    <h3>LazyLoad with Caching Demo</h3>
+    <p class="lead">
+        Automatic caching with request deduplication - eliminate manual cache management!
+    </p>
+
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Product Catalog</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    @foreach (var product in _products)
+                    {
+                        <button class="list-group-item list-group-item-action @(State.SelectedProduct == product.Id ? "active" : "")"
+                                @onclick="@(() => LoadProductDetails(product.Id))"
+                                disabled="@(State.LoadingProductIds.Contains(product.Id))">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>@product.Name</strong>
+                                    <br />
+                                    <small class="@(State.SelectedProduct == product.Id ? "text-white-50" : "text-muted")">
+                                        $@product.Price.ToString("F2")
+                                    </small>
+                                </div>
+                                @if (State.LoadingProductIds.Contains(product.Id))
+                                {
+                                    <div class="spinner-border spinner-border-sm" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                }
+                                else if (State.ProductDetails.ContainsKey(product.Id))
+                                {
+                                    <span class="badge bg-success">
+                                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                                        </svg>
+                                        Cached
+                                    </span>
+                                }
+                            </div>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary btn-sm" @onclick="TestConcurrentRequests">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                        <path d="M6.271 5.055a.5.5 0 0 1 .52.038l3.5 2.5a.5.5 0 0 1 0 .814l-3.5 2.5A.5.5 0 0 1 6 10.5v-5a.5.5 0 0 1 .271-.445z"/>
+                    </svg>
+                    Test Deduplication
+                </button>
+                <button class="btn btn-warning btn-sm" @onclick="ClearCache">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"/>
+                    </svg>
+                    Clear Cache
+                </button>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6>
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                        </svg>
+                        Statistics
+                    </h6>
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-6">Cached Items:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-primary">@State.ProductDetails.Count</span></dd>
+
+                        <dt class="col-sm-6">API Calls:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-info">@State.LoadCount</span></dd>
+
+                        <dt class="col-sm-6">Cache Hits:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-success">@State.CacheHits</span></dd>
+
+                        <dt class="col-sm-6">Cache Expiry:</dt>
+                        <dd class="col-sm-6"><span class="badge bg-warning text-dark">30s</span></dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            @if (State.SelectedProduct != null && State.ProductDetails.TryGetValue(State.SelectedProduct.Value, out var details))
+            {
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                            </svg>
+                            @details.Name
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h4 class="text-primary mb-4">${{details.Price.ToString("F2")}}</h4>
+
+                                <h6>Description</h6>
+                                <p class="text-muted">@details.Description</p>
+
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <h6>Category</h6>
+                                        <p>
+                                            <span class="badge bg-secondary">@details.Category</span>
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>In Stock</h6>
+                                        <p>
+                                            <strong class="text-success">@details.InStock</strong> units available
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-info mt-4">
+                                    <h6 class="alert-heading">
+                                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                            <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                            <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                        </svg>
+                                        Cache Information
+                                    </h6>
+                                    <p class="mb-1">
+                                        <strong>Loaded:</strong> @details.LoadedAt.ToString("hh:mm:ss tt")
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Expires:</strong> @details.ExpiresAt.ToString("hh:mm:ss tt")
+                                        @{
+                                            var remaining = details.ExpiresAt - DateTime.Now;
+                                            if (remaining.TotalSeconds > 0)
+                                            {
+                                                <span class="badge bg-success">@remaining.TotalSeconds.ToString("F0")s remaining</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Expired</span>
+                                            }
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <svg width="120" height="120" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (State.SelectedProduct == null)
+            {
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <svg class="mb-3 text-muted" width="64" height="64" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5zM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5z"/>
+                        </svg>
+                        <h5 class="text-muted">Select a Product</h5>
+                        <p class="text-muted">
+                            Click a product from the catalog to view details.<br/>
+                            Details are cached for 30 seconds with automatic request deduplication.
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>How It Works</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Features Demonstrated:</h6>
+                    <ul>
+                        <li><strong>Automatic Caching:</strong> Product details are cached for 30 seconds</li>
+                        <li><strong>Request Deduplication:</strong> Multiple concurrent requests for same product result in only one API call</li>
+                        <li><strong>Cache Expiration:</strong> Data automatically reloads after 30 seconds</li>
+                        <li><strong>Error Handling:</strong> Errors are not cached, allowing retry</li>
+                        <li><strong>Memory Management:</strong> Cache is automatically cleaned up when component disposes</li>
+                    </ul>
+
+                    <h6 class="mt-4">Code Example:</h6>
+                    <pre class="line-numbers"><code class="language-csharp">// LazyLoad with 30-second cache
+var details = await LazyLoad(
+    $"product-{{productId}}",
+    () => ProductService.GetDetailsAsync(productId),
+    cacheFor: TimeSpan.FromSeconds(30));
+
+Update(s => s with {{ ProductDetails = s.ProductDetails.SetItem(productId, details) }});</code></pre>
+
+                    <p class="text-muted mb-0">
+                        <strong>Try it:</strong> Click "Test Deduplication" to fire 5 concurrent requests for the same product.
+                        Notice that only ONE API call is made (check the "API Calls" counter)!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly List<CatalogProduct> _products = new()
+    {
+        new(1, "Laptop Pro", 999.99m),
+        new(2, "Wireless Mouse", 29.99m),
+        new(3, "Mechanical Keyboard", 79.99m),
+        new(4, "4K Monitor", 349.99m),
+        new(5, "Noise-Cancelling Headphones", 149.99m)
+    };
+
+    async Task LoadProductDetails(int productId)
+    {
+        // Mark as loading
+        await Update(s => s with { LoadingProductIds = s.LoadingProductIds.Add(productId) });
+
+        try
+        {
+            // Check if already cached (for cache hit tracking)
+            var isCacheHit = State.ProductDetails.ContainsKey(productId);
+
+            // LazyLoad with 30-second cache
+            var details = await LazyLoad(
+                $"product-{productId}",
+                () => SimulateApiLoad(productId),
+                cacheFor: TimeSpan.FromSeconds(30));
+
+            // Update state with loaded details
+            await Update(s => s with
+            {
+                ProductDetails = s.ProductDetails.SetItem(productId, details),
+                SelectedProduct = productId,
+                LoadingProductIds = s.LoadingProductIds.Remove(productId),
+                CacheHits = isCacheHit ? s.CacheHits + 1 : s.CacheHits
+            });
+        }
+        catch (Exception ex)
+        {
+            await Update(s => s with { LoadingProductIds = s.LoadingProductIds.Remove(productId) });
+            Logger.LogError(ex, "Error loading product {ProductId}", productId);
+        }
+    }
+
+    async Task<ProductDetails> SimulateApiLoad(int productId)
+    {
+        // Simulate slow API call
+        await Task.Delay(1500);
+
+        // Track API call count
+        await Update(s => s with { LoadCount = s.LoadCount + 1 });
+
+        var product = _products.First(p => p.Id == productId);
+        return new ProductDetails(
+            productId,
+            product.Name,
+            product.Price,
+            $"This is a detailed description of {product.Name}. It's a high-quality product with excellent features and great value for money.",
+            "Electronics",
+            new Random().Next(10, 100),
+            DateTime.Now,
+            DateTime.Now.AddSeconds(30));
+    }
+
+    async Task TestConcurrentRequests()
+    {
+        Logger.LogInformation("Testing concurrent request deduplication...");
+
+        // Fire 5 concurrent requests for the same product
+        var tasks = Enumerable.Range(0, 5)
+            .Select(_ => LoadProductDetails(1))
+            .ToList();
+
+        await Task.WhenAll(tasks);
+
+        Logger.LogInformation("Concurrent test complete. Check API Calls counter - should only increment by 1!");
+    }
+
+    void ClearCache()
+    {
+        Update(s => new ProductCatalogState());
+        Logger.LogInformation("Cache cleared");
+    }
+}

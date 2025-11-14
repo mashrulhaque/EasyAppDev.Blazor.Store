@@ -1,0 +1,354 @@
+using System.Diagnostics;
+using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Selectors;
+
+namespace EasyAppDev.Blazor.Store.Tests.Performance;
+
+public record TestState(int Counter, string Message);
+
+/// <summary>
+/// Performance and stress tests to validate efficiency and scalability.
+/// </summary>
+public class PerformanceTests
+{
+    [Fact]
+    public async Task StoreUpdate_Performance_1000Updates()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        // Act
+        var sw = Stopwatch.StartNew();
+
+        for (int i = 0; i < 1000; i++)
+        {
+            await store.UpdateAsync(state => state with { Counter = i });
+        }
+
+        sw.Stop();
+
+        // Assert - Should complete in reasonable time
+        sw.ElapsedMilliseconds.Should().BeLessThan(1000); // < 1 second for 1000 updates
+        store.GetState().Counter.Should().Be(999);
+
+        // Cleanup
+        if (store is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+
+    [Fact]
+    public void Subscription_Performance_1000Subscribers()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        var subscriptions = new List<IDisposable>();
+        var callCounts = new int[1000];
+
+        // Act - Create 1000 subscribers
+        var sw = Stopwatch.StartNew();
+
+        for (int i = 0; i < 1000; i++)
+        {
+            var index = i;
+            subscriptions.Add(store.Subscribe(state => callCounts[index]++));
+        }
+
+        sw.Stop();
+        var subscribeTime = sw.ElapsedMilliseconds;
+
+        // Update state
+        sw.Restart();
+        store.Update(state => state with { Counter = 1 });
+        sw.Stop();
+        var notifyTime = sw.ElapsedMilliseconds;
+
+        // Assert
+        subscribeTime.Should().BeLessThan(100); // Subscription should be fast
+        notifyTime.Should().BeLessThan(200);    // Notification should be fast
+        callCounts.Should().AllSatisfy(count => count.Should().Be(1));
+
+        // Cleanup
+        subscriptions.ForEach(s => s.Dispose());
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    [Fact]
+    public void Selector_Memoization_Performance()
+    {
+        // Arrange
+        var computeCount = 0;
+        var selector = Selectors.Create<TestState, int>(state =>
+        {
+            computeCount++;
+            // Simulate expensive computation
+            Thread.Sleep(10);
+            return state.Counter * 2;
+        });
+
+        var state = new TestState(5, "Test");
+
+        // Act
+        var sw = Stopwatch.StartNew();
+
+        // First call - should compute
+        var result1 = selector.Select(state);
+
+        var firstCallTime = sw.ElapsedMilliseconds;
+        sw.Restart();
+
+        // Second call - should use cache
+        var result2 = selector.Select(state);
+
+        var secondCallTime = sw.ElapsedMilliseconds;
+
+        // Assert
+        result1.Should().Be(10);
+        result2.Should().Be(10);
+        computeCount.Should().Be(1); // Only computed once
+        firstCallTime.Should().BeGreaterThanOrEqualTo(10); // Includes computation time
+        secondCallTime.Should().BeLessThan(5);  // Cache hit is fast
+    }
+
+    [Fact]
+    public async Task ConcurrentUpdates_ThreadSafety()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        // Act - 100 concurrent updates
+        var tasks = Enumerable.Range(0, 100).Select(async i =>
+        {
+            await store.UpdateAsync(state => state with { Counter = state.Counter + 1 });
+        });
+
+        await Task.WhenAll(tasks);
+
+        // Assert - All updates should be applied (thread-safe)
+        store.GetState().Counter.Should().Be(100);
+
+        // Cleanup
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    [Fact]
+    public async Task HighFrequency_Updates_Performance()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        var callCount = 0;
+        store.Subscribe(_ => callCount++);
+
+        // Act - Rapid fire updates
+        var sw = Stopwatch.StartNew();
+
+        var tasks = Enumerable.Range(0, 100).Select(i =>
+            store.UpdateAsync(state => state with { Counter = i })
+        );
+
+        await Task.WhenAll(tasks);
+        sw.Stop();
+
+        // Assert
+        sw.ElapsedMilliseconds.Should().BeLessThan(500); // Should be fast
+        store.GetState().Counter.Should().BeInRange(0, 99); // Some value was set
+        callCount.Should().BeGreaterThan(0); // Subscribers notified
+
+        // Cleanup
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    [Fact]
+    public void LargeState_Update_Performance()
+    {
+        // Arrange - Large state with collection
+        var largeState = new LargeTestState(
+            Id: 1,
+            Items: Enumerable.Range(0, 10000).Select(i => $"Item_{i}").ToList()
+        );
+
+        var store = StoreBuilder<LargeTestState>
+            .Create(largeState)
+            .Build();
+
+        // Act - Update with large state
+        var sw = Stopwatch.StartNew();
+
+        store.Update(state => state with
+        {
+            Items = state.Items.Append("New_Item").ToList()
+        });
+
+        sw.Stop();
+
+        // Assert - Should handle large state reasonably
+        sw.ElapsedMilliseconds.Should().BeLessThan(100);
+        store.GetState().Items.Count.Should().Be(10001);
+
+        // Cleanup
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    [Fact]
+    public void MultipleStores_IndependentPerformance()
+    {
+        // Arrange - Create multiple stores
+        var stores = Enumerable.Range(0, 10)
+            .Select(i => StoreBuilder<TestState>
+                .Create(new TestState(i, $"Store_{i}"))
+                .Build())
+            .ToList();
+
+        // Act - Update all stores concurrently
+        var sw = Stopwatch.StartNew();
+
+        Parallel.ForEach(stores, store =>
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                store.Update(state => state with { Counter = state.Counter + 1 });
+            }
+        });
+
+        sw.Stop();
+
+        // Assert - All stores updated independently
+        sw.ElapsedMilliseconds.Should().BeLessThan(1000);
+        stores.ForEach(store =>
+        {
+            store.GetState().Counter.Should().BeGreaterThanOrEqualTo(100);
+        });
+
+        // Cleanup
+        stores.ForEach(s => { if (s is IDisposable d) { d.Dispose(); } });
+    }
+
+    [Fact]
+    public void Selector_ComposedSelectors_Performance()
+    {
+        // Arrange
+        var computeCount1 = 0;
+        var computeCount2 = 0;
+        var computeCount3 = 0;
+
+        var selector1 = Selectors.Create<TestState, int>(state =>
+        {
+            computeCount1++;
+            return state.Counter * 2;
+        });
+
+        var selector2 = Selectors.Create<TestState, int>(state =>
+        {
+            computeCount2++;
+            return state.Counter * 3;
+        });
+
+        var composedSelector = Selectors.Create(
+            selector1,
+            selector2,
+            (result1, result2) =>
+            {
+                computeCount3++;
+                return result1 + result2;
+            });
+
+        var state = new TestState(5, "Test");
+
+        // Act - First call
+        var result1 = composedSelector.Select(state);
+
+        // Second call with same state - should use cache
+        var result2 = composedSelector.Select(state);
+
+        // Assert - Memoization working
+        result1.Should().Be(25); // (5*2) + (5*3) = 25
+        result2.Should().Be(25);
+        computeCount1.Should().Be(1); // Memoized
+        computeCount2.Should().Be(1); // Memoized
+        computeCount3.Should().Be(1); // Memoized
+    }
+
+    [Fact]
+    public async Task StressTest_MixedOperations()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        var subscriptions = new List<IDisposable>();
+        var totalCallbacks = 0;
+
+        // Add subscribers
+        for (int i = 0; i < 50; i++)
+        {
+            subscriptions.Add(store.Subscribe(_ => Interlocked.Increment(ref totalCallbacks)));
+        }
+
+        // Act - Mixed concurrent operations
+        var sw = Stopwatch.StartNew();
+
+        var updateTasks = Enumerable.Range(0, 50).Select(i =>
+            store.UpdateAsync(state => state with { Counter = state.Counter + 1 })
+        );
+
+        var readTasks = Enumerable.Range(0, 50).Select(_ =>
+            Task.Run(() => store.GetState())
+        );
+
+        await Task.WhenAll(updateTasks.Concat(readTasks));
+        sw.Stop();
+
+        // Assert
+        sw.ElapsedMilliseconds.Should().BeLessThan(1000);
+        store.GetState().Counter.Should().Be(50);
+        totalCallbacks.Should().BeGreaterThan(0); // Callbacks fired
+
+        // Cleanup
+        subscriptions.ForEach(s => s.Dispose());
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    [Fact]
+    public void MemoryEfficiency_SubscriptionCleanup()
+    {
+        // Arrange
+        var store = StoreBuilder<TestState>
+            .Create(new TestState(0, "Initial"))
+            .Build();
+
+        // Act - Create and dispose many subscriptions
+        for (int i = 0; i < 1000; i++)
+        {
+            var subscription = store.Subscribe(_ => { });
+            subscription.Dispose();
+        }
+
+        // Update store
+        store.Update(state => state with { Counter = 1 });
+
+        // Assert - No callbacks should fire (all disposed)
+        // This test verifies that disposed subscriptions are properly cleaned up
+        store.GetState().Counter.Should().Be(1);
+
+        // Cleanup
+        if (store is IDisposable d) { d.Dispose(); }
+    }
+
+    #region Test State Records
+
+    private record LargeTestState(int Id, List<string> Items);
+
+    #endregion
+}

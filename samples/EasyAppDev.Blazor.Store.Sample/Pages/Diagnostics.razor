@@ -1,0 +1,38 @@
+@page "/diagnostics"
+
+<PageTitle>Store Diagnostics</PageTitle>
+
+<h1>Blazor Store Diagnostics</h1>
+
+<p class="lead">
+    Monitor state changes, component renders, performance metrics, and subscriptions in real-time.
+</p>
+
+<div class="alert alert-info">
+    <h4>About This Page</h4>
+    <p>
+        This diagnostics panel is on a separate page to prevent performance impacts on other components.
+        The panel subscribes to diagnostic events and re-renders when data changes, which could cause
+        unnecessary renders if embedded directly in production pages.
+    </p>
+</div>
+
+@* Diagnostic Panel - Only available in DEBUG builds *@
+#if DEBUG
+<DiagnosticPanel DisplayMode="DiagnosticDisplayMode.Inline" InitiallyCollapsed="false" />
+#else
+<div class="alert alert-warning">
+    <h4>Diagnostics Not Available</h4>
+    <p>Diagnostics are only available in DEBUG builds. Run the application with <code>dotnet run</code> (without --configuration Release) to enable diagnostics.</p>
+</div>
+#endif
+
+<style>
+    /* Make the inline diagnostics panel take full width */
+    .blazor-store-diagnostics.inline {
+        position: static;
+        width: 100%;
+        max-width: none;
+        margin-top: 20px;
+    }
+</style>

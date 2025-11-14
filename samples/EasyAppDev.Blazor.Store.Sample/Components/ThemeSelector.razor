@@ -1,0 +1,33 @@
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits SelectorStoreComponent<ThemeState>
+
+<div class="btn-group w-100">
+    <button class="btn @(SelectedTheme == Theme.Light ? "btn-primary" : "btn-outline-primary")"
+            @onclick="@(() => Update(s => s.SetTheme(Theme.Light)))">
+        ☀️ Light
+    </button>
+    <button class="btn @(SelectedTheme == Theme.Dark ? "btn-primary" : "btn-outline-primary")"
+            @onclick="@(() => Update(s => s.SetTheme(Theme.Dark)))">
+        🌙 Dark
+    </button>
+    <button class="btn @(SelectedTheme == Theme.Auto ? "btn-primary" : "btn-outline-primary")"
+            @onclick="@(() => Update(s => s.SetTheme(Theme.Auto)))">
+        🔄 Auto
+    </button>
+</div>
+<small class="text-muted d-block mt-2">
+    Component renders: @_renderCount (only on theme change)
+</small>
+
+@code {
+    private int _renderCount = 0;
+    private Theme SelectedTheme => (Theme)SelectState(Store.GetState());
+
+    protected override object SelectState(ThemeState state) => state.CurrentTheme;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}

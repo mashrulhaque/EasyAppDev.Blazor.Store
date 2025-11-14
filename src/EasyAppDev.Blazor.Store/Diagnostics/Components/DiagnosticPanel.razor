@@ -1,0 +1,354 @@
+@using EasyAppDev.Blazor.Store.Diagnostics
+@using EasyAppDev.Blazor.Store.Diagnostics.Models
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+
+<div id="@_panelId" class="blazor-store-diagnostics @DisplayMode.ToString().ToLower()">
+    <div class="diagnostics-header">
+        <div class="diagnostics-title">
+            ⚡ Blazor Store Diagnostics
+        </div>
+        <div class="diagnostics-actions">
+            <button @onclick="ToggleCollapse">@(_isCollapsed ? "▼" : "▲")</button>
+            <button @onclick="RefreshData">⟳</button>
+            <button @onclick="ClearData">✕ Clear</button>
+        </div>
+    </div>
+
+    <div class="diagnostics-content @(_isCollapsed ? "collapsed" : "")">
+        <div class="diagnostics-tabs">
+            <button class="@GetTabClass("state")" @onclick="@(() => SetActiveTab("state"))">
+                State
+            </button>
+            <button class="@GetTabClass("renders")" @onclick="@(() => SetActiveTab("renders"))">
+                Renders
+            </button>
+            <button class="@GetTabClass("performance")" @onclick="@(() => SetActiveTab("performance"))">
+                Performance
+            </button>
+            <button class="@GetTabClass("subscriptions")" @onclick="@(() => SetActiveTab("subscriptions"))">
+                Subscriptions
+            </button>
+        </div>
+
+        <div class="diagnostics-tab-content">
+            @if (_activeTab == "state")
+            {
+                <div class="diagnostic-section">
+                    <h3>Recent State Changes</h3>
+                    @if (_recentActions.Any())
+                    {
+                        @foreach (var action in _recentActions.Take(10))
+                        {
+                            <div style="margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <strong>@action.StateType.Name</strong>
+                                    <span style="color: #6c757d; font-size: 12px;">@action.Timestamp.ToString("HH:mm:ss.fff")</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(action.Action))
+                                {
+                                    <div style="color: #667eea; font-weight: 500; margin-bottom: 8px;">Action: @action.Action</div>
+                                }
+                                <div style="font-size: 11px; color: #6c757d;">Duration: @action.Duration.TotalMilliseconds.ToString("F2")ms</div>
+                                @if (action.Diff != null && !action.Diff.AreIdentical)
+                                {
+                                    <div class="state-diff">
+                                        <strong style="font-size: 12px;">Changes:</strong>
+                                        @foreach (var change in action.Diff.Changes.Take(5))
+                                        {
+                                            <div class="property-change @(change.IsAdded ? "added" : change.IsRemoved ? "removed" : "modified")">
+                                                <span class="property-name">@change.PropertyName:</span>
+                                                @if (change.IsAdded)
+                                                {
+                                                    <span> + @change.NewValue</span>
+                                                }
+                                                else if (change.IsRemoved)
+                                                {
+                                                    <span> - @change.OldValue</span>
+                                                }
+                                                else
+                                                {
+                                                    <span> @change.OldValue → @change.NewValue</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <div class="empty-state-text">No state changes recorded yet</div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_activeTab == "renders")
+            {
+                <div class="diagnostic-section">
+                    <h3>Component Render Counts</h3>
+                    @if (_renderCounts.Any())
+                    {
+                        <table class="render-table">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Renders</th>
+                                    <th>Last Render</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var kvp in _renderCounts.OrderByDescending(x => x.Value))
+                                {
+                                    var lastRender = _recentRenders.FirstOrDefault(r => r.ComponentName == kvp.Key);
+                                    var countClass = kvp.Value < 10 ? "low" : kvp.Value < 50 ? "medium" : "high";
+                                    <tr>
+                                        <td>@kvp.Key</td>
+                                        <td><span class="render-count @countClass">@kvp.Value</span></td>
+                                        <td style="color: #6c757d; font-size: 11px;">
+                                            @(lastRender?.Timestamp.ToString("HH:mm:ss") ?? "N/A")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎨</div>
+                            <div class="empty-state-text">No renders recorded yet</div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_activeTab == "performance")
+            {
+                <div class="diagnostic-section">
+                    <h3>Performance Metrics</h3>
+                    @if (_performanceMetrics.Any())
+                    {
+                        @foreach (var metrics in _performanceMetrics.Values)
+                        {
+                            <div style="margin-bottom: 24px;">
+                                <h4 style="margin-bottom: 12px;">@metrics.StateType.Name</h4>
+                                <div class="metric-grid">
+                                    <div class="metric-card">
+                                        <div class="metric-label">Total Updates</div>
+                                        <div class="metric-value">@metrics.TotalUpdates</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-label">Average</div>
+                                        <div class="metric-value">
+                                            @metrics.AverageDuration.TotalMilliseconds.ToString("F1")<span class="metric-unit">ms</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-label">P95</div>
+                                        <div class="metric-value">
+                                            @metrics.P95Duration.TotalMilliseconds.ToString("F1")<span class="metric-unit">ms</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-label">Max</div>
+                                        <div class="metric-value">
+                                            @metrics.MaxDuration.TotalMilliseconds.ToString("F1")<span class="metric-unit">ms</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (metrics.SlowestActions.Any())
+                                {
+                                    <h5 style="margin: 16px 0 8px 0; font-size: 13px;">Slowest Actions</h5>
+                                    <ul class="action-list">
+                                        @foreach (var (action, duration) in metrics.SlowestActions.Take(5))
+                                        {
+                                            <li class="action-item">
+                                                <span class="action-name">@(action ?? "(unnamed)")</span>
+                                                <span class="action-duration">@duration.TotalMilliseconds.ToString("F2")ms</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚡</div>
+                            <div class="empty-state-text">No performance data available</div>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_activeTab == "subscriptions")
+            {
+                <div class="diagnostic-section">
+                    <h3>Active Subscriptions</h3>
+                    @if (_activeSubscriptions.Any())
+                    {
+                        <div class="subscription-list">
+                            @foreach (var sub in _activeSubscriptions)
+                            {
+                                <div class="subscription-card @(sub.IsActive ? "" : "inactive")">
+                                    <div class="subscription-header">
+                                        <span class="subscription-name">@sub.SubscriberName</span>
+                                        <span class="subscription-badge @(sub.IsActive ? "active" : "disposed")">
+                                            @(sub.IsActive ? "Active" : "Disposed")
+                                        </span>
+                                    </div>
+                                    <div class="subscription-details">
+                                        <span>Type: @sub.SubscriptionType</span>
+                                        <span>State: @sub.StateType.Name</span>
+                                        <span>Notifications: @sub.NotificationCount</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔗</div>
+                            <div class="empty-state-text">No active subscriptions</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public DiagnosticDisplayMode DisplayMode { get; set; } = DiagnosticDisplayMode.Floating;
+
+    [Parameter]
+    public bool InitiallyCollapsed { get; set; } = false;
+
+    [Inject]
+    private IDiagnosticsService? DiagnosticsService { get; set; }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private string _panelId = $"diagnostics-panel-{Guid.NewGuid():N}";
+    private string _activeTab = "state";
+    private bool _isCollapsed;
+    private IJSObjectReference? _jsModule;
+
+    private List<ActionHistoryEntry> _recentActions = new();
+    private List<RenderEvent> _recentRenders = new();
+    private Dictionary<string, int> _renderCounts = new();
+    private Dictionary<Type, PerformanceMetrics> _performanceMetrics = new();
+    private List<SubscriptionInfo> _activeSubscriptions = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isCollapsed = InitiallyCollapsed;
+
+            try
+            {
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import", "./_content/EasyAppDev.Blazor.Store/diagnostics.js");
+
+                await _jsModule.InvokeVoidAsync("initializeDiagnosticsPanel", _panelId);
+            }
+            catch
+            {
+                // JS interop might not be available in some scenarios (tests, etc.)
+            }
+
+            // Subscribe to diagnostic data changes
+            if (DiagnosticsService != null)
+            {
+                DiagnosticsService.DataChanged += OnDataChanged;
+            }
+
+            RefreshData();
+        }
+    }
+
+    private void SetActiveTab(string tab)
+    {
+        _activeTab = tab;
+        RefreshData();
+    }
+
+    private string IsActiveTab(string tab) => _activeTab == tab ? "active" : "";
+
+    private string GetTabClass(string tab) => $"diagnostics-tab {(_activeTab == tab ? "active" : "")}";
+
+    private void RefreshData()
+    {
+        if (DiagnosticsService == null) return;
+
+        _recentActions = DiagnosticsService.GetRecentActions(count: 20).ToList();
+        _recentRenders = DiagnosticsService.GetRecentRenders(count: 50).ToList();
+        _renderCounts = DiagnosticsService.GetRenderCounts().ToDictionary(x => x.Key, x => x.Value);
+        _performanceMetrics = DiagnosticsService.GetAllPerformanceMetrics().ToDictionary(x => x.Key, x => x.Value);
+        _activeSubscriptions = DiagnosticsService.GetActiveSubscriptions().ToList();
+
+        StateHasChanged();
+    }
+
+    private async Task ToggleCollapse()
+    {
+        _isCollapsed = !_isCollapsed;
+
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("toggleCollapse", _panelId);
+            }
+            catch
+            {
+                // Ignore JS errors
+            }
+        }
+    }
+
+    private void ClearData()
+    {
+        DiagnosticsService?.Clear();
+        RefreshData();
+    }
+
+    private void OnDataChanged(object? sender, EventArgs e)
+    {
+        // Use InvokeAsync to ensure we're on the UI thread
+        InvokeAsync(() =>
+        {
+            RefreshData();
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Unsubscribe from diagnostic data changes
+        if (DiagnosticsService != null)
+        {
+            DiagnosticsService.DataChanged -= OnDataChanged;
+        }
+
+        if (_jsModule != null)
+        {
+            try
+            {
+                await _jsModule.InvokeVoidAsync("disposePanel", _panelId);
+                await _jsModule.DisposeAsync();
+            }
+            catch
+            {
+                // Ignore disposal errors
+            }
+        }
+    }
+}

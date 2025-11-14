@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Persistence - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="State persistence with LocalStorage">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Persistence</h1>
+            <p class="lead">
+              Automatically save and restore your application state across page reloads using browser storage.
+            </p>
+
+            <!-- Overview -->
+            <section class="section">
+              <h2>Overview</h2>
+              <p>
+                The persistence feature allows your Blazor application to automatically save state to browser storage
+                (LocalStorage or SessionStorage) and restore it when the application reloads. This is perfect for
+                preserving user preferences, shopping carts, form data, and other stateful information.
+              </p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Key Benefits</div>
+                <ul>
+                  <li>Automatic save on every state update</li>
+                  <li>Automatic restore on application startup</li>
+                  <li>Choose between LocalStorage (permanent) and SessionStorage (tab-scoped)</li>
+                  <li>Zero boilerplate - just one line of configuration</li>
+                  <li>JSON serialization with full type safety</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Auto-Save to LocalStorage -->
+            <section class="section">
+              <h2>Auto-Save to LocalStorage</h2>
+              <p>
+                Enable persistence with a single line in your store configuration. State will be automatically
+                saved to LocalStorage on every update and restored when the application loads.
+              </p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "MyApp")
+        .WithPersistence(sp, "app-state"));  // Auto-save + restore</code></pre>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">That's it!</div>
+                <p>
+                  State is automatically saved on updates and restored on app load. No additional code required.
+                </p>
+              </div>
+            </section>
+
+            <!-- How It Works -->
+            <section class="section">
+              <h2>How It Works</h2>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Initial Load</h3>
+                  <p>
+                    When your application starts, the persistence middleware checks if saved state exists
+                    in browser storage using the specified key.
+                  </p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>State Restoration</h3>
+                  <p>
+                    If saved state is found, it's deserialized and loaded into the store, replacing the
+                    initial state. If not found, the initial state is used.
+                  </p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Automatic Saving</h3>
+                  <p>
+                    Every time state is updated via <code>Update()</code>, the new state is automatically
+                    serialized to JSON and saved to browser storage.
+                  </p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <h3>Page Refresh</h3>
+                  <p>
+                    When users refresh the page or reopen the application, their state is automatically
+                    restored, providing a seamless experience.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- SessionStorage vs LocalStorage -->
+            <section class="section">
+              <h2>SessionStorage vs LocalStorage</h2>
+              <p>
+                The library uses <strong>LocalStorage</strong> by default, but you can configure it to use
+                SessionStorage for tab-scoped persistence.
+              </p>
+
+              <div class="comparison-grid">
+                <div class="comparison-card">
+                  <h3>LocalStorage (Default)</h3>
+                  <ul>
+                    <li><strong>Persistence:</strong> Data persists across browser sessions</li>
+                    <li><strong>Scope:</strong> Shared across all tabs and windows</li>
+                    <li><strong>Use cases:</strong> User preferences, shopping carts, long-term data</li>
+                    <li><strong>Cleared when:</strong> User manually clears browser data</li>
+                  </ul>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// Uses LocalStorage (default)
+.WithPersistence(sp, "app-state")</code></pre>
+                  </div>
+                </div>
+
+                <div class="comparison-card">
+                  <h3>SessionStorage</h3>
+                  <ul>
+                    <li><strong>Persistence:</strong> Data cleared when tab/window closes</li>
+                    <li><strong>Scope:</strong> Isolated per tab/window</li>
+                    <li><strong>Use cases:</strong> Form data, temporary state, tab-specific data</li>
+                    <li><strong>Cleared when:</strong> Tab or window is closed</li>
+                  </ul>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// Configure for SessionStorage
+.WithPersistence(sp, "session-state", useSessionStorage: true)</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Configuration Examples -->
+            <section class="section">
+              <h2>Configuration Examples</h2>
+
+              <h3>Todo List with Persistence</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">public record Todo(Guid Id, string Text, bool Completed);
+
+public record TodoState(ImmutableList&lt;Todo&gt; Todos)
+{
+    public static TodoState Initial => new(ImmutableList&lt;Todo&gt;.Empty);
+
+    public TodoState AddTodo(string text) =>
+        this with { Todos = Todos.Add(new Todo(Guid.NewGuid(), text, false)) };
+}
+
+// Register with persistence
+builder.Services.AddStoreWithUtilities(
+    TodoState.Initial,
+    (store, sp) => store
+        .WithDefaults(sp, "Todos")
+        .WithPersistence(sp, "todos"));  // Saves to LocalStorage with key "todos"</code></pre>
+              </div>
+              <p>
+                Now when users add, toggle, or remove todos, the list is automatically saved. When they reload
+                the page, their todos are restored exactly as they left them.
+              </p>
+
+              <h3>Shopping Cart Example</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">public record CartItem(string ProductId, string Name, decimal Price, int Quantity);
+
+public record CartState(ImmutableList&lt;CartItem&gt; Items)
+{
+    public decimal Total => Items.Sum(i => i.Price * i.Quantity);
+
+    public CartState AddItem(CartItem item) =>
+        this with { Items = Items.Add(item) };
+}
+
+// Persist cart across sessions
+builder.Services.AddStoreWithUtilities(
+    new CartState(ImmutableList&lt;CartItem&gt;.Empty),
+    (store, sp) => store
+        .WithDefaults(sp, "Cart")
+        .WithPersistence(sp, "shopping-cart"));</code></pre>
+              </div>
+              <p>
+                Shopping cart items are preserved even if users close the browser and return days later.
+              </p>
+
+              <h3>Session-Scoped Form Data</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">public record FormState(
+    string Name,
+    string Email,
+    string Message,
+    bool IsDraft = true);
+
+// Use SessionStorage for temporary form data
+builder.Services.AddStoreWithUtilities(
+    new FormState("", "", ""),
+    (store, sp) => store
+        .WithDefaults(sp, "ContactForm")
+        .WithPersistence(sp, "contact-form", useSessionStorage: true));</code></pre>
+              </div>
+              <p>
+                Form data is preserved within the current tab session but cleared when the tab is closed.
+              </p>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Storage Limits</div>
+                <p>
+                  Browser storage typically has a 5-10 MB limit per origin. Avoid persisting large datasets
+                  or binary data. Consider persisting only essential state and loading heavy data on demand.
+                </p>
+              </div>
+
+              <h3>What to Persist</h3>
+              <ul class="checklist">
+                <li>User preferences and settings</li>
+                <li>Shopping cart contents</li>
+                <li>Form drafts and work in progress</li>
+                <li>UI state (filters, sorting, pagination)</li>
+                <li>Authentication tokens (with appropriate security)</li>
+              </ul>
+
+              <h3>What NOT to Persist</h3>
+              <ul class="checklist">
+                <li>Sensitive data (unless encrypted)</li>
+                <li>Large datasets (use server-side storage)</li>
+                <li>Temporary/transient state</li>
+                <li>Derived/computed values (calculate on load)</li>
+                <li>Binary data or large files</li>
+              </ul>
+
+              <h3>Security Considerations</h3>
+              <div class="alert alert-danger">
+                <div class="alert-title">Important Security Notes</div>
+                <ul>
+                  <li>LocalStorage/SessionStorage is NOT encrypted by default</li>
+                  <li>Data is accessible via JavaScript and browser DevTools</li>
+                  <li>Never store passwords, credit cards, or sensitive tokens unencrypted</li>
+                  <li>Consider encrypting sensitive data before persistence</li>
+                  <li>Use HTTPS to prevent network interception</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Clearing Persisted State -->
+            <section class="section">
+              <h2>Clearing Persisted State</h2>
+              <p>
+                You can programmatically clear persisted state when needed (e.g., user logout).
+              </p>
+
+              <div class="code-block">
+                <div class="code-block-title">Clearing LocalStorage</div>
+                <pre><code class="language-csharp">@inject IJSRuntime JS
+
+async Task ClearPersistedState()
+{
+    // Clear specific key
+    await JS.InvokeVoidAsync("localStorage.removeItem", "app-state");
+
+    // Or clear all storage
+    await JS.InvokeVoidAsync("localStorage.clear");
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">Logout Example</div>
+                <pre><code class="language-csharp">@page "/logout"
+@inject IJSRuntime JS
+@inject IStore&lt;AuthState&gt; AuthStore
+
+async Task Logout()
+{
+    // Reset state
+    await AuthStore.UpdateAsync(s => AuthState.Initial);
+
+    // Clear persisted data
+    await JS.InvokeVoidAsync("localStorage.removeItem", "auth-state");
+
+    // Navigate to login
+    NavigationManager.NavigateTo("/login");
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section class="section">
+              <h2>Troubleshooting</h2>
+
+              <div class="faq-item">
+                <h3>State not persisting?</h3>
+                <p>
+                  Ensure <code>.WithPersistence(sp, "storage-key")</code> is called in your store configuration.
+                  Check browser DevTools > Application > Local Storage to verify data is being saved.
+                </p>
+              </div>
+
+              <div class="faq-item">
+                <h3>State not restoring on reload?</h3>
+                <p>
+                  Verify the storage key matches between saves and loads. Check browser console for
+                  deserialization errors. Ensure your state types are JSON-serializable.
+                </p>
+              </div>
+
+              <div class="faq-item">
+                <h3>Quota exceeded errors?</h3>
+                <p>
+                  Browser storage has size limits (typically 5-10 MB). Reduce the amount of data being
+                  persisted or implement data cleanup strategies.
+                </p>
+              </div>
+
+              <div class="faq-item">
+                <h3>JSON serialization errors?</h3>
+                <p>
+                  Ensure all state properties are serializable. Complex types may need custom JSON
+                  converters. Avoid circular references.
+                </p>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./devtools.html" class="next-step-card">
+                  <div class="next-step-icon">🛠️</div>
+                  <h3>Redux DevTools</h3>
+                  <p>Learn how to debug your state with time-travel debugging.</p>
+                </a>
+
+                <a href="./middleware.html" class="next-step-card">
+                  <div class="next-step-icon">⚙️</div>
+                  <h3>Middleware</h3>
+                  <p>Extend store behavior with custom middleware.</p>
+                </a>
+
+                <a href="./best-practices.html" class="next-step-card">
+                  <div class="next-step-icon">📖</div>
+                  <h3>Best Practices</h3>
+                  <p>Learn patterns and anti-patterns for state management.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

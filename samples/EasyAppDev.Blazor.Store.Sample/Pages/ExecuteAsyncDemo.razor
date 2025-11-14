@@ -1,0 +1,331 @@
+@page "/execute-async-demo"
+@inherits StoreComponent<UserManagementState>
+@using EasyAppDev.Blazor.Store.Sample.State
+@using EasyAppDev.Blazor.Store.AsyncActions
+
+<PageTitle>ExecuteAsync Demo</PageTitle>
+
+<div class="container mt-4">
+    <h3>ExecuteAsync Helper Demo</h3>
+    <p class="lead">
+        Automatic async action handling - reduce 12+ lines of try-catch boilerplate to 5 lines!
+    </p>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <!-- Load User Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                            <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                        </svg>
+                        Load User Profile
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (State.User.IsNotAsked)
+                    {
+                        <div class="text-center py-3">
+                            <p class="text-muted mb-3">Click "Load User" to fetch profile</p>
+                            <svg width="64" height="64" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                            </svg>
+                        </div>
+                    }
+                    else if (State.User.IsLoading)
+                    {
+                        <div class="d-flex align-items-center py-3">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span>Loading user profile...</span>
+                        </div>
+                    }
+                    else if (State.User.HasError)
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <h6 class="alert-heading">
+                                <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                                </svg>
+                                Error Loading Profile
+                            </h6>
+                            <p class="mb-0">@State.User.Error</p>
+                        </div>
+                    }
+                    else if (State.User.HasData)
+                    {
+                        <div class="user-profile">
+                            <div class="d-flex align-items-center mb-3">
+                                <svg width="48" height="48" fill="currentColor" viewBox="0 0 16 16" class="me-3">
+                                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                                </svg>
+                                <div>
+                                    <h5 class="mb-0">@State.User.Data!.Name</h5>
+                                    <small class="text-muted">ID: @State.User.Data.Id</small>
+                                </div>
+                            </div>
+                            <p class="mb-0">
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
+                                </svg>
+                                <strong>Email:</strong> @State.User.Data.Email
+                            </p>
+                        </div>
+                    }
+
+                    <div class="mt-3">
+                        <button class="btn btn-primary" @onclick="LoadUser" disabled="@State.User.IsLoading">
+                            @if (State.User.IsLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <span>@(State.User.IsLoading ? "Loading..." : "Load User")</span>
+                        </button>
+                        <button class="btn btn-warning ms-2" @onclick="LoadUserWithError" disabled="@State.User.IsLoading">
+                            Simulate Error
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save User Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                        </svg>
+                        Save User Changes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (State.IsSaving)
+                    {
+                        <div class="d-flex align-items-center py-2">
+                            <div class="spinner-border spinner-border-sm text-success me-2" role="status">
+                                <span class="visually-hidden">Saving...</span>
+                            </div>
+                            <span>Saving changes...</span>
+                        </div>
+                    }
+                    else if (State.SaveSuccess)
+                    {
+                        <div class="alert alert-success mb-0">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                            </svg>
+                            Changes saved successfully!
+                        </div>
+                    }
+                    else if (State.SaveError != null)
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <strong>Error:</strong> @State.SaveError
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">Click "Save Changes" to persist user data</p>
+                    }
+
+                    <div class="mt-3">
+                        <button class="btn btn-success" @onclick="SaveUser" disabled="@(State.IsSaving || !State.User.HasData)">
+                            @if (State.IsSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <span>@(State.IsSaving ? "Saving..." : "Save Changes")</span>
+                        </button>
+                        <button class="btn btn-outline-danger ms-2" @onclick="SaveUserWithError" disabled="@(State.IsSaving || !State.User.HasData)">
+                            Save (Simulate Error)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete User Section -->
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                        Delete User
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (State.IsDeleting)
+                    {
+                        <div class="d-flex align-items-center py-2">
+                            <div class="spinner-border spinner-border-sm text-danger me-2" role="status">
+                                <span class="visually-hidden">Deleting...</span>
+                            </div>
+                            <span>Deleting user...</span>
+                        </div>
+                    }
+                    else if (State.DeleteSuccess)
+                    {
+                        <div class="alert alert-info mb-0">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+                            </svg>
+                            User deleted successfully.
+                            <button class="btn btn-link p-0 ms-2" @onclick="Reset">Reset Demo</button>
+                        </div>
+                    }
+                    else if (State.DeleteError != null)
+                    {
+                        <div class="alert alert-danger mb-0">
+                            <strong>Error:</strong> @State.DeleteError
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">Permanently remove the user account</p>
+                    }
+
+                    <div class="mt-3">
+                        <button class="btn btn-danger" @onclick="DeleteUser" disabled="@(State.IsDeleting || !State.User.HasData)">
+                            @if (State.IsDeleting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <span>@(State.IsDeleting ? "Deleting..." : "Delete User")</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Code Example -->
+            <div class="card mb-3">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Code Example</h5>
+                </div>
+                <div class="card-body p-0">
+                    <pre class="mb-0 p-3" style="font-size: 0.85rem; background: #f5f5f5;"><code>async Task LoadUser()
+{
+  await ExecuteAsync(
+    () => UserService.GetUserAsync(1),
+    loading: s => s with {
+      User = s.User.ToLoading()
+    },
+    success: (s, user) => s with {
+      User = AsyncData.Success(user)
+    },
+    error: (s, ex) => s with {
+      User = AsyncData.Failure(ex.Message)
+    }
+  );
+}</code></pre>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">
+                        <strong>ExecuteAsync</strong> provides automatic loading, success, and error handling with a clean, declarative syntax.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Benefits -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Benefits</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0" style="font-size: 0.9rem;">
+                        <li><strong>Automatic error handling</strong> - No try-catch needed</li>
+                        <li><strong>Loading state management</strong> - Set automatically</li>
+                        <li><strong>Consistent pattern</strong> - Same across all operations</li>
+                        <li><strong>Type-safe</strong> - Full compiler support</li>
+                        <li><strong>DevTools integration</strong> - Action names tracked</li>
+                        <li><strong>Async/await</strong> - Proper async flow</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    async Task LoadUser()
+    {
+        await ExecuteAsync(
+            async () =>
+            {
+                await Task.Delay(1000);  // Simulate API call
+                return new User(1, "John Doe", "john.doe@example.com");
+            },
+            loading: s => s with { User = s.User.ToLoading(), SaveSuccess = false, SaveError = null },
+            success: (s, user) => s with { User = AsyncData<User>.Success(user) },
+            error: (s, ex) => s with { User = AsyncData<User>.Failure(ex.Message) }
+        );
+    }
+
+    async Task LoadUserWithError()
+    {
+        await ExecuteAsync(
+            async () =>
+            {
+                await Task.Delay(1000);
+                throw new Exception("Failed to fetch user from API. Server returned 500 Internal Server Error.");
+#pragma warning disable CS0162 // Unreachable code detected
+                return new User(0, "", "");  // Never reached
+#pragma warning restore CS0162
+            },
+            loading: s => s with { User = s.User.ToLoading() },
+            success: (s, user) => s with { User = AsyncData<User>.Success(user) },
+            error: (s, ex) => s with { User = AsyncData<User>.Failure(ex.Message) }
+        );
+    }
+
+    async Task SaveUser()
+    {
+        await ExecuteAsync(
+            async () =>
+            {
+                await Task.Delay(1500);  // Simulate save operation
+            },
+            loading: s => s with { IsSaving = true, SaveSuccess = false, SaveError = null },
+            success: s => s with { IsSaving = false, SaveSuccess = true },
+            error: (s, ex) => s with { IsSaving = false, SaveError = ex.Message }
+        );
+    }
+
+    async Task SaveUserWithError()
+    {
+        await ExecuteAsync(
+            async () =>
+            {
+                await Task.Delay(1000);
+                throw new Exception("Failed to save user data. Validation failed: Email already exists.");
+            },
+            loading: s => s with { IsSaving = true, SaveSuccess = false, SaveError = null },
+            success: s => s with { IsSaving = false, SaveSuccess = true },
+            error: (s, ex) => s with { IsSaving = false, SaveError = ex.Message }
+        );
+    }
+
+    async Task DeleteUser()
+    {
+        await ExecuteAsync(
+            async () =>
+            {
+                await Task.Delay(1000);  // Simulate delete operation
+            },
+            loading: s => s with { IsDeleting = true, DeleteSuccess = false, DeleteError = null },
+            success: s => s with { IsDeleting = false, DeleteSuccess = true, User = AsyncData<User>.NotAsked() },
+            error: (s, ex) => s with { IsDeleting = false, DeleteError = ex.Message }
+        );
+    }
+
+    void Reset()
+    {
+        Update(s => new UserManagementState(AsyncData<User>.NotAsked()));
+    }
+}

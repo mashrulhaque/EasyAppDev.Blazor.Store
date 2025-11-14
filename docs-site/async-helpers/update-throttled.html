@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UpdateThrottled - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Throttled state updates">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="../" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="../" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="../getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="../core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="../state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="../components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="../performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="../async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="../async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="../async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="../devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="../persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="../middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="../best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="../migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="../examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="../api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>UpdateThrottled</h1>
+            <p class="lead">
+              Throttle high-frequency state updates to improve performance and prevent overwhelming your UI with rapid changes.
+            </p>
+
+            <!-- Overview -->
+            <section class="section">
+              <h2>What is UpdateThrottled?</h2>
+              <p>
+                <code>UpdateThrottled</code> limits how frequently state updates can occur. Instead of processing every single event
+                (like mouse movements or scroll events), it ensures updates happen at most once per specified interval.
+              </p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Code Reduction: 95%</div>
+                <p>
+                  From 22 lines of manual throttle logic down to 1 line. No timers, no state tracking, no cleanup.
+                </p>
+              </div>
+
+              <h3>Throttle vs Debounce</h3>
+              <div class="comparison-grid">
+                <div class="comparison-card">
+                  <h4>UpdateThrottled</h4>
+                  <ul>
+                    <li><strong>When it updates:</strong> Immediately, then at most once per interval</li>
+                    <li><strong>Behavior:</strong> Guarantees regular updates during activity</li>
+                    <li><strong>Use for:</strong> Mouse tracking, scroll events, resize handlers</li>
+                    <li><strong>Example:</strong> Update position every 100ms while mouse is moving</li>
+                  </ul>
+                </div>
+
+                <div class="comparison-card">
+                  <h4>UpdateDebounced</h4>
+                  <ul>
+                    <li><strong>When it updates:</strong> After activity stops for specified delay</li>
+                    <li><strong>Behavior:</strong> Waits for pause before updating</li>
+                    <li><strong>Use for:</strong> Search input, form validation, auto-save</li>
+                    <li><strong>Example:</strong> Search 300ms after user stops typing</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <!-- Before/After -->
+            <section class="section">
+              <h2>Before & After</h2>
+
+              <h3>Before: Manual Throttle Logic (22 lines)</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">private DateTime? _lastUpdate;
+private readonly TimeSpan _throttleInterval = TimeSpan.FromMilliseconds(100);
+private object _lock = new object();
+
+void OnMouseMove(MouseEventArgs e)
+{
+    lock (_lock)
+    {
+        var now = DateTime.UtcNow;
+
+        if (_lastUpdate.HasValue)
+        {
+            var elapsed = now - _lastUpdate.Value;
+            if (elapsed < _throttleInterval)
+            {
+                return; // Ignore this update
+            }
+        }
+
+        _lastUpdate = now;
+        await Update(s => s.SetPosition(e.ClientX, e.ClientY));
+    }
+}</code></pre>
+              </div>
+
+              <h3>After: UpdateThrottled (1 line)</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">&lt;div @onmousemove="@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))"&gt;
+    Mouse tracker
+&lt;/div&gt;</code></pre>
+              </div>
+            </section>
+
+            <!-- Mouse Tracking Example -->
+            <section class="section">
+              <h2>Example: Mouse Position Tracking</h2>
+              <p>
+                Track mouse position without overwhelming your UI with updates on every pixel movement.
+              </p>
+
+              <div class="code-block">
+                <div class="code-block-title">State.cs</div>
+                <pre><code class="language-csharp">public record MouseState(int X, int Y)
+{
+    public static MouseState Initial => new(0, 0);
+
+    public MouseState SetPosition(int x, int y) =>
+        this with { X = x, Y = y };
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">MouseTracker.razor</div>
+                <pre><code class="language-csharp">@page "/mouse"
+@inherits StoreComponent&lt;MouseState&gt;
+
+&lt;div class="tracker-container"
+     @onmousemove="@(e => UpdateThrottled(s => s.SetPosition((int)e.ClientX, (int)e.ClientY), 100))"&gt;
+    &lt;h2&gt;Mouse Position&lt;/h2&gt;
+    &lt;p&gt;X: @State.X&lt;/p&gt;
+    &lt;p&gt;Y: @State.Y&lt;/p&gt;
+    &lt;p class="hint"&gt;Move your mouse around (updates max 10x/second)&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;style&gt;
+    .tracker-container {
+        height: 400px;
+        border: 2px solid #ccc;
+        padding: 20px;
+    }
+&lt;/style&gt;</code></pre>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Performance Impact</div>
+                <p>
+                  Without throttling: ~1000 updates/second (browser maximum)<br>
+                  With 100ms throttle: ~10 updates/second<br>
+                  <strong>Result:</strong> 99% reduction in updates, smooth UX maintained
+                </p>
+              </div>
+            </section>
+
+            <!-- Scroll Event Example -->
+            <section class="section">
+              <h2>Example: Scroll Position Tracking</h2>
+              <p>
+                Track scroll position efficiently without processing every single scroll event.
+              </p>
+
+              <div class="code-block">
+                <div class="code-block-title">State.cs</div>
+                <pre><code class="language-csharp">public record ScrollState(int ScrollTop, bool ShowBackToTop)
+{
+    public static ScrollState Initial => new(0, false);
+
+    public ScrollState UpdateScroll(int scrollTop) =>
+        this with {
+            ScrollTop = scrollTop,
+            ShowBackToTop = scrollTop > 300
+        };
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">ScrollTracker.razor</div>
+                <pre><code class="language-csharp">@page "/scroll"
+@inherits StoreComponent&lt;ScrollState&gt;
+
+&lt;div class="content"
+     @onscroll="@(e => UpdateThrottled(s => s.UpdateScroll(GetScrollTop(e)), 100))"&gt;
+    &lt;!-- Long content here --&gt;
+&lt;/div&gt;
+
+@if (State.ShowBackToTop)
+{
+    &lt;button class="back-to-top" @onclick="ScrollToTop"&gt;
+        ↑ Back to Top
+    &lt;/button&gt;
+}
+
+@code {
+    int GetScrollTop(EventArgs e)
+    {
+        // Get scroll position from element
+        return State.ScrollTop; // Simplified
+    }
+
+    void ScrollToTop()
+    {
+        // Scroll logic here
+    }
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Common Use Cases -->
+            <section class="section">
+              <h2>Common Use Cases</h2>
+
+              <div class="use-case-grid">
+                <div class="use-case-card">
+                  <h3>Mouse/Touch Tracking</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">@onmousemove="@(e => UpdateThrottled(
+    s => s.SetPosition(e.ClientX, e.ClientY),
+    100))"</code></pre>
+                  </div>
+                  <p>Update position max 10 times/second</p>
+                </div>
+
+                <div class="use-case-card">
+                  <h3>Scroll Events</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">@onscroll="@(e => UpdateThrottled(
+    s => s.UpdateScroll(),
+    100))"</code></pre>
+                  </div>
+                  <p>Track scroll without performance hit</p>
+                </div>
+
+                <div class="use-case-card">
+                  <h3>Window Resize</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">@onresize="@(e => UpdateThrottled(
+    s => s.SetDimensions(e.Width, e.Height),
+    200))"</code></pre>
+                  </div>
+                  <p>Update layout max 5 times/second</p>
+                </div>
+
+                <div class="use-case-card">
+                  <h3>Live Data Updates</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">void OnDataReceived(Data data)
+{
+    UpdateThrottled(s => s.AddData(data), 500);
+}</code></pre>
+                  </div>
+                  <p>Limit UI updates from real-time streams</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <div class="code-block">
+                <div class="code-block-title">Method Signature</div>
+                <pre><code class="language-csharp">protected Task UpdateThrottled(
+    Func&lt;TState, TState&gt; updater,
+    int intervalMs,
+    string? action = null)</code></pre>
+              </div>
+
+              <div class="param-table">
+                <h3>Parameters</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Parameter</th>
+                      <th>Type</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>updater</code></td>
+                      <td><code>Func&lt;TState, TState&gt;</code></td>
+                      <td>State transformation function</td>
+                    </tr>
+                    <tr>
+                      <td><code>intervalMs</code></td>
+                      <td><code>int</code></td>
+                      <td>Minimum milliseconds between updates</td>
+                    </tr>
+                    <tr>
+                      <td><code>action</code></td>
+                      <td><code>string?</code></td>
+                      <td>Optional action name for DevTools/logging</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Important Notes</div>
+                <ul>
+                  <li>First call executes immediately</li>
+                  <li>Subsequent calls are throttled to the interval</li>
+                  <li>Each instance tracks its own throttle state</li>
+                  <li>Interval resets after quiet period</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <div class="best-practices-grid">
+                <div class="practice do">
+                  <h3>✅ Do</h3>
+                  <ul>
+                    <li>Use for high-frequency events (mouse, scroll, resize)</li>
+                    <li>Choose interval based on human perception (~100ms is good)</li>
+                    <li>Use for real-time data streams with frequent updates</li>
+                    <li>Combine with selectors for optimal performance</li>
+                  </ul>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// ✅ Good: Reasonable interval
+UpdateThrottled(s => s.Track(x, y), 100)
+
+// ✅ Good: Named action for debugging
+UpdateThrottled(s => s.Update(), 100, "SCROLL")</code></pre>
+                  </div>
+                </div>
+
+                <div class="practice dont">
+                  <h3>❌ Don't</h3>
+                  <ul>
+                    <li>Don't use for user input that needs immediate feedback</li>
+                    <li>Don't set interval too low (defeats the purpose)</li>
+                    <li>Don't use for infrequent events (button clicks)</li>
+                    <li>Don't confuse with debounce (different use cases)</li>
+                  </ul>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// ❌ Bad: Button click doesn't need throttle
+@onclick="@(() => UpdateThrottled(s => s.Click(), 100))"
+
+// ❌ Bad: Interval too low
+UpdateThrottled(s => s.Update(), 10) // Almost no throttling
+
+// ❌ Bad: Use debounce for search instead
+&lt;input @oninput="@(e => UpdateThrottled(...))" /&gt;</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Choosing the Right Interval -->
+            <section class="section">
+              <h2>Choosing the Right Interval</h2>
+
+              <div class="interval-guide">
+                <div class="interval-card">
+                  <h3>16-33ms (30-60 FPS)</h3>
+                  <p><strong>Use for:</strong> Smooth animations, game-like interactions</p>
+                  <p><strong>Examples:</strong> Canvas drawing, drag-and-drop with visual feedback</p>
+                </div>
+
+                <div class="interval-card">
+                  <h3>100ms (10 FPS)</h3>
+                  <p><strong>Use for:</strong> Mouse tracking, scroll position, live dashboards</p>
+                  <p><strong>Examples:</strong> Cursor followers, scroll progress indicators</p>
+                </div>
+
+                <div class="interval-card">
+                  <h3>200-500ms (2-5 FPS)</h3>
+                  <p><strong>Use for:</strong> Window resize, data polling, analytics</p>
+                  <p><strong>Examples:</strong> Responsive layouts, chart updates, metrics collection</p>
+                </div>
+
+                <div class="interval-card">
+                  <h3>1000ms+ (1 FPS or less)</h3>
+                  <p><strong>Use for:</strong> Background updates, heartbeat checks</p>
+                  <p><strong>Examples:</strong> Status polling, keep-alive pings</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Registration -->
+            <section class="section">
+              <h2>Setup</h2>
+              <p>
+                <code>UpdateThrottled</code> is part of the utility services. Make sure you register them:
+              </p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// Option 1: All-in-one registration (recommended)
+builder.Services.AddStoreWithUtilities(
+    new MouseState(),
+    (store, sp) => store.WithDefaults(sp, "Mouse"));
+
+// Option 2: Manual registration
+builder.Services.AddStoreUtilities();  // Includes throttle manager
+builder.Services.AddStore(
+    new MouseState(),
+    (store, sp) => store.WithDefaults(sp, "Mouse"));</code></pre>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps">
+                <a href="update-debounced.html" class="next-step-card">
+                  <span class="next-step-icon">⏱️</span>
+                  <div>
+                    <h3>UpdateDebounced</h3>
+                    <p>For search input and form validation</p>
+                  </div>
+                </a>
+                <a href="lazy-load.html" class="next-step-card">
+                  <span class="next-step-icon">📥</span>
+                  <div>
+                    <h3>LazyLoad</h3>
+                    <p>Automatic caching with request deduplication</p>
+                  </div>
+                </a>
+                <a href="../performance.html" class="next-step-card">
+                  <span class="next-step-icon">📈</span>
+                  <div>
+                    <h3>Performance Optimization</h3>
+                    <p>Learn about selectors and other optimizations</p>
+                  </div>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

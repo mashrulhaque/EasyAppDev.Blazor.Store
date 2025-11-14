@@ -1,0 +1,57 @@
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits SelectorStoreComponent<ThemeState>
+
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input"
+           type="checkbox"
+           id="animations"
+           checked="@SelectedSettings.Animations"
+           @onchange="@(() => Update(s => s.ToggleAnimations()))" />
+    <label class="form-check-label" for="animations">
+        Enable Animations
+    </label>
+</div>
+
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input"
+           type="checkbox"
+           id="reducedMotion"
+           checked="@SelectedSettings.ReducedMotion"
+           @onchange="@(() => Update(s => s.ToggleReducedMotion()))" />
+    <label class="form-check-label" for="reducedMotion">
+        Reduced Motion
+    </label>
+</div>
+
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input"
+           type="checkbox"
+           id="highContrast"
+           checked="@SelectedSettings.HighContrast"
+           @onchange="@(() => Update(s => s.ToggleHighContrast()))" />
+    <label class="form-check-label" for="highContrast">
+        High Contrast Mode
+    </label>
+</div>
+
+<small class="text-muted d-block mt-2">
+    Component renders: @_renderCount (only on accessibility changes)
+</small>
+
+@code {
+    private int _renderCount = 0;
+
+    // Custom selector type for multiple accessibility properties
+    public record AccessibilitySettings(bool Animations, bool ReducedMotion, bool HighContrast);
+
+    private AccessibilitySettings SelectedSettings => (AccessibilitySettings)SelectState(Store.GetState());
+
+    protected override object SelectState(ThemeState state)
+        => new AccessibilitySettings(state.Animations, state.ReducedMotion, state.HighContrast);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}

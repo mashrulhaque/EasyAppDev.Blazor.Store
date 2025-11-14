@@ -1,0 +1,45 @@
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<ThemeState>
+
+<div class="@State.ThemeClass p-4 rounded" style="@State.FontSizeStyle">
+    <h5>Theme Preview</h5>
+    <p>This is how your content will look with the current settings.</p>
+    <p class="mb-0">
+        <strong>Current theme:</strong> @State.CurrentTheme<br />
+        <strong>Font size:</strong> @State.FontSize px<br />
+        <strong>Animations:</strong> @(State.AnimationsDisabled ? "Disabled" : "Enabled")
+    </p>
+</div>
+<small class="text-muted d-block mt-2">
+    Component renders: @_renderCount
+</small>
+
+<style>
+    .theme-light {
+        background-color: #ffffff;
+        color: #000000;
+        border: 2px solid #dee2e6;
+    }
+
+    .theme-dark {
+        background-color: #212529;
+        color: #ffffff;
+        border: 2px solid #495057;
+    }
+
+    .theme-auto {
+        background: linear-gradient(135deg, #ffffff 0%, #ffffff 50%, #212529 50%, #212529 100%);
+        color: #000000;
+        border: 2px solid #6c757d;
+    }
+</style>
+
+@code {
+    private int _renderCount = 0;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}

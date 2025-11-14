@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UpdateDebounced - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Debounced state updates">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="../" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="../" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="../getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="../core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="../state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="../components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="../performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="../async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="../async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="../async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="../devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="../persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="../middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="../best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="../migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="../examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="../api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>UpdateDebounced</h1>
+            <p class="hero-description">
+              Eliminate timer boilerplate with debounced state updates. Perfect for search inputs, form fields, and any user input that should only trigger updates after the user stops typing.
+            </p>
+
+            <!-- What is UpdateDebounced -->
+            <section class="section">
+              <h2>What is Debouncing?</h2>
+              <p>
+                Debouncing delays the execution of a function until after a specified time has passed since the last invocation.
+                This is essential for performance when handling high-frequency events like typing, where you only want to update
+                state after the user has finished their input.
+              </p>
+              <div class="alert alert-info">
+                <div class="alert-title">How It Works</div>
+                <p>
+                  When you call <code>UpdateDebounced</code>, it starts a timer. If called again before the timer expires,
+                  the timer resets. Only when the timer completes without interruption does the state update execute.
+                </p>
+              </div>
+            </section>
+
+            <!-- Code Reduction Stats -->
+            <section class="section">
+              <h2>Code Reduction: 94%</h2>
+              <p>
+                <code>UpdateDebounced</code> eliminates the manual timer management pattern that typically requires 17+ lines of boilerplate code.
+              </p>
+              <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                <div class="feature-card">
+                  <div class="feature-icon">📉</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Before</h3>
+                  <p style="margin: 0;">17 lines of timer management</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">✨</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">After</h3>
+                  <p style="margin: 0;">1 line with UpdateDebounced</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🎯</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Reduction</h3>
+                  <p style="margin: 0;"><strong>94% less code</strong></p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Before/After Comparison -->
+            <section class="section">
+              <h2>Before & After Comparison</h2>
+              <p>See how <code>UpdateDebounced</code> simplifies timer management:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">❌ Before: Manual Timer Management (17 lines)</div>
+                <pre><code class="language-csharp">@page "/search"
+@inherits StoreComponent&lt;SearchState&gt;
+@implements IDisposable
+
+&lt;input @oninput="OnInput" placeholder="Search..." /&gt;
+
+@code {
+    private System.Timers.Timer? _debounceTimer;
+
+    void OnInput(ChangeEventArgs e)
+    {
+        // Stop existing timer
+        _debounceTimer?.Stop();
+        _debounceTimer?.Dispose();
+
+        // Create new timer
+        _debounceTimer = new System.Timers.Timer(300);
+        _debounceTimer.Elapsed += async (sender, args) =>
+        {
+            await Update(s => s.SetQuery(e.Value?.ToString() ?? ""));
+            _debounceTimer?.Dispose();
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    public void Dispose() => _debounceTimer?.Dispose();
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">✅ After: UpdateDebounced (1 line)</div>
+                <pre><code class="language-csharp">@page "/search"
+@inherits StoreComponent&lt;SearchState&gt;
+
+&lt;input @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"
+       placeholder="Search..." /&gt;</code></pre>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">No Manual Cleanup Required</div>
+                <p>
+                  <code>UpdateDebounced</code> automatically handles timer creation, cancellation, and disposal.
+                  No need to implement <code>IDisposable</code> or manage timer lifecycle.
+                </p>
+              </div>
+            </section>
+
+            <!-- Search Input Example -->
+            <section class="section">
+              <h2>Complete Search Example</h2>
+              <p>A real-world search implementation with debounced input and API calls:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define Search State</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">SearchState.cs</div>
+                    <pre><code class="language-csharp">public record SearchState(
+    string Query,
+    AsyncData&lt;List&lt;Product&gt;&gt; Results)
+{
+    public static SearchState Initial =>
+        new("", AsyncData&lt;List&lt;Product&gt;&gt;.NotAsked());
+
+    public SearchState SetQuery(string query) =>
+        this with { Query = query };
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Implement Search Component</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">ProductSearch.razor</div>
+                    <pre><code class="language-csharp">@page "/products/search"
+@inherits StoreComponent&lt;SearchState&gt;
+@inject IProductService ProductService
+
+&lt;div class="search-box"&gt;
+    &lt;input @oninput="@(e => HandleSearchInput(e.Value?.ToString() ?? ""))"
+           value="@State.Query"
+           placeholder="Search products..." /&gt;
+&lt;/div&gt;
+
+@if (State.Results.IsLoading)
+{
+    &lt;p&gt;Searching...&lt;/p&gt;
+}
+else if (State.Results.HasData)
+{
+    @foreach (var product in State.Results.Data)
+    {
+        &lt;div class="product-card"&gt;
+            &lt;h3&gt;@product.Name&lt;/h3&gt;
+            &lt;p&gt;@product.Price.ToString("C")&lt;/p&gt;
+        &lt;/div&gt;
+    }
+}
+
+@code {
+    async Task HandleSearchInput(string query)
+    {
+        // Update query immediately (no debounce for UI feedback)
+        await Update(s => s.SetQuery(query));
+
+        // Debounce the actual search API call
+        await UpdateDebounced(async s =>
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return s with { Results = AsyncData&lt;List&lt;Product&gt;&gt;.NotAsked() };
+
+            var results = await ProductService.SearchAsync(query);
+            return s with { Results = AsyncData&lt;List&lt;Product&gt;&gt;.Success(results) };
+        }, 300);
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Common Use Cases -->
+            <section class="section">
+              <h2>Common Use Cases</h2>
+              <p>Where <code>UpdateDebounced</code> shines:</p>
+
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">🔍</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Search Input</h3>
+                  <p style="margin: 0;">Wait for user to finish typing before searching</p>
+                  <div class="code-block" style="margin-top: 0.5rem;">
+                    <pre><code class="language-csharp" style="font-size: 0.85rem;">@oninput="@(e =>
+  UpdateDebounced(
+    s => s.SetQuery(e.Value?.ToString() ?? ""),
+    300))"</code></pre>
+                  </div>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">📝</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Form Auto-Save</h3>
+                  <p style="margin: 0;">Auto-save form data after user stops editing</p>
+                  <div class="code-block" style="margin-top: 0.5rem;">
+                    <pre><code class="language-csharp" style="font-size: 0.85rem;">@oninput="@(e =>
+  UpdateDebounced(
+    s => s.UpdateField(field, e.Value),
+    1000))"</code></pre>
+                  </div>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🎨</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Live Preview</h3>
+                  <p style="margin: 0;">Update preview when user pauses typing</p>
+                  <div class="code-block" style="margin-top: 0.5rem;">
+                    <pre><code class="language-csharp" style="font-size: 0.85rem;">@oninput="@(e =>
+  UpdateDebounced(
+    s => s.SetMarkdown(e.Value),
+    500))"</code></pre>
+                  </div>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🔢</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">Input Validation</h3>
+                  <p style="margin: 0;">Validate expensive operations after input stabilizes</p>
+                  <div class="code-block" style="margin-top: 0.5rem;">
+                    <pre><code class="language-csharp" style="font-size: 0.85rem;">@oninput="@(e =>
+  UpdateDebounced(
+    async s => await s.ValidateAsync(e.Value),
+    400))"</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <div class="code-block">
+                <div class="code-block-title">Method Signature</div>
+                <pre><code class="language-csharp">protected Task UpdateDebounced(
+    Func&lt;TState, TState&gt; updater,
+    int delayMs,
+    string? action = null)</code></pre>
+              </div>
+
+              <h3 style="margin-top: 1.5rem;">Parameters</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+                <thead>
+                  <tr style="background-color: var(--code-bg); border-bottom: 2px solid var(--border-color);">
+                    <th style="padding: 0.75rem; text-align: left;">Parameter</th>
+                    <th style="padding: 0.75rem; text-align: left;">Type</th>
+                    <th style="padding: 0.75rem; text-align: left;">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code>updater</code></td>
+                    <td style="padding: 0.75rem;"><code>Func&lt;TState, TState&gt;</code></td>
+                    <td style="padding: 0.75rem;">Pure function that transforms current state to new state</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code>delayMs</code></td>
+                    <td style="padding: 0.75rem;"><code>int</code></td>
+                    <td style="padding: 0.75rem;">Delay in milliseconds before executing update (typical: 200-500ms)</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code>action</code></td>
+                    <td style="padding: 0.75rem;"><code>string?</code></td>
+                    <td style="padding: 0.75rem;">Optional action name for DevTools/logging (defaults to "DEBOUNCED_UPDATE")</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="alert alert-info" style="margin-top: 1.5rem;">
+                <div class="alert-title">Async Updater Support</div>
+                <p>
+                  <code>UpdateDebounced</code> also supports async updater functions:
+                </p>
+                <div class="code-block" style="margin-top: 0.5rem;">
+                  <pre><code class="language-csharp">await UpdateDebounced(
+    async s => await s.ValidateAndUpdateAsync(value),
+    300,
+    "VALIDATE_INPUT");</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <h3>✅ Do</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// ✅ Use appropriate delays (200-500ms for search, 1000ms+ for auto-save)
+await UpdateDebounced(s => s.SetQuery(query), 300);
+
+// ✅ Combine with immediate updates for responsive UI
+await Update(s => s.SetQuery(query));  // Immediate UI feedback
+await UpdateDebounced(async s => await s.PerformSearch(), 300);  // Debounced API call
+
+// ✅ Use descriptive action names for debugging
+await UpdateDebounced(s => s.SetFilter(value), 400, "FILTER_PRODUCTS");
+
+// ✅ Handle empty/invalid input before debouncing
+if (string.IsNullOrWhiteSpace(query))
+{
+    await Update(s => s.ClearResults());
+    return;
+}
+await UpdateDebounced(s => s.Search(query), 300);</code></pre>
+              </div>
+
+              <h3 style="margin-top: 1.5rem;">❌ Don't</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// ❌ Don't use very short delays (defeats the purpose)
+await UpdateDebounced(s => s.Update(), 10);  // Too short!
+
+// ❌ Don't use for critical immediate updates
+await UpdateDebounced(s => s.SubmitForm(), 300);  // Use Update() instead!
+
+// ❌ Don't debounce state that needs instant feedback
+await UpdateDebounced(s => s.ToggleCheckbox(), 200);  // Should be immediate
+
+// ❌ Don't use excessively long delays
+await UpdateDebounced(s => s.SetQuery(q), 5000);  // Too long, poor UX</code></pre>
+              </div>
+
+              <div class="alert alert-warning" style="margin-top: 1rem;">
+                <div class="alert-title">Delay Guidelines</div>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li><strong>Search/Filter:</strong> 200-400ms (responsive feel)</li>
+                  <li><strong>Form validation:</strong> 300-500ms (not too eager)</li>
+                  <li><strong>Auto-save:</strong> 1000-2000ms (reduce API calls)</li>
+                  <li><strong>Preview/Live updates:</strong> 300-700ms (balance performance and responsiveness)</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <p>Explore other async helpers to further reduce boilerplate:</p>
+
+              <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                <a href="./update-throttled.html" class="feature-card" style="text-decoration: none; color: inherit;">
+                  <div class="feature-icon">💧</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">UpdateThrottled</h3>
+                  <p style="margin: 0;">Limit update frequency for high-frequency events like scroll or resize</p>
+                </a>
+
+                <a href="./async-data.html" class="feature-card" style="text-decoration: none; color: inherit;">
+                  <div class="feature-icon">🔄</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">AsyncData&lt;T&gt;</h3>
+                  <p style="margin: 0;">Eliminate loading/error state boilerplate (95% reduction)</p>
+                </a>
+
+                <a href="./execute-async.html" class="feature-card" style="text-decoration: none; color: inherit;">
+                  <div class="feature-icon">⚡</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">ExecuteAsync</h3>
+                  <p style="margin: 0;">Automatic try-catch error handling for async operations</p>
+                </a>
+
+                <a href="./lazy-load.html" class="feature-card" style="text-decoration: none; color: inherit;">
+                  <div class="feature-icon">📥</div>
+                  <h3 style="font-size: 1.1rem; margin: 0.5rem 0;">LazyLoad</h3>
+                  <p style="margin: 0;">Automatic caching with request deduplication</p>
+                </a>
+              </div>
+
+              <div style="margin-top: 2rem; padding: 1.5rem; background: var(--code-bg); border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                <p style="margin: 0;"><strong>📚 Learn More:</strong></p>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li><a href="./index.html" style="color: var(--primary-color);">Async Helpers Overview</a> - Complete guide to all helpers</li>
+                  <li><a href="../best-practices.html" style="color: var(--primary-color);">Best Practices</a> - Patterns and anti-patterns</li>
+                  <li><a href="../examples.html" style="color: var(--primary-color);">Examples</a> - Real-world implementations</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examples - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Real-world examples and patterns">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link active"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Real-World Examples</h1>
+            <p>Complete examples demonstrating common patterns and use cases with EasyAppDev.Blazor.Store.</p>
+
+            <!-- Todo List with Persistence -->
+            <section class="section">
+              <h2>Todo List with Persistence</h2>
+              <p>A complete todo application with LocalStorage persistence, demonstrating immutable list operations and automatic state saving.</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define State</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">TodoState.cs</div>
+                    <pre><code class="language-csharp">public record Todo(Guid Id, string Text, bool Completed);
+
+public record TodoState(ImmutableList&lt;Todo&gt; Todos)
+{
+    public static TodoState Initial => new(ImmutableList&lt;Todo&gt;.Empty);
+
+    public TodoState AddTodo(string text) =>
+        this with { Todos = Todos.Add(new Todo(Guid.NewGuid(), text, false)) };
+
+    public TodoState ToggleTodo(Guid id) =>
+        this with {
+            Todos = Todos.Select(t => t.Id == id ? t with { Completed = !t.Completed } : t)
+                .ToImmutableList()
+        };
+
+    public TodoState RemoveTodo(Guid id) =>
+        this with { Todos = Todos.RemoveAll(t => t.Id == id) };
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Register Store</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">Program.cs</div>
+                    <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    TodoState.Initial,
+    (store, sp) => store
+        .WithDefaults(sp, "Todos")
+        .WithPersistence(sp, "todos"));  // Auto-save to LocalStorage</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Create Component</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">TodoList.razor</div>
+                    <pre><code class="language-csharp">@page "/todos"
+@inherits StoreComponent&lt;TodoState&gt;
+
+&lt;input @bind="newTodo" @onkeyup="HandleKeyUp" placeholder="What needs to be done?" /&gt;
+
+@foreach (var todo in State.Todos)
+{
+    &lt;div&gt;
+        &lt;input type="checkbox"
+               checked="@todo.Completed"
+               @onchange="@(() => Update(s => s.ToggleTodo(todo.Id)))" /&gt;
+        &lt;span class="@(todo.Completed ? "completed" : "")"&gt;@todo.Text&lt;/span&gt;
+        &lt;button @onclick="@(() => Update(s => s.RemoveTodo(todo.Id)))"&gt;🗑️&lt;/button&gt;
+    &lt;/div&gt;
+}
+
+@code {
+    string newTodo = "";
+
+    async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newTodo))
+        {
+            await Update(s => s.AddTodo(newTodo));
+            newTodo = "";
+        }
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Key Features</div>
+                <ul>
+                  <li><strong>Immutable Collections:</strong> Uses <code>ImmutableList&lt;T&gt;</code> for safe list operations</li>
+                  <li><strong>Persistence:</strong> Automatically saves to LocalStorage with <code>WithPersistence()</code></li>
+                  <li><strong>Pure Functions:</strong> All state methods return new state instances</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Authentication with Async Helpers -->
+            <section class="section">
+              <h2>Authentication with Async Helpers</h2>
+              <p>Complete authentication flow using <code>AsyncData&lt;T&gt;</code> and <code>ExecuteAsync</code> for automatic loading/error state management.</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define State</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">AuthState.cs</div>
+                    <pre><code class="language-csharp">public record User(string Id, string Name, string Email);
+
+public record AuthState(AsyncData&lt;User&gt; CurrentUser)
+{
+    public static AuthState Initial => new(AsyncData&lt;User&gt;.NotAsked());
+    public bool IsAuthenticated => CurrentUser.HasData;
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Create Login Component</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">Login.razor</div>
+                    <pre><code class="language-csharp">@page "/login"
+@inherits StoreComponent&lt;AuthState&gt;
+@inject IAuthService AuthService
+
+@if (State.CurrentUser.IsLoading)
+{
+    &lt;p&gt;Logging in...&lt;/p&gt;
+}
+else if (State.IsAuthenticated)
+{
+    &lt;p&gt;Welcome, @State.CurrentUser.Data!.Name!&lt;/p&gt;
+    &lt;button @onclick="Logout"&gt;Logout&lt;/button&gt;
+}
+else
+{
+    &lt;input @bind="email" placeholder="Email" /&gt;
+    &lt;input @bind="password" type="password" /&gt;
+    &lt;button @onclick="Login"&gt;Login&lt;/button&gt;
+
+    @if (State.CurrentUser.HasError)
+    {
+        &lt;p class="error"&gt;@State.CurrentUser.Error&lt;/p&gt;
+    }
+}
+
+@code {
+    string email = "", password = "";
+
+    async Task Login() =>
+        await ExecuteAsync(
+            () => AuthService.LoginAsync(email, password),
+            loading: s => s with { CurrentUser = s.CurrentUser.ToLoading() },
+            success: (s, user) => s with { CurrentUser = AsyncData&lt;User&gt;.Success(user) },
+            error: (s, ex) => s with { CurrentUser = AsyncData&lt;User&gt;.Failure(ex.Message) }
+        );
+
+    async Task Logout() => await Update(s => AuthState.Initial);
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Async Helpers in Action</div>
+                <ul>
+                  <li><strong>AsyncData&lt;T&gt;:</strong> Eliminates 95% of loading/error boilerplate</li>
+                  <li><strong>ExecuteAsync:</strong> Automatic try-catch with state transitions</li>
+                  <li><strong>Type-Safe:</strong> Compile-time checks for all states (NotAsked, Loading, Success, Failure)</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Shopping Cart -->
+            <section class="section">
+              <h2>Shopping Cart</h2>
+              <p>A shopping cart implementation demonstrating computed properties, immutable updates, and complex state transformations.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">CartState.cs</div>
+                <pre><code class="language-csharp">public record Product(string Id, string Name, decimal Price);
+public record CartItem(Product Product, int Quantity);
+
+public record CartState(ImmutableList&lt;CartItem&gt; Items)
+{
+    public decimal Total => Items.Sum(i => i.Product.Price * i.Quantity);
+    public int ItemCount => Items.Sum(i => i.Quantity);
+
+    public CartState AddItem(Product product)
+    {
+        var existing = Items.FirstOrDefault(i => i.Product.Id == product.Id);
+        return existing != null
+            ? this with { Items = Items.Replace(existing, existing with { Quantity = existing.Quantity + 1 }) }
+            : this with { Items = Items.Add(new CartItem(product, 1)) };
+    }
+
+    public CartState UpdateQuantity(string productId, int quantity) =>
+        quantity <= 0 ? RemoveItem(productId)
+        : this with {
+            Items = Items.Select(i =>
+                i.Product.Id == productId ? i with { Quantity = quantity } : i
+            ).ToImmutableList()
+        };
+
+    public CartState RemoveItem(string productId) =>
+        this with { Items = Items.RemoveAll(i => i.Product.Id == productId) };
+}</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Pattern Highlights</div>
+                <ul>
+                  <li><strong>Computed Properties:</strong> <code>Total</code> and <code>ItemCount</code> automatically recalculate</li>
+                  <li><strong>Conditional Logic:</strong> <code>AddItem()</code> handles both new items and quantity updates</li>
+                  <li><strong>Collection Operations:</strong> Safe immutable operations with <code>Replace()</code>, <code>RemoveAll()</code></li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Complete Example with Multiple Features -->
+            <section class="section">
+              <h2>Complete Example: Product Search</h2>
+              <p>Combining multiple async helpers: <code>UpdateDebounced</code>, <code>ExecuteAsync</code>, <code>AsyncData&lt;T&gt;</code>, and <code>LazyLoad</code>.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">ProductSearch.razor</div>
+                <pre><code class="language-csharp">@page "/products"
+@inherits StoreComponent&lt;ProductState&gt;
+
+&lt;!-- 1. Debounced search --&gt;
+&lt;input @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"
+       placeholder="Search..." /&gt;
+
+&lt;!-- 2. Load with ExecuteAsync --&gt;
+&lt;button @onclick="Search"&gt;Search&lt;/button&gt;
+
+&lt;!-- 3. Display with AsyncData --&gt;
+@if (State.Products.IsLoading) { &lt;p&gt;Loading...&lt;/p&gt; }
+@if (State.Products.HasData)
+{
+    @foreach (var product in State.Products.Data)
+    {
+        &lt;div @onclick="@(() => LoadDetails(product.Id))"&gt;@product.Name&lt;/div&gt;
+    }
+}
+
+@code {
+    async Task Search() =>
+        await ExecuteAsync(
+            () => ProductService.SearchAsync(State.Query),
+            loading: s => s with { Products = s.Products.ToLoading() },
+            success: (s, data) => s with { Products = AsyncData.Success(data) }
+        );
+
+    async Task LoadDetails(int id)
+    {
+        // 4. LazyLoad with caching
+        var details = await LazyLoad(
+            $"product-{id}",
+            () => ProductService.GetDetailsAsync(id),
+            TimeSpan.FromMinutes(5));
+
+        await Update(s => s.AddDetails(id, details));
+    }
+}</code></pre>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">74% Code Reduction</div>
+                <p>This example demonstrates how async helpers eliminate boilerplate:</p>
+                <ul>
+                  <li><strong>UpdateDebounced:</strong> No timer management needed (17 lines → 1 line)</li>
+                  <li><strong>AsyncData&lt;T&gt;:</strong> No manual loading/error states (20+ lines → 1 property)</li>
+                  <li><strong>ExecuteAsync:</strong> Automatic error handling (12 lines → 5 lines)</li>
+                  <li><strong>LazyLoad:</strong> Built-in caching + deduplication (15+ lines → 2 lines)</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <h3>✅ Do</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// ✅ Use records for state
+public record AppState(int Count, string Name);
+
+// ✅ Use 'with' expressions
+public AppState Increment() => this with { Count = Count + 1 };
+
+// ✅ Use ImmutableList/ImmutableDictionary
+public record State(ImmutableList&lt;Item&gt; Items);
+
+// ✅ Keep state methods pure (no I/O, no logging)
+public State AddItem(Item item) => this with { Items = Items.Add(item) };
+
+// ✅ Batch updates when possible
+await Update(s => s.SetLoading(true).ClearErrors().ResetForm());</code></pre>
+              </div>
+
+              <h3>❌ Don't</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// ❌ Don't mutate state
+public void Increment() { Count++; }  // Wrong!
+
+// ❌ Don't use mutable collections
+public record State(List&lt;Item&gt; Items);  // Wrong!
+
+// ❌ Don't add side effects to state methods
+public State AddItem(Item item)
+{
+    _logger.Log("Adding");  // Wrong! Side effect!
+    return this with { Items = Items.Add(item) };
+}
+
+// ✅ Do side effects in components instead
+@code {
+    async Task AddItem(Item item)
+    {
+        Logger.LogInformation("Adding item");
+        await Update(s => s.AddItem(item));
+    }
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">⚡</div>
+                  <h3>Async Helpers</h3>
+                  <p>Explore all 5 async helpers for maximum productivity.</p>
+                  <a href="./async-helpers/index.html" class="btn btn-secondary btn-small">Learn More →</a>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">📈</div>
+                  <h3>Performance</h3>
+                  <p>Optimize with selectors for 25x fewer re-renders.</p>
+                  <a href="./performance.html" class="btn btn-secondary btn-small">View Guide →</a>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🛠️</div>
+                  <h3>DevTools</h3>
+                  <p>Debug with Redux DevTools time-travel debugging.</p>
+                  <a href="./devtools.html" class="btn btn-secondary btn-small">Setup DevTools →</a>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

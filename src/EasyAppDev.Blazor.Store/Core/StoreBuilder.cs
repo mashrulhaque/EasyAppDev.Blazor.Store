@@ -1,0 +1,332 @@
+using System.Text.Json;
+using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.DevTools;
+using EasyAppDev.Blazor.Store.Persistence;
+using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
+
+namespace EasyAppDev.Blazor.Store.Core;
+
+/// <summary>
+/// Fluent builder for creating and configuring <see cref="IStore{TState}"/> instances.
+/// </summary>
+public class StoreBuilder<TState> where TState : notnull
+{
+    private readonly TState _initialState;
+    private IEqualityComparer<TState>? _comparer;
+    private readonly List<IMiddleware<TState>> _middlewares = new();
+    private ILogger<MiddlewarePipeline<TState>>? _middlewarePipelineLogger;
+    private ILogger<Store<TState>>? _storeLogger;
+    private ILogger<SubscriptionManager<TState>>? _subscriptionManagerLogger;
+    private IJSRuntime? _jsRuntime;
+    private MiddlewarePipelineOptions? _middlewareOptions;
+
+    private StoreBuilder(TState initialState)
+    {
+        _initialState = initialState ?? throw new ArgumentNullException(nameof(initialState));
+    }
+
+    /// <summary>
+    /// Creates a new store builder with the specified initial state.
+    /// </summary>
+    /// <param name="initialState">The initial state for the store.</param>
+    /// <returns>A new store builder instance.</returns>
+    public static StoreBuilder<TState> Create(TState initialState)
+    {
+        return new StoreBuilder<TState>(initialState);
+    }
+
+    /// <summary>
+    /// Sets a custom equality comparer for state comparison.
+    /// </summary>
+    /// <param name="comparer">The equality comparer to use.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithComparer(IEqualityComparer<TState> comparer)
+    {
+        _comparer = comparer ?? throw new ArgumentNullException(nameof(comparer));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds middleware to the store.
+    /// </summary>
+    /// <param name="middleware">The middleware to add.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithMiddleware(IMiddleware<TState> middleware)
+    {
+        ArgumentNullException.ThrowIfNull(middleware);
+        _middlewares.Add(middleware);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds multiple middlewares to the store.
+    /// </summary>
+    /// <param name="middlewares">The middlewares to add.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithMiddlewares(params IMiddleware<TState>[] middlewares)
+    {
+        ArgumentNullException.ThrowIfNull(middlewares);
+        _middlewares.AddRange(middlewares);
+        return this;
+    }
+
+    /// <summary>
+    /// Enables logging middleware.
+    /// </summary>
+    /// <param name="logger">Optional custom logging function.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithLogging(Action<string>? logger = null)
+    {
+        var loggingMiddleware = logger != null
+            ? new LoggingMiddleware<TState>(logger)
+            : new LoggingMiddleware<TState>();
+
+        return WithMiddleware(loggingMiddleware);
+    }
+
+    /// <summary>
+    /// Sets a logger for the middleware pipeline.
+    /// </summary>
+    /// <param name="logger">The logger to use for the middleware pipeline.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithLogger(ILogger<MiddlewarePipeline<TState>> logger)
+    {
+        _middlewarePipelineLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a logger for store operations.
+    /// </summary>
+    /// <param name="logger">The logger to use for the store.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithStoreLogger(ILogger<Store<TState>> logger)
+    {
+        _storeLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+        return this;
+    }
+
+    /// <summary>
+    /// Sets a logger for subscription manager.
+    /// </summary>
+    /// <param name="logger">The logger to use for the subscription manager.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithSubscriptionManagerLogger(ILogger<SubscriptionManager<TState>> logger)
+    {
+        _subscriptionManagerLogger = logger ?? throw new ArgumentNullException(nameof(logger));
+        return this;
+    }
+
+    /// <summary>
+    /// Sets configuration options for middleware pipeline behavior.
+    /// </summary>
+    /// <param name="options">The middleware pipeline options.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithMiddlewareOptions(MiddlewarePipelineOptions options)
+    {
+        _middlewareOptions = options ?? throw new ArgumentNullException(nameof(options));
+        return this;
+    }
+
+    /// <summary>
+    /// Configures middleware pipeline behavior.
+    /// </summary>
+    /// <param name="configure">Action to configure middleware options.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> ConfigureMiddleware(Action<MiddlewarePipelineOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = _middlewareOptions ?? new MiddlewarePipelineOptions();
+        configure(options);
+        _middlewareOptions = options;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the JSRuntime for DevTools and other JS interop features.
+    /// </summary>
+    /// <param name="jsRuntime">The JS runtime instance.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithJSRuntime(IJSRuntime jsRuntime)
+    {
+        _jsRuntime = jsRuntime ?? throw new ArgumentNullException(nameof(jsRuntime));
+        return this;
+    }
+
+    /// <summary>
+    /// Enables Redux DevTools integration.
+    /// </summary>
+    /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when JSRuntime has not been set.</exception>
+    public StoreBuilder<TState> WithDevTools(string? storeName = null)
+    {
+        if (_jsRuntime == null)
+            throw new InvalidOperationException(
+                "JSRuntime must be provided. Use WithJSRuntime() first or pass IJSRuntime to WithDevTools().");
+
+        var devToolsMiddleware = new DevToolsMiddleware<TState>(
+            _jsRuntime,
+            storeName ?? typeof(TState).Name);
+
+        return WithMiddleware(devToolsMiddleware);
+    }
+
+    /// <summary>
+    /// Enables Redux DevTools integration with an explicit JSRuntime.
+    /// </summary>
+    /// <param name="jsRuntime">The JS runtime instance.</param>
+    /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithDevTools(IJSRuntime jsRuntime, string? storeName = null)
+    {
+        ArgumentNullException.ThrowIfNull(jsRuntime);
+
+        _jsRuntime = jsRuntime;
+        var devToolsMiddleware = new DevToolsMiddleware<TState>(
+            jsRuntime,
+            storeName ?? typeof(TState).Name);
+
+        return WithMiddleware(devToolsMiddleware);
+    }
+
+    /// <summary>
+    /// Adds state persistence with the provided provider.
+    /// </summary>
+    /// <param name="provider">The persistence provider.</param>
+    /// <param name="key">The storage key.</param>
+    /// <param name="jsonOptions">Optional JSON serialization options.</param>
+    /// <param name="debounceMs">Debounce duration in milliseconds.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithPersistence(
+        IPersistenceProvider provider,
+        string key,
+        JsonSerializerOptions? jsonOptions = null,
+        int debounceMs = 0)
+    {
+        var hydratedBuilder = TryLoadPersistedState(key, jsonOptions);
+
+        var middleware = new PersistenceMiddleware<TState>(
+            provider,
+            key,
+            jsonOptions,
+            debounceMs);
+
+        return hydratedBuilder.WithMiddleware(middleware);
+    }
+
+    /// <summary>
+    /// Loads persisted state synchronously if available.
+    /// </summary>
+    private StoreBuilder<TState> TryLoadPersistedState(
+        string key,
+        JsonSerializerOptions? jsonOptions)
+    {
+        if (_jsRuntime is not IJSInProcessRuntime jsInProcess)
+        {
+            return this;
+        }
+
+        try
+        {
+            var persistedJson = jsInProcess.Invoke<string?>("localStorage.getItem", key);
+
+            if (!string.IsNullOrEmpty(persistedJson))
+            {
+                var options = jsonOptions ?? new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+
+                var loadedState = JsonSerializer.Deserialize<TState>(persistedJson, options);
+
+                if (loadedState != null)
+                {
+                    var builder = new StoreBuilder<TState>(loadedState)
+                    {
+                        _comparer = this._comparer,
+                        _middlewarePipelineLogger = this._middlewarePipelineLogger,
+                        _storeLogger = this._storeLogger,
+                        _subscriptionManagerLogger = this._subscriptionManagerLogger,
+                        _jsRuntime = this._jsRuntime,
+                        _middlewareOptions = this._middlewareOptions
+                    };
+                    builder._middlewares.AddRange(this._middlewares);
+                    return builder;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Loads initial state from the persistence provider.
+    /// </summary>
+    /// <param name="provider">The persistence provider.</param>
+    /// <param name="key">The storage key.</param>
+    /// <param name="jsonOptions">Optional JSON serialization options.</param>
+    /// <returns>The builder instance with loaded state.</returns>
+    public async Task<StoreBuilder<TState>> WithHydratedStateAsync(
+        IPersistenceProvider provider,
+        string key,
+        JsonSerializerOptions? jsonOptions = null)
+    {
+        try
+        {
+            var json = await provider.LoadAsync(key).ConfigureAwait(false);
+            if (json != null)
+            {
+                var options = jsonOptions ?? new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+
+                var loadedState = JsonSerializer.Deserialize<TState>(json, options);
+                if (loadedState != null)
+                {
+                    var builder = new StoreBuilder<TState>(loadedState)
+                    {
+                        _comparer = this._comparer,
+                        _middlewarePipelineLogger = this._middlewarePipelineLogger,
+                        _storeLogger = this._storeLogger,
+                        _subscriptionManagerLogger = this._subscriptionManagerLogger,
+                        _jsRuntime = this._jsRuntime,
+                        _middlewareOptions = this._middlewareOptions
+                    };
+                    builder._middlewares.AddRange(this._middlewares);
+                    return builder;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Builds the configured store instance.
+    /// </summary>
+    /// <returns>A new <see cref="IStore{TState}"/> instance.</returns>
+    public IStore<TState> Build()
+    {
+        var subscriptionManager = new SubscriptionManager<TState>(_subscriptionManagerLogger);
+
+        return new Store<TState>(
+            initialState: _initialState,
+            subscriptionManager: subscriptionManager,
+            comparer: _comparer,
+            middlewares: _middlewares,
+            middlewarePipelineLogger: _middlewarePipelineLogger,
+            logger: _storeLogger,
+            middlewareOptions: _middlewareOptions);
+    }
+}

@@ -1,0 +1,41 @@
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits SelectorStoreComponent<ThemeState>
+
+<div class="d-flex align-items-center gap-2">
+    <button class="btn btn-outline-secondary"
+            @onclick="@(() => Update(s => s.DecreaseFontSize()))"
+            disabled="@(SelectedFontSize <= 12)">
+        A-
+    </button>
+    <div class="flex-grow-1 text-center">
+        <strong style="font-size: @(SelectedFontSize)px;">@SelectedFontSize px</strong>
+    </div>
+    <button class="btn btn-outline-secondary"
+            @onclick="@(() => Update(s => s.IncreaseFontSize()))"
+            disabled="@(SelectedFontSize >= 24)">
+        A+
+    </button>
+</div>
+<input type="range"
+       class="form-range mt-2"
+       min="12"
+       max="24"
+       step="2"
+       value="@SelectedFontSize"
+       @oninput="@((e) => Update(s => s.SetFontSize(int.Parse(e.Value?.ToString() ?? "16"))))" />
+<small class="text-muted d-block mt-2">
+    Component renders: @_renderCount (only on font size change)
+</small>
+
+@code {
+    private int _renderCount = 0;
+    private int SelectedFontSize => (int)SelectState(Store.GetState());
+
+    protected override object SelectState(ThemeState state) => state.FontSize;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}

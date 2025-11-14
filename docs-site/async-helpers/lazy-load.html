@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LazyLoad - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Lazy loading with caching">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="../" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="../" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="../getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="../core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="../state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="../components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="../performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="../async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="../async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="../async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="../devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="../persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="../middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="../best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="../migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="../examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="../api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>LazyLoad</h1>
+            <p class="lead">Automatic caching with request deduplication for efficient data loading</p>
+
+            <!-- Overview -->
+            <section class="section">
+              <h2>Overview</h2>
+              <p>
+                <code>LazyLoad</code> provides automatic caching with configurable expiration and intelligent request deduplication.
+                When multiple components request the same data simultaneously, only one API call is made and the result is shared
+                across all requesters.
+              </p>
+
+              <div class="alert alert-info">
+                <strong>Code Reduction:</strong> Reduces caching and deduplication logic by <strong>85%</strong> (15+ lines → 2 lines)
+              </div>
+            </section>
+
+            <!-- What Problem Does It Solve -->
+            <section class="section">
+              <h2>What Problem Does It Solve?</h2>
+
+              <h3>Without LazyLoad (15+ lines)</h3>
+              <pre><code class="language-csharp">// Manual caching with deduplication
+private readonly Dictionary&lt;string, (object Data, DateTime Expiry)&gt; _cache = new();
+private readonly Dictionary&lt;string, Task&gt; _pending = new();
+private readonly SemaphoreSlim _lock = new(1, 1);
+
+async Task&lt;User&gt; LoadUser(int userId)
+{
+    var key = $"user-{userId}";
+
+    await _lock.WaitAsync();
+    try
+    {
+        // Check cache
+        if (_cache.TryGetValue(key, out var cached) && cached.Expiry > DateTime.UtcNow)
+            return (User)cached.Data;
+
+        // Check if request in flight
+        if (_pending.TryGetValue(key, out var task))
+        {
+            _lock.Release();
+            return await (Task&lt;User&gt;)task;
+        }
+
+        // Start new request
+        var loadTask = UserService.GetUserAsync(userId);
+        _pending[key] = loadTask;
+        _lock.Release();
+
+        var user = await loadTask;
+
+        await _lock.WaitAsync();
+        _cache[key] = (user, DateTime.UtcNow.AddMinutes(5));
+        _pending.Remove(key);
+        return user;
+    }
+    finally
+    {
+        if (_lock.CurrentCount == 0) _lock.Release();
+    }
+}</code></pre>
+
+              <h3>With LazyLoad (2 lines)</h3>
+              <pre><code class="language-csharp">var user = await LazyLoad(
+    $"user-{userId}",
+    () => UserService.GetUserAsync(userId),
+    cacheFor: TimeSpan.FromMinutes(5));</code></pre>
+
+              <div class="alert alert-success">
+                <strong>Benefits:</strong>
+                <ul>
+                  <li>Automatic caching with configurable expiration</li>
+                  <li>Automatic request deduplication (10 simultaneous calls = 1 API request)</li>
+                  <li>Thread-safe without manual locking</li>
+                  <li>No manual cache management</li>
+                  <li>Clean, declarative API</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- How Request Deduplication Works -->
+            <section class="section">
+              <h2>How Request Deduplication Works</h2>
+              <p>
+                When multiple components request the same data before the first request completes, LazyLoad ensures only
+                one API call is made:
+              </p>
+
+              <div style="background: #f5f5f5; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                <pre style="margin: 0; white-space: pre; font-family: monospace; font-size: 0.9em;">
+┌─────────────────────────────────────────────────────────┐
+│ Timeline: 10 Components Request user-123 Simultaneously │
+└─────────────────────────────────────────────────────────┘
+
+Component 1: LazyLoad("user-123", ...) → [Starts API call]
+Component 2: LazyLoad("user-123", ...) → [Waits for #1]
+Component 3: LazyLoad("user-123", ...) → [Waits for #1]
+...
+Component 10: LazyLoad("user-123", ...) → [Waits for #1]
+
+                    ↓
+            [Single API call completes]
+                    ↓
+        [All 10 components receive data]
+                    ↓
+            [Result cached for 5 min]
+                    ↓
+    [Next request within 5 min = instant]
+                </pre>
+              </div>
+
+              <div class="alert alert-info">
+                <strong>Performance Impact:</strong> In scenarios with 10 simultaneous requests, this reduces API calls by <strong>90%</strong>
+                (10 calls → 1 call) and eliminates race conditions.
+              </div>
+            </section>
+
+            <!-- Complete Example -->
+            <section class="section">
+              <h2>Complete Example</h2>
+
+              <h3>Product Details with Caching</h3>
+              <pre><code class="language-csharp">@page "/product/{ProductId:int}"
+@inherits StoreComponent&lt;ProductState&gt;
+@inject IProductService ProductService
+
+&lt;div class="product-details"&gt;
+    @if (State.Details.IsLoading)
+    {
+        &lt;p&gt;Loading product...&lt;/p&gt;
+    }
+    else if (State.Details.HasData)
+    {
+        var product = State.Details.Data;
+        &lt;h1&gt;@product.Name&lt;/h1&gt;
+        &lt;p&gt;@product.Description&lt;/p&gt;
+        &lt;p class="price"&gt;$@product.Price&lt;/p&gt;
+
+        &lt;button @onclick="LoadReviews"&gt;Load Reviews&lt;/button&gt;
+
+        @if (State.Reviews.HasData)
+        {
+            &lt;div class="reviews"&gt;
+                @foreach (var review in State.Reviews.Data)
+                {
+                    &lt;div class="review"&gt;
+                        &lt;strong&gt;@review.Author&lt;/strong&gt;
+                        &lt;p&gt;@review.Comment&lt;/p&gt;
+                    &lt;/div&gt;
+                }
+            &lt;/div&gt;
+        }
+    }
+&lt;/div&gt;
+
+@code {
+    [Parameter] public int ProductId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduct();
+    }
+
+    async Task LoadProduct()
+    {
+        await Update(s => s with { Details = s.Details.ToLoading() });
+
+        // Cached for 5 minutes - multiple tabs showing same product = 1 API call
+        var product = await LazyLoad(
+            $"product-{ProductId}",
+            () => ProductService.GetProductAsync(ProductId),
+            cacheFor: TimeSpan.FromMinutes(5));
+
+        await Update(s => s with { Details = AsyncData.Success(product) });
+    }
+
+    async Task LoadReviews()
+    {
+        await Update(s => s with { Reviews = s.Reviews.ToLoading() });
+
+        // Cached for 2 minutes - reviews change more frequently
+        var reviews = await LazyLoad(
+            $"reviews-{ProductId}",
+            () => ProductService.GetReviewsAsync(ProductId),
+            cacheFor: TimeSpan.FromMinutes(2));
+
+        await Update(s => s with { Reviews = AsyncData.Success(reviews) });
+    }
+}
+
+// State.cs
+public record ProductState(
+    AsyncData&lt;Product&gt; Details,
+    AsyncData&lt;ImmutableList&lt;Review&gt;&gt; Reviews)
+{
+    public static ProductState Initial => new(
+        AsyncData&lt;Product&gt;.NotAsked(),
+        AsyncData&lt;ImmutableList&lt;Review&gt;&gt;.NotAsked());
+}</code></pre>
+
+              <h3>User Profile with Related Data</h3>
+              <pre><code class="language-csharp">@page "/profile/{UserId}"
+@inherits StoreComponent&lt;ProfileState&gt;
+@inject IUserService UserService
+
+@code {
+    [Parameter] public string UserId { get; set; } = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Load user, posts, and followers in parallel
+        // If multiple components load same user, only 1 API call per resource
+        var loadTasks = new[]
+        {
+            LoadUser(),
+            LoadPosts(),
+            LoadFollowers()
+        };
+
+        await Task.WhenAll(loadTasks);
+    }
+
+    async Task LoadUser()
+    {
+        var user = await LazyLoad(
+            $"user-{UserId}",
+            () => UserService.GetUserAsync(UserId),
+            cacheFor: TimeSpan.FromMinutes(10));
+
+        await Update(s => s with { User = AsyncData.Success(user) });
+    }
+
+    async Task LoadPosts()
+    {
+        var posts = await LazyLoad(
+            $"posts-{UserId}",
+            () => UserService.GetPostsAsync(UserId),
+            cacheFor: TimeSpan.FromMinutes(5));
+
+        await Update(s => s with { Posts = AsyncData.Success(posts) });
+    }
+
+    async Task LoadFollowers()
+    {
+        var followers = await LazyLoad(
+            $"followers-{UserId}",
+            () => UserService.GetFollowersAsync(UserId),
+            cacheFor: TimeSpan.FromMinutes(5));
+
+        await Update(s => s with { Followers = AsyncData.Success(followers) });
+    }
+}</code></pre>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <h3>Method Signature</h3>
+              <pre><code class="language-csharp">protected Task&lt;T&gt; LazyLoad&lt;T&gt;(
+    string key,
+    Func&lt;Task&lt;T&gt;&gt; loader,
+    TimeSpan? cacheFor = null)</code></pre>
+
+              <h3>Parameters</h3>
+              <table class="api-table">
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>key</code></td>
+                    <td><code>string</code></td>
+                    <td>Unique cache key. Use descriptive keys like <code>"user-{id}"</code>, <code>"products-page-{page}"</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>loader</code></td>
+                    <td><code>Func&lt;Task&lt;T&gt;&gt;</code></td>
+                    <td>Async function that loads the data (typically an API call)</td>
+                  </tr>
+                  <tr>
+                    <td><code>cacheFor</code></td>
+                    <td><code>TimeSpan?</code></td>
+                    <td>Cache duration. Default is 5 minutes if not specified</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>Return Value</h3>
+              <p>
+                Returns <code>Task&lt;T&gt;</code> - The loaded data (from cache if valid, or from loader if expired/missing)
+              </p>
+
+              <h3>Behavior</h3>
+              <ul>
+                <li><strong>Cache Hit:</strong> Returns cached data immediately (no API call)</li>
+                <li><strong>Cache Miss:</strong> Calls loader, caches result, returns data</li>
+                <li><strong>Request In-Flight:</strong> Waits for existing request and shares result</li>
+                <li><strong>Cache Expiration:</strong> After <code>cacheFor</code> duration, next request will reload</li>
+              </ul>
+            </section>
+
+            <!-- Common Patterns -->
+            <section class="section">
+              <h2>Common Patterns</h2>
+
+              <h3>Pattern 1: Different Cache Durations</h3>
+              <pre><code class="language-csharp">// Rarely changing data - long cache
+var config = await LazyLoad(
+    "app-config",
+    () => ConfigService.GetConfigAsync(),
+    cacheFor: TimeSpan.FromHours(1));
+
+// Frequently changing data - short cache
+var livePrice = await LazyLoad(
+    $"price-{symbol}",
+    () => StockService.GetPriceAsync(symbol),
+    cacheFor: TimeSpan.FromSeconds(30));
+
+// User session data - medium cache
+var userProfile = await LazyLoad(
+    $"profile-{userId}",
+    () => UserService.GetProfileAsync(userId),
+    cacheFor: TimeSpan.FromMinutes(5));</code></pre>
+
+              <h3>Pattern 2: Paginated Data</h3>
+              <pre><code class="language-csharp">async Task LoadPage(int pageNumber)
+{
+    // Each page cached separately
+    var products = await LazyLoad(
+        $"products-page-{pageNumber}",
+        () => ProductService.GetPageAsync(pageNumber, pageSize: 20),
+        cacheFor: TimeSpan.FromMinutes(10));
+
+    await Update(s => s.SetPage(pageNumber, products));
+}</code></pre>
+
+              <h3>Pattern 3: Cache Invalidation</h3>
+              <pre><code class="language-csharp">@inject ILazyCache Cache
+
+async Task UpdateProduct(Product product)
+{
+    // Update via API
+    await ProductService.UpdateAsync(product);
+
+    // Invalidate cache so next load fetches fresh data
+    Cache.Invalidate($"product-{product.Id}");
+
+    // Reload with fresh data
+    await LoadProduct(product.Id);
+}</code></pre>
+
+              <h3>Pattern 4: Related Data Loading</h3>
+              <pre><code class="language-csharp">async Task LoadOrderWithDetails(int orderId)
+{
+    // Load order and related data in parallel
+    // Deduplication ensures shared data (like customer) only loads once
+    var loadTasks = new[]
+    {
+        LazyLoad($"order-{orderId}", () => OrderService.GetOrderAsync(orderId)),
+        LazyLoad($"customer-{customerId}", () => CustomerService.GetAsync(customerId)),
+        LazyLoad($"order-items-{orderId}", () => OrderService.GetItemsAsync(orderId))
+    };
+
+    await Task.WhenAll(loadTasks);
+}</code></pre>
+
+              <h3>Pattern 5: Conditional Loading</h3>
+              <pre><code class="language-csharp">async Task LoadUserData(string userId)
+{
+    // Always load basic profile (cached)
+    var user = await LazyLoad(
+        $"user-{userId}",
+        () => UserService.GetAsync(userId),
+        cacheFor: TimeSpan.FromMinutes(10));
+
+    // Only load expensive data if user is premium
+    if (user.IsPremium)
+    {
+        var analytics = await LazyLoad(
+            $"analytics-{userId}",
+            () => AnalyticsService.GetAsync(userId),
+            cacheFor: TimeSpan.FromMinutes(5));
+
+        await Update(s => s.SetAnalytics(analytics));
+    }
+}</code></pre>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <div class="alert alert-success">
+                <h4>✅ Do</h4>
+                <ul>
+                  <li><strong>Use descriptive cache keys</strong> - Include entity type and ID: <code>"user-{id}"</code>, <code>"products-category-{cat}"</code></li>
+                  <li><strong>Match cache duration to data volatility</strong> - Frequent changes = shorter cache, stable data = longer cache</li>
+                  <li><strong>Combine with AsyncData&lt;T&gt;</strong> - Use together for loading states + caching</li>
+                  <li><strong>Invalidate on mutations</strong> - Clear cache after create/update/delete operations</li>
+                  <li><strong>Use for expensive operations</strong> - API calls, database queries, complex computations</li>
+                  <li><strong>Leverage deduplication</strong> - Don't worry about simultaneous requests, LazyLoad handles it</li>
+                </ul>
+              </div>
+
+              <div class="alert alert-warning">
+                <h4>❌ Don't</h4>
+                <ul>
+                  <li><strong>Don't cache user-specific data with global keys</strong> - Include user ID in key: <code>$"cart-{userId}"</code></li>
+                  <li><strong>Don't use extremely long cache times</strong> - Unless data truly never changes</li>
+                  <li><strong>Don't cache sensitive data unnecessarily</strong> - Consider security implications</li>
+                  <li><strong>Don't forget about memory usage</strong> - Very large cached objects can impact performance</li>
+                  <li><strong>Don't use for real-time data</strong> - Use SignalR/WebSockets instead</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Performance Characteristics -->
+            <section class="section">
+              <h2>Performance Characteristics</h2>
+
+              <table class="api-table">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Without LazyLoad</th>
+                    <th>With LazyLoad</th>
+                    <th>Improvement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>10 simultaneous requests</td>
+                    <td>10 API calls</td>
+                    <td>1 API call</td>
+                    <td><strong>90% reduction</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Repeated requests (within cache)</td>
+                    <td>N API calls</td>
+                    <td>1 API call</td>
+                    <td><strong>~100% reduction</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Code complexity</td>
+                    <td>15+ lines (manual)</td>
+                    <td>2 lines</td>
+                    <td><strong>85% reduction</strong></td>
+                  </tr>
+                  <tr>
+                    <td>Memory overhead</td>
+                    <td>Manual dictionaries</td>
+                    <td>Managed cache</td>
+                    <td>Automatic cleanup</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <!-- Integration with Other Helpers -->
+            <section class="section">
+              <h2>Integration with Other Async Helpers</h2>
+
+              <h3>LazyLoad + AsyncData&lt;T&gt;</h3>
+              <pre><code class="language-csharp">async Task LoadUser(int userId)
+{
+    await Update(s => s with { User = s.User.ToLoading() });
+
+    try
+    {
+        // Combine caching with loading state management
+        var user = await LazyLoad(
+            $"user-{userId}",
+            () => UserService.GetUserAsync(userId),
+            cacheFor: TimeSpan.FromMinutes(5));
+
+        await Update(s => s with { User = AsyncData.Success(user) });
+    }
+    catch (Exception ex)
+    {
+        await Update(s => s with { User = AsyncData.Failure(ex.Message) });
+    }
+}</code></pre>
+
+              <h3>LazyLoad + ExecuteAsync</h3>
+              <pre><code class="language-csharp">async Task LoadProduct(int productId)
+{
+    await ExecuteAsync(
+        // LazyLoad inside ExecuteAsync for automatic error handling + caching
+        () => LazyLoad(
+            $"product-{productId}",
+            () => ProductService.GetAsync(productId),
+            cacheFor: TimeSpan.FromMinutes(5)),
+        loading: s => s with { Product = s.Product.ToLoading() },
+        success: (s, product) => s with { Product = AsyncData.Success(product) },
+        error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) }
+    );
+}</code></pre>
+            </section>
+
+            <!-- Common Use Cases -->
+            <section class="section">
+              <h2>Common Use Cases</h2>
+
+              <ul>
+                <li><strong>User profiles</strong> - Cache user data across multiple components</li>
+                <li><strong>Product catalogs</strong> - Cache product lists, categories, filters</li>
+                <li><strong>Reference data</strong> - Countries, states, categories (rarely changes)</li>
+                <li><strong>API responses</strong> - Any expensive API call that can be cached</li>
+                <li><strong>Search results</strong> - Cache search queries to avoid duplicate searches</li>
+                <li><strong>Master-detail views</strong> - Cache master list while details load</li>
+                <li><strong>Dashboard data</strong> - Cache dashboard widgets for performance</li>
+                <li><strong>Configuration</strong> - App settings, feature flags, etc.</li>
+              </ul>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section class="section">
+              <h2>Troubleshooting</h2>
+
+              <h3>LazyLoad not available?</h3>
+              <pre><code class="language-csharp">// ✅ Register utilities in Program.cs
+builder.Services.AddStoreUtilities();
+
+// OR use the all-in-one registration
+builder.Services.AddStoreWithUtilities(...);</code></pre>
+
+              <h3>Data not updating after mutation?</h3>
+              <pre><code class="language-csharp">@inject ILazyCache Cache
+
+async Task DeleteItem(int id)
+{
+    await ItemService.DeleteAsync(id);
+
+    // Invalidate cache so next load gets fresh data
+    Cache.Invalidate($"item-{id}");
+    Cache.Invalidate("items-list"); // If cached list exists
+}</code></pre>
+
+              <h3>Multiple requests still being made?</h3>
+              <p>
+                Ensure you're using the <strong>same cache key</strong> across all requests. Keys must match exactly:
+              </p>
+              <pre><code class="language-csharp">// ❌ Different keys = different cache entries
+await LazyLoad("user-123", ...);
+await LazyLoad("User-123", ...);  // Case sensitive!
+
+// ✅ Same key = shared cache
+await LazyLoad($"user-{userId}", ...);
+await LazyLoad($"user-{userId}", ...);</code></pre>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <ul>
+                <li><a href="./index.html">← Back to Async Helpers Overview</a></li>
+                <li><a href="./update-debounced.html">UpdateDebounced - Debounced state updates</a></li>
+                <li><a href="./async-data.html">AsyncData&lt;T&gt; - Async state management</a></li>
+                <li><a href="./execute-async.html">ExecuteAsync - Automatic error handling</a></li>
+                <li><a href="./update-throttled.html">UpdateThrottled - Throttled updates</a></li>
+                <li><a href="../examples.html">View Complete Examples</a></li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

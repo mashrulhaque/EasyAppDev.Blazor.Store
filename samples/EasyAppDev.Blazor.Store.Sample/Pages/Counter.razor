@@ -1,0 +1,70 @@
+﻿@page "/counter"
+@inherits SelectorStoreComponent<CounterState>
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter with DevTools</h1>
+
+<p role="status">Current count: @State.Count</p>
+
+@if (!string.IsNullOrEmpty(State.LastAction))
+{
+    <p><small>Last action: <strong>@State.LastAction</strong></small></p>
+}
+
+<div class="alert alert-secondary mt-2">
+    <strong>Render Count:</strong> @_renderCount
+    <small class="text-muted"> (Expected: 1 per increment/decrement + 1 initial = @(State.Count + 1))</small>
+</div>
+
+@* Note: This component uses SelectorStoreComponent and only re-renders when Count changes.
+   Changes to LastAction alone will NOT trigger a re-render, improving performance. *@
+
+<div class="btn-group" role="group">
+    <button class="btn btn-primary" @onclick="@(() => Update(s => s.Increment()))">Increment</button>
+    <button class="btn btn-secondary" @onclick="@(() => Update(s => s.Decrement()))">Decrement</button>
+    <button class="btn btn-success" @onclick="@(() => Update(s => s.IncrementBy(5)))">+5</button>
+    <button class="btn btn-danger" @onclick="@(() => Update(s => s.Reset()))">Reset</button>
+</div>
+
+@code {
+    private int _renderCount = 0;
+
+    // Granular selector: only re-render when Count changes
+    // The base SelectorStoreComponent automatically prevents duplicate renders!
+    protected override object SelectState(CounterState state)
+        => state.Count;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}
+
+
+<div class="alert alert-info mt-3">
+    <h4>Redux DevTools Integration</h4>
+    <p>
+        Open your browser's developer tools and look for the <strong>Redux</strong> tab to see:
+    </p>
+    <ul>
+        <li>State changes tracked in real-time</li>
+        <li>Action names for each state update</li>
+        <li>Time-travel debugging - jump to any previous state</li>
+        <li>State diff visualization</li>
+    </ul>
+    <p>
+        <small>Install Redux DevTools extension from:
+        <a href="https://github.com/reduxjs/redux-devtools" target="_blank">
+            https://github.com/reduxjs/redux-devtools
+        </a>
+        </small>
+    </p>
+</div>
+
+@* DiagnosticPanel kept on separate /diagnostics page.
+   The Counter component only re-renders when Count changes (selector optimization).
+   This means DiagnosticPanel updates for other events (subscriptions, non-Count state changes)
+   would be blocked by ShouldRender(). For full diagnostic visibility, visit /diagnostics. *@
+

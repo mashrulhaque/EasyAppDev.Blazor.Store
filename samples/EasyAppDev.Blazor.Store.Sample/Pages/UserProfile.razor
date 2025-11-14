@@ -1,0 +1,223 @@
+@page "/profile"
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<UserProfileState>
+
+<PageTitle>User Profile</PageTitle>
+
+<div class="container mt-4">
+    <h1>👤 User Profile</h1>
+    <p class="lead">Demonstrates <strong>async actions</strong> and <strong>loading states</strong></p>
+
+    <div class="alert alert-info">
+        <h5>💡 What This Demo Shows:</h5>
+        <ul class="mb-0">
+            <li>Async state updates with <code>UpdateAsync</code></li>
+            <li>Loading states (IsLoading, Error handling)</li>
+            <li>Simulated API calls with delays</li>
+            <li>UI feedback during async operations</li>
+        </ul>
+    </div>
+
+    @if (State.IsLoading)
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Loading user profile...</h5>
+                <p class="text-muted">This simulates a 1.5 second API call</p>
+            </div>
+        </div>
+    }
+    else if (State.Error != null)
+    {
+        <div class="alert alert-danger">
+            <h5>❌ Error Loading Profile</h5>
+            <p class="mb-0">@State.Error</p>
+            <button class="btn btn-danger btn-sm mt-2" @onclick="@(() => Update(s => s.Clear()))">
+                Clear Error
+            </button>
+        </div>
+    }
+    else if (State.User == null)
+    {
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <h4>No profile loaded</h4>
+                <p class="text-muted">Load a user profile to get started</p>
+                <div class="mt-3">
+                    <h5>Try loading a user:</h5>
+                    <div class="d-flex gap-2 justify-content-center flex-wrap">
+                        @for (int i = 1; i <= 6; i++)
+                        {
+                            var userId = i;
+                            <button class="btn btn-outline-primary" @onclick="@(() => LoadUser(userId))">
+                                User @userId
+                            </button>
+                        }
+                        <button class="btn btn-outline-danger" @onclick="@(() => LoadUser(-1))">
+                            Invalid User (Error Demo)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <div style="font-size: 100px;">@State.User.AvatarUrl</div>
+                        <h5 class="card-title mt-3">@State.User.Name</h5>
+                        <p class="text-muted">@State.User.Email</p>
+                        @if (State.LastUpdated.HasValue)
+                        {
+                            <small class="text-muted">
+                                Last updated: @State.LastUpdated.Value.ToString("h:mm:ss tt")
+                            </small>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Edit Profile</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text"
+                                   class="form-control"
+                                   value="@State.User.Name"
+                                   @onchange="@((e) => Update(s => s.UpdateName(e.Value?.ToString() ?? "")))" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email"
+                                   class="form-control"
+                                   value="@State.User.Email"
+                                   @onchange="@((e) => Update(s => s.UpdateEmail(e.Value?.ToString() ?? "")))" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bio</label>
+                            <textarea class="form-control"
+                                      rows="4"
+                                      @onchange="@((e) => Update(s => s.UpdateBio(e.Value?.ToString() ?? "")))">@State.User.Bio</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" @onclick="@(() => LoadUser(State.User.Id + 1))">
+                Load Next User
+            </button>
+            <button class="btn btn-secondary" @onclick="@(() => Update(s => s.Clear()))">
+                Clear Profile
+            </button>
+        </div>
+    }
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5>📖 Code Example</h5>
+        </div>
+        <div class="card-body">
+            <h6>State Definition with Loading States:</h6>
+            <pre class="bg-light p-3"><code>public record UserProfileState(
+    UserProfile? User = null,
+    bool IsLoading = false,
+    string? Error = null,
+    DateTime? LastUpdated = null)
+{
+    public UserProfileState StartLoading() => this with
+    {
+        IsLoading = true,
+        Error = null
+    };
+
+    public UserProfileState LoadSuccess(UserProfile user) => this with
+    {
+        User = user,
+        IsLoading = false,
+        Error = null,
+        LastUpdated = DateTime.Now
+    };
+
+    public UserProfileState LoadFailure(string error) => this with
+    {
+        IsLoading = false,
+        Error = error
+    };
+}</code></pre>
+
+            <h6 class="mt-3">Component with Async Updates:</h6>
+            <pre class="bg-light p-3"><code>private async Task LoadUser(int userId)
+{
+    // Set loading state
+    Update(s => s.StartLoading());
+
+    try
+    {
+        // Simulate API call
+        var user = await UserProfileState.SimulateApiLoad(userId);
+
+        // Update with success
+        Update(s => s.LoadSuccess(user));
+    }
+    catch (Exception ex)
+    {
+        // Update with error
+        Update(s => s.LoadFailure(ex.Message));
+    }
+}</code></pre>
+
+            <h6 class="mt-3">Alternative: Async State Method</h6>
+            <pre class="bg-light p-3"><code>// In state class:
+public async Task&lt;UserProfileState&gt; LoadUser(int id, IUserService service)
+{
+    var user = await service.GetUserAsync(id);
+    return this with { User = user, Loading = false };
+}
+
+// In component:
+await UpdateAsync(async s => await s.LoadUser(userId, UserService));</code></pre>
+
+            <h6 class="mt-3">Key Principles:</h6>
+            <ul>
+                <li>✅ Use dedicated loading/error state properties</li>
+                <li>✅ Handle loading state → API call → success/error pattern</li>
+                <li>✅ Keep async logic in components, state methods pure</li>
+                <li>✅ Alternative: async state methods with injected dependencies</li>
+                <li>✅ Always handle errors gracefully</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task LoadUser(int userId)
+    {
+        // Set loading state
+        Update(s => s.StartLoading());
+
+        try
+        {
+            // Simulate API call (1.5 second delay)
+            var user = await UserProfileState.SimulateApiLoad(userId);
+
+            // Update with loaded user
+            Update(s => s.LoadSuccess(user));
+        }
+        catch (Exception ex)
+        {
+            // Update with error
+            Update(s => s.LoadFailure(ex.Message));
+        }
+    }
+}

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Components - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="StoreComponent and SelectorStoreComponent for automatic reactivity and granular subscriptions in Blazor applications">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link active"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Components</h1>
+            <p class="hero-description">
+              Blazor components with automatic reactivity and subscription management
+            </p>
+
+            <!-- Introduction -->
+            <section class="section">
+              <h2>Overview</h2>
+              <p>
+                EasyAppDev.Blazor.Store provides two base components for integrating state management into your Blazor applications.
+                These components handle subscription management, automatic updates, and provide convenient methods for state mutations.
+              </p>
+            </section>
+
+            <!-- StoreComponent -->
+            <section class="section">
+              <h2>StoreComponent&lt;TState&gt;</h2>
+              <p>
+                The primary component for state management. Inherit from <code>StoreComponent&lt;TState&gt;</code> to get automatic subscription
+                to state changes and reactive updates.
+              </p>
+
+              <h3>What You Get</h3>
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">🔄</div>
+                  <h4>Automatic Subscription</h4>
+                  <p>Components automatically subscribe to state changes on initialization.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">💾</div>
+                  <h4>State Access</h4>
+                  <p>Direct access to current state via the <code>State</code> property.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">✨</div>
+                  <h4>Update Methods</h4>
+                  <p>Convenient <code>Update()</code> methods for state transformations.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🧹</div>
+                  <h4>Automatic Cleanup</h4>
+                  <p>Subscriptions are automatically disposed when component is disposed.</p>
+                </div>
+              </div>
+
+              <h3>Basic Usage</h3>
+              <div class="code-block">
+                <div class="code-block-title">TodoList.razor</div>
+                <pre><code class="language-csharp">@page "/todos"
+@inherits StoreComponent&lt;TodoState&gt;
+
+&lt;h1&gt;My Todo List&lt;/h1&gt;
+
+@foreach (var todo in State.Todos)
+{
+    &lt;div&gt;
+        &lt;input type="checkbox"
+               checked="@todo.Completed"
+               @onchange="@(() => Update(s => s.ToggleTodo(todo.Id)))" /&gt;
+        &lt;span&gt;@todo.Text&lt;/span&gt;
+        &lt;button @onclick="@(() => Update(s => s.RemoveTodo(todo.Id)))"&gt;🗑️&lt;/button&gt;
+    &lt;/div&gt;
+}
+
+@code {
+    async Task AddTodo() => await Update(s => s.AddTodo("New task"));
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Component Patterns -->
+            <section class="section">
+              <h2>Component Patterns</h2>
+              <p>
+                There are three main patterns for updating state from components, each suited for different scenarios.
+              </p>
+
+              <h3>Pattern 1: Inline Updates (Simple)</h3>
+              <p>For simple, direct state updates without additional logic:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">&lt;button @onclick="@(() => Update(s => s.Increment()))"&gt;+&lt;/button&gt;
+&lt;button @onclick="@(() => Update(s => s.Decrement()))"&gt;-&lt;/button&gt;
+&lt;button @onclick="@(() => Update(s => s.Reset()))"&gt;Reset&lt;/button&gt;</code></pre>
+              </div>
+              <div class="alert alert-info">
+                <div class="alert-title">Best for:</div>
+                <p>Simple state transformations that don't require validation or additional logic.</p>
+              </div>
+
+              <h3>Pattern 2: Component Methods (With Validation/Logic)</h3>
+              <p>When you need to add validation, conditional logic, or side effects:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">&lt;button @onclick="IncrementIfValid"&gt;+&lt;/button&gt;
+
+@code {
+    void IncrementIfValid()
+    {
+        if (State.Count < 100)
+        {
+            Update(s => s.Increment());
+        }
+        else
+        {
+            ShowError("Cannot exceed 100");
+        }
+    }
+
+    async Task AddTodo()
+    {
+        if (string.IsNullOrWhiteSpace(newTodo))
+            return;
+
+        Logger.LogInformation("Adding todo: {Text}", newTodo);
+        await Update(s => s.AddTodo(newTodo));
+        newTodo = "";
+    }
+}</code></pre>
+              </div>
+              <div class="alert alert-info">
+                <div class="alert-title">Best for:</div>
+                <p>Updates that require validation, logging, or conditional execution.</p>
+              </div>
+
+              <h3>Pattern 3: Ad-hoc Inline (Flexibility)</h3>
+              <p>For one-off updates or dynamic state changes:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">&lt;input type="number"
+       @bind="newValue"
+       @bind:after="@(() => Update(s => s with { Count = newValue }))" /&gt;
+
+&lt;button @onclick="@(() => Update(s => s with { Count = newValue, Name = newName }))"&gt;
+    Set Values
+&lt;/button&gt;</code></pre>
+              </div>
+              <div class="alert alert-info">
+                <div class="alert-title">Best for:</div>
+                <p>Quick inline transformations or when you don't have a dedicated state method.</p>
+              </div>
+            </section>
+
+            <!-- Update Flow -->
+            <section class="section">
+              <h2>Update Flow</h2>
+              <p>Understanding how state updates flow through your application:</p>
+
+              <div class="code-block">
+                <pre><code class="language-text">Component calls Update(s => s.Method())
+    ↓
+Store applies transformation
+    ↓
+New state created (old unchanged)
+    ↓
+All subscribers notified
+    ↓
+Components re-render automatically</code></pre>
+              </div>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Component Update Call</h3>
+                  <p>User interaction triggers <code>Update(s => s.Increment())</code></p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Store Transformation</h3>
+                  <p>Store applies the updater function in a thread-safe manner</p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Immutable Update</h3>
+                  <p>New state instance created, original remains unchanged</p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                  <h3>Notification</h3>
+                  <p>All subscribed components receive state change notification</p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                  <h3>Re-render</h3>
+                  <p>Components call <code>StateHasChanged()</code> and re-render with new state</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- SelectorStoreComponent -->
+            <section class="section">
+              <h2>SelectorStoreComponent&lt;TState&gt;</h2>
+              <p>
+                For performance optimization, use <code>SelectorStoreComponent</code> to subscribe to only specific parts of your state.
+                This dramatically reduces unnecessary re-renders in large applications.
+              </p>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Performance Boost</div>
+                <p>Components using selectors can see up to <strong>25x fewer re-renders</strong> in high-frequency update scenarios.</p>
+              </div>
+
+              <h3>Basic Example</h3>
+              <div class="code-block">
+                <div class="code-block-title">CounterDisplay.razor</div>
+                <pre><code class="language-csharp">@page "/counter-display"
+@inherits SelectorStoreComponent&lt;AppState&gt;
+
+&lt;!-- Only re-renders when Counter changes, not when other state properties change --&gt;
+&lt;h1&gt;Count: @State.Counter&lt;/h1&gt;
+
+@code {
+    // Component only re-renders when Counter changes
+    protected override object SelectState(AppState state) => state.Counter;
+}</code></pre>
+              </div>
+
+              <h3>Selector Patterns</h3>
+
+              <h4>Single Property</h4>
+              <div class="code-block">
+                <pre><code class="language-csharp">protected override object SelectState(AppState s) => s.UserName;</code></pre>
+              </div>
+
+              <h4>Multiple Properties (Tuple)</h4>
+              <div class="code-block">
+                <pre><code class="language-csharp">protected override object SelectState(AppState s) => (s.UserName, s.IsLoading);</code></pre>
+              </div>
+
+              <h4>Computed Values (Record)</h4>
+              <div class="code-block">
+                <pre><code class="language-csharp">protected override object SelectState(TodoState s) => new TodoStats(
+    Total: s.Todos.Count,
+    Completed: s.Todos.Count(t => t.Completed)
+);</code></pre>
+              </div>
+
+              <h4>Filtered Collections</h4>
+              <div class="code-block">
+                <pre><code class="language-csharp">protected override object SelectState(TodoState s) =>
+    s.Todos.Where(t => !t.Completed).ToImmutableList();</code></pre>
+              </div>
+
+              <h3>When to Use Selectors</h3>
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📊</span>
+                    <strong>Large State Objects</strong>
+                  </div>
+                  <p>When your state has many properties and components only need a few.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚡</span>
+                    <strong>High-Frequency Updates</strong>
+                  </div>
+                  <p>When state updates frequently but most components don't care about every change.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🎯</span>
+                    <strong>Performance Critical</strong>
+                  </div>
+                  <p>When you've profiled and identified unnecessary re-renders as a bottleneck.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📋</span>
+                    <strong>List Components</strong>
+                  </div>
+                  <p>When rendering large lists where each item should only update when its data changes.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <h3>StoreComponent&lt;TState&gt;</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">public abstract class StoreComponent&lt;TState&gt; : ComponentBase
+{
+    // State access
+    protected TState State { get; }
+
+    // Core updates
+    protected Task Update(Func&lt;TState, TState&gt; updater, string? action = null);
+    protected Task UpdateAsync(Func&lt;TState, Task&lt;TState&gt;&gt; asyncUpdater, string? action = null);
+
+    // Async helpers (when utilities are registered)
+    protected Task UpdateDebounced(Func&lt;TState, TState&gt; updater, int delayMs, string? action = null);
+    protected Task UpdateThrottled(Func&lt;TState, TState&gt; updater, int intervalMs, string? action = null);
+    protected Task ExecuteAsync&lt;T&gt;(
+        Func&lt;Task&lt;T&gt;&gt; action,
+        Func&lt;TState, TState&gt; loading,
+        Func&lt;TState, T, TState&gt; success,
+        Func&lt;TState, Exception, TState&gt;? error = null);
+    protected Task&lt;T&gt; LazyLoad&lt;T&gt;(string key, Func&lt;Task&lt;T&gt;&gt; loader, TimeSpan? cacheFor = null);
+}</code></pre>
+              </div>
+
+              <h3>SelectorStoreComponent&lt;TState&gt;</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">public abstract class SelectorStoreComponent&lt;TState&gt; : ComponentBase
+{
+    // State access
+    protected TState State { get; }
+    protected object? Selected { get; }
+
+    // Required: Override to select specific state slice
+    protected abstract object SelectState(TState state);
+
+    // Update methods (no async helpers)
+    protected Task Update(Func&lt;TState, TState&gt; updater, string? action = null);
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Complete Example -->
+            <section class="section">
+              <h2>Complete Example</h2>
+              <p>A real-world example combining all component patterns:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">TodoPage.razor</div>
+                <pre><code class="language-csharp">@page "/todos"
+@inherits StoreComponent&lt;TodoState&gt;
+
+&lt;div class="todo-app"&gt;
+    &lt;h1&gt;Todo List&lt;/h1&gt;
+
+    &lt;!-- Pattern 1: Inline updates --&gt;
+    &lt;input @bind="newTodo"
+           @onkeyup="HandleKeyUp"
+           placeholder="What needs to be done?" /&gt;
+
+    &lt;!-- Stats using computed values --&gt;
+    &lt;div class="stats"&gt;
+        &lt;span&gt;Total: @State.Todos.Count&lt;/span&gt;
+        &lt;span&gt;Completed: @State.CompletedCount&lt;/span&gt;
+        &lt;span&gt;Progress: @State.CompletionRate.ToString("F1")%&lt;/span&gt;
+    &lt;/div&gt;
+
+    &lt;!-- Todo list --&gt;
+    @foreach (var todo in State.Todos)
+    {
+        &lt;div class="todo-item"&gt;
+            &lt;input type="checkbox"
+                   checked="@todo.Completed"
+                   @onchange="@(() => Update(s => s.ToggleTodo(todo.Id)))" /&gt;
+            &lt;span class="@(todo.Completed ? "completed" : "")"&gt;@todo.Text&lt;/span&gt;
+            &lt;button @onclick="@(() => Update(s => s.RemoveTodo(todo.Id)))"&gt;🗑️&lt;/button&gt;
+        &lt;/div&gt;
+    }
+&lt;/div&gt;
+
+@code {
+    string newTodo = "";
+
+    // Pattern 2: Component method with validation
+    async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newTodo))
+        {
+            await Update(s => s.AddTodo(newTodo));
+            newTodo = "";
+        }
+    }
+
+    // Pattern 2: Component method with logging
+    async Task ClearCompleted()
+    {
+        var count = State.Todos.Count(t => t.Completed);
+        if (count > 0)
+        {
+            Logger.LogInformation("Clearing {Count} completed todos", count);
+            await Update(s => s.ClearCompleted());
+        }
+    }
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./async-helpers/index.html" class="next-step-card">
+                  <div class="next-step-icon">⚡</div>
+                  <h3>Async Helpers</h3>
+                  <p>Explore powerful async helpers like UpdateDebounced and ExecuteAsync.</p>
+                </a>
+
+                <a href="./performance.html" class="next-step-card">
+                  <div class="next-step-icon">📈</div>
+                  <h3>Performance</h3>
+                  <p>Learn how to optimize your components with selectors and best practices.</p>
+                </a>
+
+                <a href="./examples.html" class="next-step-card">
+                  <div class="next-step-icon">💻</div>
+                  <h3>Examples</h3>
+                  <p>View complete real-world examples and common patterns.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>
