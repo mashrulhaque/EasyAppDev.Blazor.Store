@@ -851,6 +851,6 @@ MIT © EasyAppDev
 
 <div align="center">
 
-**[⭐ Star us on GitHub](https://github.com/yourusername/EasyAppDev.Blazor.Store)** • **[🐛 Report Issues](https://github.com/yourusername/EasyAppDev.Blazor.Store/issues)** • **[💬 Discussions](https://github.com/yourusername/EasyAppDev.Blazor.Store/discussions)**
+**[⭐ Star us on GitHub](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store)** • **[🐛 Report Issues](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store/issues)** • **[💬 Discussions](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store/discussions)**
 
 </div>
