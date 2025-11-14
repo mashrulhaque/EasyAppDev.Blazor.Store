@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Reference - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Complete API reference">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>API Reference</h1>
+            <p class="lead">Complete API documentation for EasyAppDev.Blazor.Store.</p>
+
+            <!-- StoreComponent<TState> -->
+            <section class="section">
+              <h2 id="store-component">StoreComponent&lt;TState&gt;</h2>
+              <p>Base component class that provides automatic state subscription and reactivity. Inherit from this class to get access to state and update methods.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Definition</div>
+                <pre><code class="language-csharp">public abstract class StoreComponent&lt;TState&gt; : ComponentBase
+{
+    // State access
+    protected TState State { get; }
+
+    // Core updates
+    protected Task Update(Func&lt;TState, TState&gt; updater, string? action = null);
+    protected Task UpdateAsync(Func&lt;TState, Task&lt;TState&gt;&gt; asyncUpdater, string? action = null);
+
+    // Async helpers
+    protected Task UpdateDebounced(Func&lt;TState, TState&gt; updater, int delayMs, string? action = null);
+    protected Task UpdateThrottled(Func&lt;TState, TState&gt; updater, int intervalMs, string? action = null);
+    protected Task ExecuteAsync&lt;T&gt;(
+        Func&lt;Task&lt;T&gt;&gt; action,
+        Func&lt;TState, TState&gt; loading,
+        Func&lt;TState, T, TState&gt; success,
+        Func&lt;TState, Exception, TState&gt;? error = null);
+    protected Task&lt;T&gt; LazyLoad&lt;T&gt;(string key, Func&lt;Task&lt;T&gt;&gt; loader, TimeSpan? cacheFor = null);
+}</code></pre>
+              </div>
+
+              <h3>Properties</h3>
+              <div class="api-section">
+                <h4><code>State</code></h4>
+                <p>Gets the current state. Automatically updated when the store changes.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected TState State { get; }</code></pre>
+                </div>
+              </div>
+
+              <h3>Methods</h3>
+
+              <div class="api-section">
+                <h4><code>Update</code></h4>
+                <p>Updates the state synchronously using a transformation function.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task Update(Func&lt;TState, TState&gt; updater, string? action = null)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>updater</code> - Function that takes current state and returns new state</li>
+                  <li><code>action</code> - Optional action name for DevTools and logging</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await Update(s => s.Increment(), "INCREMENT");</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>UpdateAsync</code></h4>
+                <p>Updates the state asynchronously using an async transformation function.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task UpdateAsync(Func&lt;TState, Task&lt;TState&gt;&gt; asyncUpdater, string? action = null)</code></pre>
+                </div>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await UpdateAsync(async s => await s.LoadUserAsync(id), "LOAD_USER");</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>UpdateDebounced</code></h4>
+                <p>Debounces state updates. Multiple rapid calls within the delay period will result in only the last update being applied.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task UpdateDebounced(Func&lt;TState, TState&gt; updater, int delayMs, string? action = null)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>updater</code> - State transformation function</li>
+                  <li><code>delayMs</code> - Debounce delay in milliseconds</li>
+                  <li><code>action</code> - Optional action name</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">&lt;input @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))" /&gt;</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>UpdateThrottled</code></h4>
+                <p>Throttles state updates. Ensures updates happen at most once per interval.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task UpdateThrottled(Func&lt;TState, TState&gt; updater, int intervalMs, string? action = null)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>updater</code> - State transformation function</li>
+                  <li><code>intervalMs</code> - Throttle interval in milliseconds</li>
+                  <li><code>action</code> - Optional action name</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">&lt;div @onmousemove="@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))"&gt;</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>ExecuteAsync</code></h4>
+                <p>Executes an async operation with automatic state management for loading, success, and error states.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task ExecuteAsync&lt;T&gt;(
+    Func&lt;Task&lt;T&gt;&gt; action,
+    Func&lt;TState, TState&gt; loading,
+    Func&lt;TState, T, TState&gt; success,
+    Func&lt;TState, Exception, TState&gt;? error = null)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>action</code> - Async operation to execute</li>
+                  <li><code>loading</code> - State transformation for loading state</li>
+                  <li><code>success</code> - State transformation for success with result</li>
+                  <li><code>error</code> - Optional state transformation for error handling</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await ExecuteAsync(
+    () => UserService.LoadAsync(id),
+    loading: s => s with { User = s.User.ToLoading() },
+    success: (s, user) => s with { User = AsyncData.Success(user) },
+    error: (s, ex) => s with { User = AsyncData.Failure(ex.Message) }
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>LazyLoad</code></h4>
+                <p>Loads and caches data with automatic request deduplication. If multiple components request the same data simultaneously, only one request is made.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task&lt;T&gt; LazyLoad&lt;T&gt;(string key, Func&lt;Task&lt;T&gt;&gt; loader, TimeSpan? cacheFor = null)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>key</code> - Unique cache key</li>
+                  <li><code>loader</code> - Function to load the data</li>
+                  <li><code>cacheFor</code> - Optional cache expiration (default: 5 minutes)</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">var user = await LazyLoad(
+    $"user-{userId}",
+    () => UserService.GetUserAsync(userId),
+    TimeSpan.FromMinutes(5)
+);</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- SelectorStoreComponent<TState> -->
+            <section class="section">
+              <h2 id="selector-store-component">SelectorStoreComponent&lt;TState&gt;</h2>
+              <p>Advanced component that subscribes to only specific parts of the state. Use this for performance optimization to avoid unnecessary re-renders.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Definition</div>
+                <pre><code class="language-csharp">public abstract class SelectorStoreComponent&lt;TState&gt; : ComponentBase
+{
+    protected TState State { get; }
+    protected object? Selected { get; }
+
+    // Required: Override to select specific state slice
+    protected abstract object SelectState(TState state);
+
+    // Update methods (no async helpers)
+    protected Task Update(Func&lt;TState, TState&gt; updater, string? action = null);
+}</code></pre>
+              </div>
+
+              <h3>Properties</h3>
+              <div class="api-section">
+                <h4><code>State</code></h4>
+                <p>Gets the full current state.</p>
+              </div>
+              <div class="api-section">
+                <h4><code>Selected</code></h4>
+                <p>Gets the selected slice of state returned by SelectState.</p>
+              </div>
+
+              <h3>Methods</h3>
+              <div class="api-section">
+                <h4><code>SelectState</code> (Abstract)</h4>
+                <p>Override this method to select the specific part of state you want to monitor. The component will only re-render when this selected value changes.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected abstract object SelectState(TState state)</code></pre>
+                </div>
+                <p><strong>Examples:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Single property
+protected override object SelectState(AppState s) => s.UserName;
+
+// Multiple properties (tuple)
+protected override object SelectState(AppState s) => (s.UserName, s.IsLoading);
+
+// Computed values (record)
+protected override object SelectState(TodoState s) => new TodoStats(
+    Total: s.Todos.Count,
+    Completed: s.Todos.Count(t => t.Completed)
+);</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Registration Methods -->
+            <section class="section">
+              <h2 id="registration">Registration Methods</h2>
+              <p>Methods to register stores in your dependency injection container.</p>
+
+              <div class="api-section">
+                <h4><code>AddStoreWithUtilities</code> (Recommended)</h4>
+                <p>Registers a store with all utility services (debounce, throttle, cache, async executor) in one call.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new MyState(),
+    (store, sp) => store.WithDefaults(sp, "MyStore"));</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddStore</code></h4>
+                <p>Registers a singleton store. Requires manual registration of utilities if you want to use async helpers.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Manual registration
+builder.Services.AddStoreUtilities();  // Required for async helpers
+builder.Services.AddAsyncActionExecutor&lt;MyState&gt;();  // Required for ExecuteAsync
+builder.Services.AddStore(
+    new MyState(),
+    (store, sp) => store.WithDefaults(sp, "MyStore"));</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddScopedStore</code> / <code>AddScopedStoreWithUtilities</code></h4>
+                <p>Registers a scoped store (Blazor Server scenarios).</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddScopedStoreWithUtilities(
+    new SessionState(),
+    (store, sp) => store.WithDefaults(sp, "Session"));</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddTransientStore</code> / <code>AddTransientStoreWithUtilities</code></h4>
+                <p>Registers a transient store (new instance per injection).</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddTransientStoreWithUtilities(
+    () => new TempState(),
+    (store, sp) => store.WithDefaults(sp, "Temp"));</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- StoreBuilder Configuration -->
+            <section class="section">
+              <h2 id="store-builder">StoreBuilder Configuration</h2>
+              <p>Fluent methods for configuring your store.</p>
+
+              <div class="api-section">
+                <h4><code>WithDefaults</code></h4>
+                <p>Configures store with DevTools, logging middleware, and JSRuntime integration in one call.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">(store, sp) => store.WithDefaults(sp, "StoreName")</code></pre>
+                </div>
+                <p>Equivalent to:</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">store
+    .WithDevTools("StoreName")
+    .WithLogging()
+    .WithJSRuntime(sp.GetRequiredService&lt;IJSRuntime&gt;())</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>WithPersistence</code></h4>
+                <p>Enables automatic persistence to LocalStorage or SessionStorage.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">(store, sp) => store
+    .WithDefaults(sp, "MyStore")
+    .WithPersistence(sp, "storage-key")  // LocalStorage by default</code></pre>
+                </div>
+                <p>State is automatically saved on updates and restored on app load.</p>
+              </div>
+
+              <div class="api-section">
+                <h4><code>WithDiagnosticsIfAvailable</code></h4>
+                <p>Adds diagnostics middleware (DEBUG builds only, compiled out in production).</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Program.cs
+builder.Services.AddStoreDiagnostics();
+
+builder.Services.AddStore(
+    new MyState(),
+    (store, sp) => store
+        .WithDefaults(sp, "MyStore")
+        .WithDiagnosticsIfAvailable(sp));</code></pre>
+                </div>
+                <p>Tracks action history, performance metrics, and subscriptions. Zero overhead in production.</p>
+              </div>
+
+              <div class="api-section">
+                <h4><code>WithMiddleware</code></h4>
+                <p>Adds custom middleware for state update interception.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">(store, sp) => store
+    .WithDefaults(sp, "MyStore")
+    .WithMiddleware(new CustomMiddleware&lt;MyState&gt;())</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Complete Configuration Example -->
+            <section class="section">
+              <h2 id="complete-example">Complete Configuration Example</h2>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// All-in-one registration with utilities
+builder.Services.AddStoreWithUtilities(
+    new MyState(),
+    (store, sp) => store
+        .WithDefaults(sp, "MyStore")         // DevTools + Logging + JSRuntime
+        .WithPersistence(sp, "my-state")     // LocalStorage auto-save
+        .WithDiagnosticsIfAvailable(sp)      // Diagnostics (DEBUG only)
+        .WithMiddleware(customMiddleware));  // Custom middleware</code></pre>
+              </div>
+            </section>
+
+            <!-- Quick Reference Table -->
+            <section class="section">
+              <h2 id="quick-reference">Quick Reference</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>API</th>
+                    <th>Purpose</th>
+                    <th>Code Reduction</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>StoreComponent&lt;T&gt;</code></td>
+                    <td>Base component with auto-subscription</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td><code>SelectorStoreComponent&lt;T&gt;</code></td>
+                    <td>Granular subscriptions (performance)</td>
+                    <td>25x fewer re-renders</td>
+                  </tr>
+                  <tr>
+                    <td><code>Update()</code></td>
+                    <td>Sync state updates</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td><code>UpdateAsync()</code></td>
+                    <td>Async state updates</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td><code>UpdateDebounced()</code></td>
+                    <td>Debounced updates (search, input)</td>
+                    <td>94%</td>
+                  </tr>
+                  <tr>
+                    <td><code>UpdateThrottled()</code></td>
+                    <td>Throttled updates (scroll, mouse)</td>
+                    <td>95%</td>
+                  </tr>
+                  <tr>
+                    <td><code>ExecuteAsync()</code></td>
+                    <td>Automatic error handling</td>
+                    <td>58%</td>
+                  </tr>
+                  <tr>
+                    <td><code>LazyLoad()</code></td>
+                    <td>Caching + deduplication</td>
+                    <td>85%</td>
+                  </tr>
+                  <tr>
+                    <td><code>AsyncData&lt;T&gt;</code></td>
+                    <td>Async state management</td>
+                    <td>95%</td>
+                  </tr>
+                  <tr>
+                    <td><code>AddStoreWithUtilities()</code></td>
+                    <td>All-in-one registration</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithDefaults()</code></td>
+                    <td>DevTools + Logging + JSRuntime</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithPersistence()</code></td>
+                    <td>LocalStorage auto-save</td>
+                    <td>-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <div class="section">
+              <div class="alert alert-info">
+                <div class="alert-title">Need More Details?</div>
+                <p>Check out the <a href="./getting-started.html">Getting Started</a> guide for practical examples, or explore <a href="./async-helpers/index.html">Async Helpers</a> for in-depth documentation on async operations.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

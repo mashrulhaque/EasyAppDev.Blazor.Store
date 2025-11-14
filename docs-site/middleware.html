@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Middleware - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Extend EasyAppDev.Blazor.Store with custom middleware for logging, validation, analytics, and cross-cutting concerns">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Middleware</h1>
+            <p class="lead">Extend store behavior with custom middleware for cross-cutting concerns like logging, validation, and custom logic.</p>
+
+            <!-- Introduction -->
+            <section class="section">
+              <h2>What is Middleware?</h2>
+              <p>Middleware intercepts state updates before and after they happen, allowing you to add cross-cutting concerns without modifying your state logic. Think of it as a pipeline that wraps around every state update.</p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Key Use Cases</div>
+                <ul>
+                  <li><strong>Logging:</strong> Track state changes for debugging</li>
+                  <li><strong>DevTools Integration:</strong> Time-travel debugging with Redux DevTools</li>
+                  <li><strong>Persistence:</strong> Auto-save state to LocalStorage/SessionStorage</li>
+                  <li><strong>Validation:</strong> Enforce business rules before updates</li>
+                  <li><strong>Analytics:</strong> Track user actions and state changes</li>
+                  <li><strong>Notifications:</strong> Trigger side effects on specific actions</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Interface -->
+            <section class="section">
+              <h2>IMiddleware Interface</h2>
+              <p>All middleware implements the <code>IMiddleware&lt;TState&gt;</code> interface with two hooks:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">IMiddleware&lt;TState&gt;</div>
+                <pre><code class="language-csharp">public interface IMiddleware&lt;TState&gt; where TState : notnull
+{
+    // Called BEFORE state is updated
+    Task OnBeforeUpdateAsync(TState currentState, string? action);
+
+    // Called AFTER state has been updated
+    Task OnAfterUpdateAsync(TState newState, string? action);
+}</code></pre>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Important Notes</div>
+                <ul>
+                  <li>Middleware executes in the order it was registered</li>
+                  <li>Both hooks are asynchronous to support I/O operations</li>
+                  <li>The <code>action</code> parameter is optional and can be null</li>
+                  <li>Middleware should not modify state directly</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Built-in Middleware -->
+            <section class="section">
+              <h2>Built-in Middleware</h2>
+              <p>The library includes several production-ready middleware implementations:</p>
+
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🛠️</span>
+                    <strong>DevToolsMiddleware</strong>
+                  </div>
+                  <p>Integrates with Redux DevTools browser extension for time-travel debugging, state inspection, and action replay.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">💾</span>
+                    <strong>PersistenceMiddleware</strong>
+                  </div>
+                  <p>Automatically saves state to LocalStorage or SessionStorage on updates and restores it on app load.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📝</span>
+                    <strong>LoggingMiddleware</strong>
+                  </div>
+                  <p>Logs state changes to the console or your logging provider for debugging and monitoring.</p>
+                </div>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Quick Setup</div>
+                <p>Use <code>.WithDefaults(sp, "StoreName")</code> to automatically add DevTools and Logging middleware:</p>
+              </div>
+
+              <div class="code-block">
+                <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store.WithDefaults(sp, "MyApp"));  // Includes DevTools + Logging</code></pre>
+              </div>
+            </section>
+
+            <!-- Custom Middleware -->
+            <section class="section">
+              <h2>Creating Custom Middleware</h2>
+              <p>Implement <code>IMiddleware&lt;TState&gt;</code> to create your own middleware:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define the Middleware Class</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">LoggingMiddleware.cs</div>
+                    <pre><code class="language-csharp">public class LoggingMiddleware&lt;TState&gt; : IMiddleware&lt;TState&gt;
+    where TState : notnull
+{
+    private readonly ILogger&lt;LoggingMiddleware&lt;TState&gt;&gt; _logger;
+
+    public LoggingMiddleware(ILogger&lt;LoggingMiddleware&lt;TState&gt;&gt; logger)
+    {
+        _logger = logger;
+    }
+
+    public Task OnBeforeUpdateAsync(TState currentState, string? action)
+    {
+        _logger.LogInformation(
+            "Before update - Action: {Action}, State: {@State}",
+            action ?? "Unknown",
+            currentState);
+        return Task.CompletedTask;
+    }
+
+    public Task OnAfterUpdateAsync(TState newState, string? action)
+    {
+        _logger.LogInformation(
+            "After update - Action: {Action}, New State: {@State}",
+            action ?? "Unknown",
+            newState);
+        return Task.CompletedTask;
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Register the Middleware</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">Program.cs</div>
+                    <pre><code class="language-csharp">// Option 1: Using WithMiddleware
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store.WithMiddleware(
+        new LoggingMiddleware&lt;AppState&gt;(
+            sp.GetRequiredService&lt;ILogger&lt;LoggingMiddleware&lt;AppState&gt;&gt;&gt;())));
+
+// Option 2: Manual builder setup
+var logger = serviceProvider.GetRequiredService&lt;ILogger&lt;LoggingMiddleware&lt;AppState&gt;&gt;&gt;();
+var middleware = new LoggingMiddleware&lt;AppState&gt;(logger);
+
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store.WithMiddleware(middleware));</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Advanced Examples -->
+            <section class="section">
+              <h2>Advanced Examples</h2>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Validation Middleware</h3>
+                  <p>Enforce business rules before state updates:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">public class ValidationMiddleware&lt;TState&gt; : IMiddleware&lt;TState&gt;
+    where TState : notnull
+{
+    public Task OnBeforeUpdateAsync(TState currentState, string? action)
+    {
+        if (currentState is CartState cart && cart.Total > 10000)
+        {
+            throw new InvalidOperationException("Cart total exceeds limit");
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task OnAfterUpdateAsync(TState newState, string? action)
+        => Task.CompletedTask;
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Analytics Middleware</h3>
+                  <p>Track user actions for analytics:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">public class AnalyticsMiddleware&lt;TState&gt; : IMiddleware&lt;TState&gt;
+    where TState : notnull
+{
+    private readonly IAnalyticsService _analytics;
+
+    public AnalyticsMiddleware(IAnalyticsService analytics)
+    {
+        _analytics = analytics;
+    }
+
+    public Task OnBeforeUpdateAsync(TState currentState, string? action)
+        => Task.CompletedTask;
+
+    public async Task OnAfterUpdateAsync(TState newState, string? action)
+    {
+        if (!string.IsNullOrEmpty(action))
+        {
+            await _analytics.TrackEventAsync(new AnalyticsEvent
+            {
+                Name = action,
+                Properties = new { StateType = typeof(TState).Name }
+            });
+        }
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Notification Middleware</h3>
+                  <p>Show toast notifications on specific actions:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">public class NotificationMiddleware&lt;TState&gt; : IMiddleware&lt;TState&gt;
+    where TState : notnull
+{
+    private readonly IToastService _toast;
+
+    public NotificationMiddleware(IToastService toast)
+    {
+        _toast = toast;
+    }
+
+    public Task OnBeforeUpdateAsync(TState currentState, string? action)
+        => Task.CompletedTask;
+
+    public async Task OnAfterUpdateAsync(TState newState, string? action)
+    {
+        if (action == "ORDER_COMPLETED")
+        {
+            await _toast.ShowSuccessAsync("Order placed successfully!");
+        }
+        else if (action?.StartsWith("ERROR_") == true)
+        {
+            await _toast.ShowErrorAsync("An error occurred");
+        }
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Middleware Pipeline -->
+            <section class="section">
+              <h2>Middleware Pipeline</h2>
+              <p>Multiple middleware instances execute in registration order:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Chaining Multiple Middleware</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithMiddleware(new ValidationMiddleware&lt;AppState&gt;())
+        .WithMiddleware(new LoggingMiddleware&lt;AppState&gt;(logger))
+        .WithMiddleware(new AnalyticsMiddleware&lt;AppState&gt;(analytics))
+        .WithPersistence(sp, "app-state")
+        .WithDevTools(sp, "MyApp"));</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Execution Order</div>
+                <p><strong>OnBeforeUpdateAsync:</strong> Validation → Logging → Analytics → Persistence → DevTools</p>
+                <p><strong>OnAfterUpdateAsync:</strong> DevTools → Persistence → Analytics → Logging → Validation</p>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">✅</span>
+                    <strong>Keep Middleware Focused</strong>
+                  </div>
+                  <p>Each middleware should have a single responsibility (logging, validation, etc.)</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">✅</span>
+                    <strong>Don't Modify State</strong>
+                  </div>
+                  <p>Middleware should observe state changes, not modify them. Use Update() in components instead.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">✅</span>
+                    <strong>Handle Errors Gracefully</strong>
+                  </div>
+                  <p>Wrap async operations in try-catch to prevent middleware failures from breaking updates.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">✅</span>
+                    <strong>Use Action Names</strong>
+                  </div>
+                  <p>Always provide action names when updating: <code>Update(s => s.Method(), "ACTION_NAME")</code></p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Avoid Heavy Computation</strong>
+                  </div>
+                  <p>Keep middleware lightweight. Heavy processing should be done asynchronously or outside the update flow.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Be Careful with Ordering</strong>
+                  </div>
+                  <p>Validation should come first, persistence/DevTools last to ensure valid state is saved.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Navigation -->
+            <section class="section">
+              <div class="next-steps-grid">
+                <a href="./persistence.html" class="next-step-card">
+                  <div class="next-step-icon">📦</div>
+                  <h3>Persistence</h3>
+                  <p>Learn about auto-save and restore with LocalStorage</p>
+                </a>
+
+                <a href="./devtools.html" class="next-step-card">
+                  <div class="next-step-icon">🛠️</div>
+                  <h3>DevTools</h3>
+                  <p>Time-travel debugging with Redux DevTools</p>
+                </a>
+
+                <a href="./best-practices.html" class="next-step-card">
+                  <div class="next-step-icon">📖</div>
+                  <h3>Best Practices</h3>
+                  <p>Patterns and anti-patterns for effective state management</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

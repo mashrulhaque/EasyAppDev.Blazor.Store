@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>State Management - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Advanced state management patterns">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>State Management Patterns</h1>
+            <p class="lead">Advanced patterns for organizing and managing state across your Blazor application.</p>
+
+            <!-- Multiple Stores -->
+            <section class="section">
+              <h2>Multiple Stores</h2>
+              <p>
+                Split your application state into focused, domain-specific stores rather than one monolithic store.
+                This improves separation of concerns, makes testing easier, and allows teams to work independently.
+              </p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">When to Use Multiple Stores</div>
+                <ul>
+                  <li>Separate authentication from application data</li>
+                  <li>Isolate feature-specific state (shopping cart, notifications, etc.)</li>
+                  <li>Different lifecycle requirements (global vs. scoped state)</li>
+                  <li>Team boundaries in larger applications</li>
+                </ul>
+              </div>
+
+              <h3>Registration</h3>
+              <p>Register multiple stores independently in your Program.cs:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// Register separate stores for different domains
+builder.Services.AddStoreWithUtilities(
+    new AuthState(null),
+    (store, sp) => store.WithDefaults(sp, "Auth"));
+
+builder.Services.AddStoreWithUtilities(
+    new CartState(ImmutableList&lt;CartItem&gt;.Empty),
+    (store, sp) => store
+        .WithDefaults(sp, "Cart")
+        .WithPersistence(sp, "cart-state"));
+
+builder.Services.AddStoreWithUtilities(
+    new NotificationState(ImmutableList&lt;Notification&gt;.Empty),
+    (store, sp) => store.WithDefaults(sp, "Notifications"));</code></pre>
+              </div>
+
+              <h3>Usage in Components</h3>
+              <p>Access multiple stores by inheriting from one and injecting others:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Dashboard.razor</div>
+                <pre><code class="language-csharp">@page "/dashboard"
+@inherits StoreComponent&lt;AuthState&gt;
+@inject IStore&lt;CartState&gt; CartStore
+@inject IStore&lt;NotificationState&gt; NotificationStore
+
+&lt;div class="dashboard"&gt;
+    &lt;!-- Use primary store via State property --&gt;
+    &lt;h1&gt;Welcome, @State.CurrentUser?.Name&lt;/h1&gt;
+
+    &lt;!-- Access other stores via GetState() --&gt;
+    &lt;div class="cart-summary"&gt;
+        &lt;p&gt;Cart: @CartStore.GetState().ItemCount items&lt;/p&gt;
+        &lt;p&gt;Total: @CartStore.GetState().Total.ToString("C")&lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;div class="notifications"&gt;
+        @foreach (var notification in NotificationStore.GetState().Items)
+        {
+            &lt;div class="notification"&gt;@notification.Message&lt;/div&gt;
+        }
+    &lt;/div&gt;
+&lt;/div&gt;
+
+@code {
+    // Primary store updates via Update()
+    async Task Logout() =&gt; await Update(s =&gt; AuthState.Initial);
+
+    // Other stores via their Update() method
+    async Task ClearCart() =&gt; await CartStore.UpdateAsync(s =&gt; CartState.Empty, "CLEAR_CART");
+}</code></pre>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Best Practice</div>
+                <p>
+                  Inherit from the store you'll interact with most frequently. Inject other stores as dependencies.
+                  This keeps your component code clean and intentional.
+                </p>
+              </div>
+            </section>
+
+            <!-- Derived State -->
+            <section class="section">
+              <h2>Derived State</h2>
+              <p>
+                Computed properties that derive values from existing state. These are calculated on-demand and don't need to be stored separately,
+                ensuring your state stays minimal and avoiding synchronization issues.
+              </p>
+
+              <h3>Computed Properties</h3>
+              <p>Add read-only properties to your state record for derived values:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">TodoState.cs</div>
+                <pre><code class="language-csharp">public record TodoState(ImmutableList&lt;Todo&gt; Todos)
+{
+    public static TodoState Initial =&gt; new(ImmutableList&lt;Todo&gt;.Empty);
+
+    // Derived state: calculated on access
+    public int TotalCount =&gt; Todos.Count;
+    public int CompletedCount =&gt; Todos.Count(t =&gt; t.Completed);
+    public int ActiveCount =&gt; Todos.Count(t =&gt; !t.Completed);
+
+    // Computed percentages
+    public double CompletionRate =&gt; Todos.Count &gt; 0
+        ? (double)CompletedCount / Todos.Count * 100
+        : 0;
+
+    // Filtered collections
+    public ImmutableList&lt;Todo&gt; ActiveTodos =&gt;
+        Todos.Where(t =&gt; !t.Completed).ToImmutableList();
+
+    public ImmutableList&lt;Todo&gt; CompletedTodos =&gt;
+        Todos.Where(t =&gt; t.Completed).ToImmutableList();
+
+    // State transformation methods
+    public TodoState AddTodo(string text) =&gt;
+        this with { Todos = Todos.Add(new Todo(Guid.NewGuid(), text, false)) };
+
+    public TodoState ToggleTodo(Guid id) =&gt;
+        this with {
+            Todos = Todos.Select(t =&gt;
+                t.Id == id ? t with { Completed = !t.Completed } : t
+            ).ToImmutableList()
+        };
+}</code></pre>
+              </div>
+
+              <h3>Complex Derived State</h3>
+              <p>For more complex calculations, create dedicated record types:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">ShoppingCartState.cs</div>
+                <pre><code class="language-csharp">// Separate record for derived statistics
+public record CartSummary(
+    decimal Subtotal,
+    decimal Tax,
+    decimal Shipping,
+    decimal Total,
+    int ItemCount,
+    bool HasItems);
+
+public record CartState(ImmutableList&lt;CartItem&gt; Items)
+{
+    public static CartState Empty =&gt; new(ImmutableList&lt;CartItem&gt;.Empty);
+
+    // Simple derived values
+    public int ItemCount =&gt; Items.Sum(i =&gt; i.Quantity);
+    public decimal Subtotal =&gt; Items.Sum(i =&gt; i.Product.Price * i.Quantity);
+
+    // Complex derived state as a record
+    public CartSummary Summary
+    {
+        get
+        {
+            var subtotal = Subtotal;
+            var tax = subtotal * 0.08m; // 8% tax
+            var shipping = subtotal &gt; 50 ? 0 : 5.99m;
+            var total = subtotal + tax + shipping;
+
+            return new CartSummary(
+                Subtotal: subtotal,
+                Tax: tax,
+                Shipping: shipping,
+                Total: total,
+                ItemCount: ItemCount,
+                HasItems: Items.Count &gt; 0
+            );
+        }
+    }
+
+    public CartState AddItem(Product product) { /* ... */ }
+    public CartState RemoveItem(string productId) { /* ... */ }
+}</code></pre>
+              </div>
+
+              <h3>Component Usage</h3>
+              <div class="code-block">
+                <div class="code-block-title">TodoStats.razor</div>
+                <pre><code class="language-csharp">@inherits StoreComponent&lt;TodoState&gt;
+
+&lt;div class="stats"&gt;
+    &lt;div class="stat-card"&gt;
+        &lt;h3&gt;@State.TotalCount&lt;/h3&gt;
+        &lt;p&gt;Total Tasks&lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;div class="stat-card"&gt;
+        &lt;h3&gt;@State.CompletedCount&lt;/h3&gt;
+        &lt;p&gt;Completed&lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;div class="stat-card"&gt;
+        &lt;h3&gt;@State.CompletionRate.ToString("F1")%&lt;/h3&gt;
+        &lt;p&gt;Completion Rate&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Performance Consideration</div>
+                <p>
+                  Derived properties are recalculated on every access. For expensive computations accessed multiple times per render,
+                  consider using selectors with <code>SelectorStoreComponent</code> for memoization.
+                </p>
+              </div>
+            </section>
+
+            <!-- Optimistic Updates -->
+            <section class="section">
+              <h2>Optimistic Updates</h2>
+              <p>
+                Update the UI immediately while an async operation is in progress, then rollback if the operation fails.
+                This provides instant feedback and a snappier user experience.
+              </p>
+
+              <h3>Basic Pattern</h3>
+              <div class="code-block">
+                <div class="code-block-title">TodoList.razor</div>
+                <pre><code class="language-csharp">@page "/todos"
+@inherits StoreComponent&lt;TodoState&gt;
+@inject ITodoService TodoService
+
+&lt;!-- Component markup --&gt;
+
+@code {
+    async Task DeleteOptimistically(Guid id)
+    {
+        // 1. Save current state for potential rollback
+        var originalState = State;
+
+        // 2. Apply optimistic update immediately
+        await Update(s =&gt; s.RemoveTodo(id));
+
+        try
+        {
+            // 3. Perform async operation
+            await TodoService.DeleteAsync(id);
+        }
+        catch (Exception ex)
+        {
+            // 4. Rollback on error
+            await Update(_ =&gt; originalState);
+
+            // 5. Show error to user
+            await ShowError($"Failed to delete: {ex.Message}");
+        }
+    }
+}</code></pre>
+              </div>
+
+              <h3>With Loading States</h3>
+              <p>Combine optimistic updates with loading indicators for better UX:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">LikeButton.razor</div>
+                <pre><code class="language-csharp">@inherits StoreComponent&lt;PostState&gt;
+@inject IPostService PostService
+
+&lt;button @onclick="ToggleLike" disabled="@isProcessing"&gt;
+    @(State.IsLiked ? "❤️" : "🤍") @State.LikeCount
+&lt;/button&gt;
+
+@code {
+    private bool isProcessing = false;
+
+    async Task ToggleLike()
+    {
+        if (isProcessing) return;
+
+        isProcessing = true;
+        var originalState = State;
+
+        // Optimistic update
+        await Update(s =&gt; s.ToggleLike());
+
+        try
+        {
+            if (State.IsLiked)
+                await PostService.LikeAsync(State.Id);
+            else
+                await PostService.UnlikeAsync(State.Id);
+        }
+        catch
+        {
+            // Rollback on failure
+            await Update(_ =&gt; originalState);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}</code></pre>
+              </div>
+
+              <h3>Advanced: Retry Logic</h3>
+              <div class="code-block">
+                <div class="code-block-title">OptimisticHelper.cs</div>
+                <pre><code class="language-csharp">public static class OptimisticUpdateHelper
+{
+    public static async Task&lt;bool&gt; ExecuteOptimistically&lt;TState&gt;(
+        IStore&lt;TState&gt; store,
+        Func&lt;TState, TState&gt; optimisticUpdate,
+        Func&lt;Task&gt; asyncOperation,
+        int maxRetries = 3) where TState : notnull
+    {
+        var originalState = store.GetState();
+
+        // Apply optimistic update
+        await store.UpdateAsync(optimisticUpdate);
+
+        for (int attempt = 0; attempt &lt; maxRetries; attempt++)
+        {
+            try
+            {
+                await asyncOperation();
+                return true; // Success
+            }
+            catch when (attempt &lt; maxRetries - 1)
+            {
+                // Retry after delay
+                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
+            }
+        }
+
+        // All retries failed - rollback
+        await store.UpdateAsync(_ =&gt; originalState);
+        return false;
+    }
+}
+
+// Usage
+var success = await OptimisticUpdateHelper.ExecuteOptimistically(
+    Store,
+    s =&gt; s.RemoveTodo(id),
+    () =&gt; TodoService.DeleteAsync(id)
+);</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">When to Use Optimistic Updates</div>
+                <ul>
+                  <li><strong>High-probability success:</strong> Operations that rarely fail (likes, favorites, toggles)</li>
+                  <li><strong>Instant feedback:</strong> User interactions that should feel immediate</li>
+                  <li><strong>Reversible operations:</strong> Changes that can be easily rolled back</li>
+                  <li><strong>Avoid for:</strong> Critical operations (payments, deletions), unreliable networks</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- State Composition -->
+            <section class="section">
+              <h2>State Composition Patterns</h2>
+              <p>
+                Compose complex state from smaller, reusable pieces. This promotes code reuse and makes state easier to test and maintain.
+              </p>
+
+              <h3>Nested Records</h3>
+              <div class="code-block">
+                <div class="code-block-title">ComposedState.cs</div>
+                <pre><code class="language-csharp">// Composable sub-states
+public record UserProfile(string Name, string Email, string AvatarUrl);
+
+public record UserPreferences(
+    bool DarkMode,
+    string Language,
+    bool EmailNotifications);
+
+public record UserStats(
+    int PostCount,
+    int FollowerCount,
+    DateTime LastActive);
+
+// Composed state
+public record UserState(
+    UserProfile Profile,
+    UserPreferences Preferences,
+    UserStats Stats,
+    AsyncData&lt;ImmutableList&lt;Post&gt;&gt; Posts)
+{
+    public static UserState Initial =&gt; new(
+        Profile: new("", "", ""),
+        Preferences: new(false, "en", true),
+        Stats: new(0, 0, DateTime.UtcNow),
+        Posts: AsyncData&lt;ImmutableList&lt;Post&gt;&gt;.NotAsked()
+    );
+
+    // Update specific sub-states
+    public UserState UpdateProfile(UserProfile profile) =&gt;
+        this with { Profile = profile };
+
+    public UserState ToggleDarkMode() =&gt;
+        this with {
+            Preferences = Preferences with {
+                DarkMode = !Preferences.DarkMode
+            }
+        };
+
+    public UserState IncrementPostCount() =&gt;
+        this with {
+            Stats = Stats with {
+                PostCount = Stats.PostCount + 1,
+                LastActive = DateTime.UtcNow
+            }
+        };
+}</code></pre>
+              </div>
+
+              <h3>Shared State Behaviors</h3>
+              <p>Create reusable state patterns with extension methods:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">StateExtensions.cs</div>
+                <pre><code class="language-csharp">// Reusable pagination pattern
+public record PaginatedData&lt;T&gt;(
+    ImmutableList&lt;T&gt; Items,
+    int CurrentPage,
+    int PageSize,
+    int TotalItems)
+{
+    public int TotalPages =&gt; (int)Math.Ceiling((double)TotalItems / PageSize);
+    public bool HasPreviousPage =&gt; CurrentPage &gt; 1;
+    public bool HasNextPage =&gt; CurrentPage &lt; TotalPages;
+}
+
+public static class PaginatedDataExtensions
+{
+    public static PaginatedData&lt;T&gt; NextPage&lt;T&gt;(this PaginatedData&lt;T&gt; data) =&gt;
+        data.HasNextPage
+            ? data with { CurrentPage = data.CurrentPage + 1 }
+            : data;
+
+    public static PaginatedData&lt;T&gt; PreviousPage&lt;T&gt;(this PaginatedData&lt;T&gt; data) =&gt;
+        data.HasPreviousPage
+            ? data with { CurrentPage = data.CurrentPage - 1 }
+            : data;
+
+    public static PaginatedData&lt;T&gt; GoToPage&lt;T&gt;(this PaginatedData&lt;T&gt; data, int page) =&gt;
+        page &gt;= 1 && page &lt;= data.TotalPages
+            ? data with { CurrentPage = page }
+            : data;
+}
+
+// Usage in state
+public record ProductState(PaginatedData&lt;Product&gt; Products)
+{
+    public ProductState NextPage() =&gt;
+        this with { Products = Products.NextPage() };
+
+    public ProductState PreviousPage() =&gt;
+        this with { Products = Products.PreviousPage() };
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <h3>Organizing State</h3>
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📂</span>
+                    <strong>Group by Domain, Not by Type</strong>
+                  </div>
+                  <p>Organize state files by feature domain (Auth, Cart, User) rather than technical type (States, Actions).</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🎯</span>
+                    <strong>Keep Stores Focused</strong>
+                  </div>
+                  <p>Each store should have a single, clear responsibility. Split large stores into smaller, focused ones.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔄</span>
+                    <strong>Use Static Initial Values</strong>
+                  </div>
+                  <p>Define <code>static Initial</code> or <code>static Empty</code> properties for default state values.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">💡</span>
+                    <strong>Prefer Derived State Over Duplication</strong>
+                  </div>
+                  <p>Calculate values from existing state rather than storing them separately to avoid sync issues.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🧪</span>
+                    <strong>Test State Methods Independently</strong>
+                  </div>
+                  <p>State methods are pure functions - test them without mocks or component infrastructure.</p>
+                </div>
+              </div>
+
+              <h3>Anti-Patterns to Avoid</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// ❌ DON'T: Duplicate derived data
+public record BadState(
+    ImmutableList&lt;Todo&gt; Todos,
+    int CompletedCount,  // Duplicates what can be calculated
+    int TotalCount       // Duplicates what can be calculated
+);
+
+// ✅ DO: Calculate on access
+public record GoodState(ImmutableList&lt;Todo&gt; Todos)
+{
+    public int CompletedCount =&gt; Todos.Count(t =&gt; t.Completed);
+    public int TotalCount =&gt; Todos.Count;
+}
+
+// ❌ DON'T: Store UI state globally
+public record BadAppState(
+    UserData User,
+    bool IsModalOpen,      // UI state
+    int SelectedTabIndex   // UI state
+);
+
+// ✅ DO: Keep UI state local to components
+public record GoodAppState(UserData User);
+// Component: private bool isModalOpen = false;
+
+// ❌ DON'T: Deeply nested updates
+public UserState UpdateNestedProperty(string value) =&gt;
+    this with {
+        Profile = Profile with {
+            Settings = Settings with {
+                Privacy = Privacy with {
+                    EmailVisible = value
+                }
+            }
+        }
+    };
+
+// ✅ DO: Create focused update methods
+public UserState UpdateEmailVisibility(bool visible) =&gt;
+    this with {
+        Profile = Profile.WithEmailVisibility(visible)
+    };</code></pre>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./components.html" class="next-step-card">
+                  <div class="next-step-icon">🧩</div>
+                  <h3>Components</h3>
+                  <p>Learn how to build reactive components with StoreComponent and selectors.</p>
+                </a>
+
+                <a href="./performance.html" class="next-step-card">
+                  <div class="next-step-icon">📈</div>
+                  <h3>Performance</h3>
+                  <p>Optimize rendering with selectors and granular subscriptions.</p>
+                </a>
+
+                <a href="./middleware.html" class="next-step-card">
+                  <div class="next-step-icon">⚙️</div>
+                  <h3>Middleware</h3>
+                  <p>Extend store behavior with custom middleware hooks.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

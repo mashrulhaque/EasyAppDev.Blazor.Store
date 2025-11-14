@@ -1,0 +1,104 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">EasyAppDev.Blazor.Store.Sample</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span aria-hidden="true">🏠</span> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 mt-3">
+            <small class="text-muted ps-2">EXAMPLES</small>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span aria-hidden="true">🔢</span> Counter
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="todos">
+                <span aria-hidden="true">📝</span> Todo List
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="profile">
+                <span aria-hidden="true">👤</span> User Profile
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="cart">
+                <span aria-hidden="true">🛒</span> Shopping Cart
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="theme">
+                <span aria-hidden="true">🎨</span> Theme Settings
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="debounce-demo">
+                <span aria-hidden="true">⏱️</span> Debounce Demo
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="async-data-demo">
+                <span aria-hidden="true">🔄</span> AsyncData Demo
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="execute-async-demo">
+                <span aria-hidden="true">⚡</span> ExecuteAsync Demo
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="lazy-load-demo">
+                <span aria-hidden="true">📦</span> LazyLoad Demo
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="form-validation">
+                <span aria-hidden="true">✅</span> Form Validation
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 mt-3">
+            <small class="text-muted ps-2">COMPREHENSIVE</small>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="comprehensive-demo">
+                <span aria-hidden="true">🎯</span> All Features Demo
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3 mt-3">
+            <small class="text-muted ps-2">TOOLS</small>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="diagnostics">
+                <span aria-hidden="true">🔍</span> Diagnostics
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

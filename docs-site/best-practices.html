@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Best Practices - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Best practices, do's and don'ts, troubleshooting, and common pitfalls for EasyAppDev.Blazor.Store state management">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link active"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Best Practices</h1>
+            <p>Follow these guidelines to write clean, maintainable state management code with EasyAppDev.Blazor.Store.</p>
+
+            <!-- Do's Section -->
+            <section class="section">
+              <h2>✅ Do's - Follow These Patterns</h2>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Use Records for State</h3>
+                  <p>Always define state as C# records to leverage immutability and structural equality.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public record AppState(int Count, string Name);</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Use 'with' Expressions</h3>
+                  <p>Always use <code>with</code> expressions to create modified copies of state.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public AppState Increment() => this with { Count = Count + 1 };</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Use Immutable Collections</h3>
+                  <p>Use <code>ImmutableList</code> and <code>ImmutableDictionary</code> for collections in your state.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public record State(ImmutableList&lt;Item&gt; Items);</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Keep State Methods Pure</h3>
+                  <p>State methods should be pure functions with no side effects, I/O, or logging.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public State AddItem(Item item) => this with { Items = Items.Add(item) };</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Batch Updates When Possible</h3>
+                  <p>Chain multiple state transformations into a single update to minimize re-renders.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">await Update(s => s.SetLoading(true).ClearErrors().ResetForm());</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Don'ts Section -->
+            <section class="section">
+              <h2>❌ Don'ts - Avoid These Anti-Patterns</h2>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Don't Mutate State</h3>
+                  <p>Never mutate state properties directly. This breaks immutability and reactivity.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">❌ Wrong</div>
+                    <pre><code class="language-csharp">public void Increment() { Count++; }  // Wrong! Mutates state</code></pre>
+                  </div>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public AppState Increment() => this with { Count = Count + 1 };</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Don't Use Mutable Collections</h3>
+                  <p>Avoid <code>List&lt;T&gt;</code>, <code>Dictionary&lt;K,V&gt;</code>, and other mutable collections.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">❌ Wrong</div>
+                    <pre><code class="language-csharp">public record State(List&lt;Item&gt; Items);  // Wrong! Mutable collection</code></pre>
+                  </div>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct</div>
+                    <pre><code class="language-csharp">public record State(ImmutableList&lt;Item&gt; Items);</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-content">
+                  <h3>Don't Add Side Effects to State Methods</h3>
+                  <p>State methods must be pure functions. Put side effects (logging, API calls) in components.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">❌ Wrong</div>
+                    <pre><code class="language-csharp">public State AddItem(Item item)
+{
+    _logger.Log("Adding");  // Wrong! Side effect!
+    return this with { Items = Items.Add(item) };
+}</code></pre>
+                  </div>
+                  <div class="code-block">
+                    <div class="code-block-title">✅ Correct - Do Side Effects in Components</div>
+                    <pre><code class="language-csharp">@code {
+    async Task AddItem(Item item)
+    {
+        Logger.LogInformation("Adding item");
+        await Update(s => s.AddItem(item));
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Troubleshooting Section -->
+            <section class="section">
+              <h2>🔧 Troubleshooting</h2>
+              <p>Common issues and their solutions:</p>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Component not updating?</div>
+                <p>Make sure your component inherits from <code>StoreComponent&lt;TState&gt;</code>.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">@inherits StoreComponent&lt;CounterState&gt;</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">State not changing?</div>
+                <p>Always use <code>with</code> expressions to create new state instances.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// ✅ Correct
+return state with { Count = 5 };
+
+// ❌ Wrong
+state.Count = 5;
+return state;</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Collections not updating?</div>
+                <p>Use <code>ImmutableList</code> and its transformation methods like <code>Add()</code>, <code>Remove()</code>, <code>RemoveAll()</code>.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// ✅ Correct
+return this with { Items = Items.Add(newItem) };
+
+// ❌ Wrong
+Items.Add(newItem);
+return this;</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Async operations failing?</div>
+                <p>Use <code>UpdateAsync</code> instead of <code>Update</code> for async state methods.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// ✅ Correct
+await UpdateAsync(async s => await s.LoadDataAsync());
+
+// ❌ Wrong
+await Update(async s => await s.LoadDataAsync());</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">ExecuteAsync not available?</div>
+                <p>Make sure you registered the store utilities in Program.cs.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// ✅ Use this registration method
+builder.Services.AddStoreWithUtilities(...);</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">UpdateDebounced/Throttle/LazyLoad not available?</div>
+                <p>Register utility services before using async helpers.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// ✅ All-in-one registration
+builder.Services.AddStoreWithUtilities(...);
+
+// OR manually
+builder.Services.AddStoreUtilities();</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Common Pitfalls Section -->
+            <section class="section">
+              <h2>⚠️ Common Pitfalls</h2>
+
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Forgetting 'with' expressions</strong>
+                  </div>
+                  <p>Always use <code>this with { Property = value }</code> instead of direct assignment.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Using Update instead of UpdateAsync</strong>
+                  </div>
+                  <p>For async state methods, use <code>UpdateAsync(async s => await s.Method())</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Mutating collections</strong>
+                  </div>
+                  <p>Use <code>ImmutableList.Add()</code> not <code>List.Add()</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Side effects in state methods</strong>
+                  </div>
+                  <p>Keep state methods pure. No logging, no API calls, no database access.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Forgetting optional action names</strong>
+                  </div>
+                  <p>While optional, providing action names helps with debugging: <code>Update(s => s.Method(), "ACTION_NAME")</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Not registering utilities</strong>
+                  </div>
+                  <p>Always call <code>AddStoreUtilities()</code> or use <code>AddStoreWithUtilities()</code> before using <code>StoreComponent&lt;T&gt;</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">⚠️</span>
+                    <strong>Missing async executor registration</strong>
+                  </div>
+                  <p>Each state type needs <code>AddAsyncActionExecutor&lt;TState&gt;()</code> to use <code>ExecuteAsync</code>. Or use <code>AddStoreWithUtilities()</code>.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Additional Tips Section -->
+            <section class="section">
+              <h2>💡 Additional Tips</h2>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Performance Optimization</div>
+                <p>Use <code>SelectorStoreComponent</code> for granular subscriptions to prevent unnecessary re-renders.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">@inherits SelectorStoreComponent&lt;AppState&gt;
+
+@code {
+    // Only re-render when Counter changes
+    protected override object SelectState(AppState state) => state.Counter;
+}</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Derived State</div>
+                <p>Use computed properties in your state records for derived values.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">public record TodoState(ImmutableList&lt;Todo&gt; Todos)
+{
+    public int CompletedCount => Todos.Count(t => t.Completed);
+    public double CompletionRate => Todos.Count > 0
+        ? (double)CompletedCount / Todos.Count * 100 : 0;
+}</code></pre>
+                </div>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Debugging with DevTools</div>
+                <p>Enable Redux DevTools integration for time-travel debugging and state inspection.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store.WithDefaults(sp, "MyApp"));  // DevTools included!</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./examples.html" class="next-step-card">
+                  <div class="next-step-icon">💻</div>
+                  <h3>View Examples</h3>
+                  <p>See real-world patterns and code examples.</p>
+                </a>
+
+                <a href="./api-reference.html" class="next-step-card">
+                  <div class="next-step-icon">📚</div>
+                  <h3>API Reference</h3>
+                  <p>Complete API documentation and method signatures.</p>
+                </a>
+
+                <a href="./performance.html" class="next-step-card">
+                  <div class="next-step-icon">📈</div>
+                  <h3>Performance Tips</h3>
+                  <p>Learn how to optimize your state management.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using EasyAppDev.Blazor.Store.Sample;
+using EasyAppDev.Blazor.Store.Sample.State;
+using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Blazor;
+using EasyAppDev.Blazor.Store.Persistence;
+using Microsoft.JSInterop;
+using EasyAppDev.Blazor.Store.Diagnostics;
+using EasyAppDev.Blazor.Store.AsyncActions;
+using EasyAppDev.Blazor.Store.Utilities;
+
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
+
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+
+// Register diagnostics service - only active in DEBUG builds
+builder.Services.AddStoreDiagnostics();
+
+// Register utility services required by StoreComponent
+// Note: AddStoreUtilities() registers IDebounceManager, IThrottleManager, and ILazyCache
+// These services are required dependencies for StoreComponent<T>
+builder.Services.AddStoreUtilities();
+
+// Register async action executors ONLY for state types that use ExecuteAsync
+// These must be registered BEFORE their corresponding stores
+builder.Services.AddAsyncActionExecutor<UserManagementState>();
+builder.Services.AddAsyncActionExecutor<ComprehensiveDemoState>();
+
+// ============================================================================
+// Counter Store - Basic example with DevTools and Logging
+// ============================================================================
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Debounce Store - Demonstrates debounce and throttle functionality
+// ============================================================================
+builder.Services.AddStore(
+    new DebounceState(),
+    (store, sp) => store.WithDefaults(sp, "Debounce Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Todo Store - Demonstrates immutable collections (ImmutableList)
+// ============================================================================
+builder.Services.AddStore(
+    TodoState.Empty,
+    (store, sp) => store.WithDefaults(sp, "Todo Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// User Profile Store - Demonstrates async actions and loading states
+// ============================================================================
+builder.Services.AddStore(
+    UserProfileState.Empty,
+    (store, sp) => store.WithDefaults(sp, "User Profile Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// AsyncData Demo Store - Demonstrates AsyncData<T> wrapper pattern
+// Simplifies async state from 20+ lines to 1 property!
+// ============================================================================
+builder.Services.AddStore(
+    AsyncDataDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "AsyncData Demo Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// User Management Store - Demonstrates ExecuteAsync helper
+// Automatic error handling - reduces try-catch from 12+ lines to 5 lines!
+// ============================================================================
+builder.Services.AddStore(
+    UserManagementState.Initial,
+    (store, sp) => store.WithDefaults(sp, "User Management Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Shopping Cart Store - Demonstrates persistence with LocalStorage
+// State survives page refreshes and browser restarts
+// WithPersistence automatically loads and saves state - no manual hydration needed!
+// ============================================================================
+builder.Services.AddStore(
+    ShoppingCartState.Empty,
+    (store, sp) => store.WithDefaults(sp, "Shopping Cart Store")
+                        .WithPersistence(sp, "shopping-cart-state")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Theme Store - Demonstrates selector optimization with SelectorStoreComponent
+// Multiple components can subscribe to different slices of state
+// WithPersistence automatically loads and saves state - no manual hydration needed!
+// ============================================================================
+builder.Services.AddStore(
+    ThemeState.Default,
+    (store, sp) => store.WithDefaults(sp, "Theme Store")
+                        .WithPersistence(sp, "theme-state")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Product Catalog Store - Demonstrates LazyLoad with caching
+// Automatic caching with request deduplication - no manual cache management!
+// ============================================================================
+builder.Services.AddStore(
+    new ProductCatalogState(),
+    (store, sp) => store.WithDefaults(sp, "Product Catalog Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Comprehensive Demo Store - Demonstrates ALL async helpers working together
+// Debounce + Throttle + ExecuteAsync + LazyLoad + AsyncData
+// Real-world e-commerce scenario showing all features in action!
+// ============================================================================
+builder.Services.AddStore(
+    ComprehensiveDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "Comprehensive Demo Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+// ============================================================================
+// Form Validation Store - Demonstrates form state management and validation
+// Field-level validation, async validation, and form submission
+// Real-world form patterns with comprehensive error handling!
+// ============================================================================
+builder.Services.AddStore(
+    new FormValidationState(),
+    (store, sp) => store.WithDefaults(sp, "Form Validation Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+await builder.Build().RunAsync();

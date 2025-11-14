@@ -1,0 +1,141 @@
+@page "/theme"
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<ThemeState>
+
+<PageTitle>Theme Settings</PageTitle>
+
+<div class="container mt-4">
+    <h1>🎨 Theme Settings</h1>
+    <p class="lead">Demonstrates <strong>selector optimization</strong> with SelectorStoreComponent</p>
+
+    <div class="alert alert-info">
+        <h5>💡 What This Demo Shows:</h5>
+        <ul class="mb-0">
+            <li><strong>SelectorStoreComponent</strong> for granular subscriptions</li>
+            <li>Components only re-render when their selected data changes</li>
+            <li>Performance optimization for complex state</li>
+            <li>Multiple components subscribing to different slices of state</li>
+        </ul>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Theme Selection</h5>
+                </div>
+                <div class="card-body">
+                    <ThemeSelector />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Font Size</h5>
+                </div>
+                <div class="card-body">
+                    <FontSizeControl />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Accessibility</h5>
+                </div>
+                <div class="card-body">
+                    <AccessibilityControls />
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Render Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <RenderStats />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Preview</h5>
+                </div>
+                <div class="card-body">
+                    <ThemePreview />
+                </div>
+            </div>
+
+            <button class="btn btn-danger w-100" @onclick="@(() => Update(s => s.Reset()))">
+                Reset All Settings
+            </button>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5>📖 Code Example</h5>
+        </div>
+        <div class="card-body">
+            <h6>SelectorStoreComponent Usage:</h6>
+            <pre class="bg-light p-3"><code>// Component that only re-renders when CurrentTheme changes
+@@inherits SelectorStoreComponent&lt;ThemeState, Theme&gt;
+
+protected override Theme SelectState(ThemeState state)
+    => state.CurrentTheme;
+
+// This component won't re-render when FontSize, Animations, etc. change!
+// Only when CurrentTheme changes.</code></pre>
+
+            <h6 class="mt-3">Full State Component (re-renders on any change):</h6>
+            <pre class="bg-light p-3"><code>@@inherits StoreComponent&lt;ThemeState&gt;
+
+// Re-renders whenever ANY property in ThemeState changes</code></pre>
+
+            <h6 class="mt-3">Benefits of Selectors:</h6>
+            <ul>
+                <li>✅ <strong>Performance:</strong> Only re-render when relevant data changes</li>
+                <li>✅ <strong>Granular updates:</strong> Multiple components can subscribe to different slices</li>
+                <li>✅ <strong>Automatic optimization:</strong> SelectorStoreComponent handles equality checks</li>
+                <li>✅ <strong>Composability:</strong> Build complex UIs from focused components</li>
+            </ul>
+
+            <h6 class="mt-3">Example Scenario:</h6>
+            <pre class="bg-light p-3"><code>// State has 5 properties
+ThemeState(CurrentTheme, FontSize, Animations, ReducedMotion, HighContrast)
+
+// Component A only cares about CurrentTheme
+@@inherits SelectorStoreComponent&lt;ThemeState, Theme&gt;
+protected override Theme SelectState(ThemeState state) => state.CurrentTheme;
+
+// Component B only cares about FontSize
+@@inherits SelectorStoreComponent&lt;ThemeState, int&gt;
+protected override int SelectState(ThemeState state) => state.FontSize;
+
+// Changing FontSize:
+// ✅ Component B re-renders
+// ❌ Component A does NOT re-render (performance win!)</code></pre>
+
+            <h6 class="mt-3">Complex Selectors:</h6>
+            <pre class="bg-light p-3"><code>// Select multiple properties as a tuple/record
+@@inherits SelectorStoreComponent&lt;ThemeState, (Theme, bool)&gt;
+
+protected override (Theme, bool) SelectState(ThemeState state)
+    => (state.CurrentTheme, state.HighContrast);
+
+// Or create a custom selector type
+public record ThemeInfo(Theme Theme, bool HighContrast);
+
+@@inherits SelectorStoreComponent&lt;ThemeState, ThemeInfo&gt;
+
+protected override ThemeInfo SelectState(ThemeState state)
+    => new(state.CurrentTheme, state.HighContrast);</code></pre>
+        </div>
+    </div>
+</div>
+
+@code {
+    // This parent component uses full StoreComponent and will re-render on any change
+    // Child components use SelectorStoreComponent for optimization
+}

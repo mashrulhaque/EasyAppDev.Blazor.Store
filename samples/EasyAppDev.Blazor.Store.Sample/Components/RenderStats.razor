@@ -1,0 +1,38 @@
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<ThemeState>
+
+<div class="alert alert-secondary mb-0">
+    <h6>This component uses full StoreComponent</h6>
+    <p class="mb-2">It re-renders on <strong>ANY</strong> state change:</p>
+    <ul class="mb-2">
+        <li>Theme: @State.CurrentTheme</li>
+        <li>Font Size: @State.FontSize px</li>
+        <li>Animations: @(State.Animations ? "✓" : "✗")</li>
+        <li>Reduced Motion: @(State.ReducedMotion ? "✓" : "✗")</li>
+        <li>High Contrast: @(State.HighContrast ? "✓" : "✗")</li>
+    </ul>
+    @if (State.LastChanged.HasValue)
+    {
+        <small class="text-muted">
+            Last changed: @State.LastChanged.Value.ToString("h:mm:ss.fff tt")
+        </small>
+    }
+    <div class="mt-2">
+        <strong class="text-danger">
+            Render count: @_renderCount
+        </strong>
+        <small class="d-block text-muted">
+            (This increases on ANY change - compare with other components!)
+        </small>
+    </div>
+</div>
+
+@code {
+    private int _renderCount = 0;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        _renderCount++;
+    }
+}

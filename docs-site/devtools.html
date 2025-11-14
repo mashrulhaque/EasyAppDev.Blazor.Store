@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevTools - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Redux DevTools integration and built-in diagnostics for debugging Blazor state management with time-travel debugging, performance monitoring, and more.">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>DevTools & Diagnostics</h1>
+            <p class="lead">Debug and monitor your Blazor state with powerful developer tools including Redux DevTools integration and built-in diagnostics.</p>
+
+            <!-- Redux DevTools Integration -->
+            <section class="section">
+              <h2>Redux DevTools Integration</h2>
+              <p>EasyAppDev.Blazor.Store seamlessly integrates with the Redux DevTools browser extension, bringing powerful time-travel debugging and state inspection to your Blazor applications.</p>
+
+              <h3>Features</h3>
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🕐</span>
+                    <strong>Time-travel debugging</strong>
+                  </div>
+                  <p>Navigate through your application's state history, jump to any point in time, and replay actions.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📊</span>
+                    <strong>State diffs and inspection</strong>
+                  </div>
+                  <p>View detailed state changes, compare before/after states, and inspect the current state tree.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🎬</span>
+                    <strong>Action replay</strong>
+                  </div>
+                  <p>Replay specific actions to reproduce bugs and understand state transformations.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📸</span>
+                    <strong>Import/export snapshots</strong>
+                  </div>
+                  <p>Save and share state snapshots for debugging, testing, or collaboration.</p>
+                </div>
+              </div>
+
+              <h3>Installation</h3>
+              <p>First, install the Redux DevTools browser extension:</p>
+              <ul>
+                <li><a href="https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd" target="_blank" rel="noopener noreferrer">Chrome Extension</a></li>
+                <li><a href="https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/" target="_blank" rel="noopener noreferrer">Firefox Extension</a></li>
+                <li><a href="https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei" target="_blank" rel="noopener noreferrer">Edge Extension</a></li>
+              </ul>
+              <p>More information: <a href="https://github.com/reduxjs/redux-devtools" target="_blank" rel="noopener noreferrer">Redux DevTools GitHub</a></p>
+
+              <h3>Usage</h3>
+              <p>Enable DevTools by using <code>WithDefaults()</code> when registering your store:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store.WithDefaults(sp, "MyApp"));  // DevTools included!</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">What is WithDefaults()?</div>
+                <p><code>WithDefaults()</code> is a convenience method that automatically configures:</p>
+                <ul>
+                  <li>Redux DevTools integration</li>
+                  <li>Logging middleware</li>
+                  <li>JSRuntime integration for browser APIs</li>
+                </ul>
+              </div>
+
+              <p>Once enabled, open the Redux DevTools in your browser to:</p>
+              <ul>
+                <li>View all state changes in real-time</li>
+                <li>Inspect the current state tree</li>
+                <li>Jump to any previous state (time-travel)</li>
+                <li>Export/import state snapshots</li>
+              </ul>
+            </section>
+
+            <!-- Diagnostics -->
+            <section class="section">
+              <h2>Diagnostics (DEBUG builds only)</h2>
+              <p>For deeper insights during development, use the built-in diagnostics panel. This feature is <strong>only available in DEBUG builds</strong> and has zero overhead in production releases.</p>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">DEBUG Only</div>
+                <p>The diagnostics system is compiled out in RELEASE builds, ensuring zero performance impact in production. Use conditional compilation to include the diagnostic panel only in debug mode.</p>
+              </div>
+
+              <h3>Setup</h3>
+              <p>Register diagnostics services and configure your store to use them:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// Register diagnostics service
+builder.Services.AddStoreDiagnostics();
+
+// Configure store with diagnostics
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store
+        .WithDefaults(sp, "Counter")
+        .WithDiagnosticsIfAvailable(sp));</code></pre>
+              </div>
+
+              <h3>Usage</h3>
+              <p>Add the diagnostic panel to your component or page:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">DiagnosticsPage.razor</div>
+                <pre><code class="language-csharp">#if DEBUG
+&lt;DiagnosticPanel DisplayMode="DiagnosticDisplayMode.Inline" /&gt;
+#endif</code></pre>
+              </div>
+
+              <h3>What Does It Track?</h3>
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📜</span>
+                    <strong>Action History</strong>
+                  </div>
+                  <p>Complete log of all state updates with action names and timestamps.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📊</span>
+                    <strong>Performance Metrics</strong>
+                  </div>
+                  <p>Track update times, identify slow operations, and monitor P95/P99 percentiles.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🎨</span>
+                    <strong>Render Tracking</strong>
+                  </div>
+                  <p>See which components re-render on state changes and identify unnecessary updates.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔗</span>
+                    <strong>Subscription Monitoring</strong>
+                  </div>
+                  <p>View active subscriptions and detect potential memory leaks from undisposed subscribers.</p>
+                </div>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Zero Production Overhead</div>
+                <p>Thanks to conditional compilation, all diagnostic code is completely removed from RELEASE builds. You get powerful debugging tools during development without any performance cost in production.</p>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <h3>Naming Your Stores</h3>
+              <p>Give your stores descriptive names to make debugging easier:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">// Good: Descriptive names
+store.WithDefaults(sp, "UserAuthentication")
+store.WithDefaults(sp, "ShoppingCart")
+store.WithDefaults(sp, "TodoList")
+
+// Avoid: Generic names
+store.WithDefaults(sp, "Store")
+store.WithDefaults(sp, "State")</code></pre>
+              </div>
+
+              <h3>Action Names</h3>
+              <p>Provide meaningful action names for better debugging:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">// Explicit action names
+await Update(s => s.Increment(), "INCREMENT_COUNTER");
+await Update(s => s.AddTodo(text), "ADD_TODO");
+
+// Or let the method name serve as the action
+await Update(s => s.Increment());  // Auto-tracked as state change</code></pre>
+              </div>
+
+              <h3>Using Both Tools Together</h3>
+              <p>Combine Redux DevTools and Diagnostics for maximum insight:</p>
+              <ul>
+                <li><strong>Redux DevTools</strong>: Track state changes and time-travel through history</li>
+                <li><strong>Diagnostics</strong>: Monitor performance, renders, and subscriptions</li>
+              </ul>
+            </section>
+
+            <!-- Related Pages -->
+            <section class="section">
+              <h2>Related Topics</h2>
+              <div class="next-steps-grid">
+                <a href="./middleware.html" class="next-step-card">
+                  <div class="next-step-icon">⚙️</div>
+                  <h3>Middleware</h3>
+                  <p>Learn how to create custom middleware for logging, validation, and more.</p>
+                </a>
+
+                <a href="./performance.html" class="next-step-card">
+                  <div class="next-step-icon">📈</div>
+                  <h3>Performance</h3>
+                  <p>Optimize your app with selectors and best practices.</p>
+                </a>
+
+                <a href="./best-practices.html" class="next-step-card">
+                  <div class="next-step-icon">📖</div>
+                  <h3>Best Practices</h3>
+                  <p>Follow recommended patterns for maintainable state management.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

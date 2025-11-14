@@ -1,0 +1,340 @@
+@page "/comprehensive-demo"
+@inherits StoreComponent<ComprehensiveDemoState>
+@using System.Collections.Immutable
+@using EasyAppDev.Blazor.Store.AsyncActions
+
+<PageTitle>Comprehensive Demo - All Async Features</PageTitle>
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4">Comprehensive Demo - All Async Helpers Together</h2>
+    <p class="lead">This demo showcases all async helper features working together in a realistic e-commerce scenario.</p>
+
+    <div class="row mt-4">
+        <!-- Left Panel: Search & Filters -->
+        <div class="col-md-4">
+            <!-- 1. Debounced Search -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <span class="badge bg-light text-primary me-2">1</span>
+                        UpdateDebounced - Search
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <input class="form-control form-control-lg"
+                           @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"
+                           placeholder="Type to search products..."
+                           value="@State.SearchQuery" />
+
+                    <div class="mt-2 text-muted small">
+                        <div><strong>Query:</strong> @(string.IsNullOrEmpty(State.SearchQuery) ? "(none)" : State.SearchQuery)</div>
+                        <div><strong>Search Count:</strong> @State.SearchCount</div>
+                        <div class="text-success">✓ Debouncing prevents excessive updates</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ExecuteAsync - Load Button -->
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <span class="badge bg-light text-success me-2">2</span>
+                        ExecuteAsync - Load Data
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-success btn-lg w-100"
+                            @onclick="SearchProducts"
+                            disabled="@State.SearchResults.IsLoading">
+                        @if (State.SearchResults.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Loading...</span>
+                        }
+                        else
+                        {
+                            <span>🔍 Search Products</span>
+                        }
+                    </button>
+
+                    @if (State.SearchResults.HasError)
+                    {
+                        <div class="alert alert-danger mt-2 mb-0">
+                            <strong>Error:</strong> @State.SearchResults.Error
+                        </div>
+                    }
+
+                    <div class="mt-2 text-muted small">
+                        <div class="text-success">✓ Automatic loading/success/error states</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Throttled Scroll Tracking -->
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <span class="badge bg-dark me-2">3</span>
+                        UpdateThrottled - Scroll
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div style="height: 150px; overflow-y: scroll; border: 2px solid #dee2e6; border-radius: 4px; background: #f8f9fa;"
+                         @onscroll="@(e => UpdateThrottled(s => s.IncrementScroll(), 100))">
+                        <div style="height: 500px; padding: 15px;">
+                            <p class="text-center text-muted"><strong>Scroll here to test throttling</strong></p>
+                            <p>Scroll events are throttled to once every 100ms...</p>
+                            <p>Without throttling, this would fire hundreds of times per second!</p>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <div><strong>Scroll Events:</strong> @State.ScrollEvents</div>
+                        <div class="text-success">✓ Throttling limits high-frequency events</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Results -->
+        <div class="col-md-8">
+            @if (State.SearchResults.IsNotAsked)
+            {
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <h4 class="text-muted">👆 Enter a search query and click Search to begin</h4>
+                        <p class="text-muted">This demo demonstrates:</p>
+                        <ul class="list-unstyled">
+                            <li>✓ Debounced search input</li>
+                            <li>✓ ExecuteAsync for data loading</li>
+                            <li>✓ AsyncData state management</li>
+                            <li>✓ LazyLoad with caching</li>
+                            <li>✓ Throttled scroll tracking</li>
+                        </ul>
+                    </div>
+                </div>
+            }
+            else if (State.SearchResults.IsLoading)
+            {
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                        <h4 class="mt-3">Loading products...</h4>
+                    </div>
+                </div>
+            }
+            else if (State.SearchResults.HasData)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Search Results (@State.SearchResults.Data!.Count products)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @foreach (var product in State.SearchResults.Data!)
+                            {
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">@product.Name</h6>
+                                            <p class="card-text text-primary h5">$@product.Price.ToString("N2")</p>
+
+                                            <button class="btn btn-sm btn-outline-primary w-100"
+                                                    @onclick="@(() => LoadDetails(product.Id))"
+                                                    disabled="@State.LoadingDetails.Contains(product.Id)">
+                                                @if (State.LoadingDetails.Contains(product.Id))
+                                                {
+                                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                                    <span>Loading...</span>
+                                                }
+                                                else if (State.ProductDetails.ContainsKey(product.Id))
+                                                {
+                                                    <span>✓ View Cached Details</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>📦 Load Details</span>
+                                                }
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. LazyLoad Details Panel -->
+                @if (State.SelectedProductDetails != null)
+                {
+                    <div class="card mt-3">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <span class="badge bg-light text-info me-2">4</span>
+                                LazyLoad - Product Details (Cached)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <h4>@State.SelectedProductDetails.Name</h4>
+                            <p class="lead text-primary">$@State.SelectedProductDetails.Price.ToString("N2")</p>
+                            <p>@State.SelectedProductDetails.Description</p>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <strong>In Stock:</strong> @State.SelectedProductDetails.InStock units
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <small class="text-muted">
+                                        Loaded at @State.SelectedProductDetails.LoadedAt.ToString("HH:mm:ss")
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="alert alert-info mt-3 mb-0">
+                                <strong>LazyLoad Benefits:</strong> Automatic caching, request deduplication,
+                                and optional expiration (cached for 5 minutes)
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Statistics Panel -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📊 Performance Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="display-4">@State.SearchCount</div>
+                            <div class="text-muted">Search Executions</div>
+                            <small class="text-success">Debounced</small>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="display-4">@State.ScrollEvents</div>
+                            <div class="text-muted">Scroll Events</div>
+                            <small class="text-success">Throttled</small>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="display-4">@State.ProductDetails.Count</div>
+                            <div class="text-muted">Cached Products</div>
+                            <small class="text-success">LazyLoaded</small>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="display-4">@State.CacheHits</div>
+                            <div class="text-muted">Cache Hits</div>
+                            <small class="text-success">Saved API Calls</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">✨ Features Demonstrated</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>UpdateDebounced</h6>
+                            <p class="text-muted small">Search input is debounced by 300ms, reducing unnecessary updates from 10-20 per second to 1.</p>
+
+                            <h6>ExecuteAsync</h6>
+                            <p class="text-muted small">Automatic loading/success/error state management. No manual try-catch blocks needed.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>UpdateThrottled</h6>
+                            <p class="text-muted small">Scroll events are throttled to once per 100ms, preventing performance issues.</p>
+
+                            <h6>LazyLoad</h6>
+                            <p class="text-muted small">Product details are cached for 5 minutes with automatic request deduplication.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    async Task SearchProducts()
+    {
+        await ExecuteAsync<List<Product>>(
+            async () =>
+            {
+                await Task.Delay(1000); // Simulate API call
+                var query = State.SearchQuery.ToLower();
+
+                // Return filtered products
+                var allProducts = new List<Product>
+                {
+                    new(1, "Gaming Laptop Pro", 1299.99m, "/images/laptop.jpg"),
+                    new(2, "Wireless Mouse", 29.99m, "/images/mouse.jpg"),
+                    new(3, "Mechanical Keyboard RGB", 149.99m, "/images/keyboard.jpg"),
+                    new(4, "4K Monitor 27\"", 449.99m, "/images/monitor.jpg"),
+                    new(5, "USB-C Hub", 79.99m, "/images/hub.jpg"),
+                    new(6, "Laptop Stand", 49.99m, "/images/stand.jpg"),
+                    new(7, "Webcam HD", 89.99m, "/images/webcam.jpg"),
+                    new(8, "Headset Gaming", 199.99m, "/images/headset.jpg")
+                };
+
+                return string.IsNullOrEmpty(query)
+                    ? allProducts
+                    : allProducts.Where(p => p.Name.ToLower().Contains(query)).ToList();
+            },
+            loading: s => s with { SearchResults = s.SearchResults.ToLoading() },
+            success: (s, results) => s with { SearchResults = AsyncData<List<Product>>.Success(results) },
+            error: (s, ex) => s with { SearchResults = AsyncData<List<Product>>.Failure(ex.Message) }
+        );
+    }
+
+    async Task LoadDetails(int productId)
+    {
+        Update(s => s with { LoadingDetails = s.LoadingDetails.Add(productId) });
+
+        try
+        {
+            // Check if we already loaded this (for cache hit tracking)
+            var wasAlreadyCached = State.ProductDetails.ContainsKey(productId);
+
+            // LazyLoad with 5-minute caching
+            var details = await LazyLoad(
+                $"product-{productId}",
+                async () =>
+                {
+                    await Task.Delay(1000); // Simulate API call
+                    var product = State.SearchResults.Data!.First(p => p.Id == productId);
+                    return new ProductDetails(
+                        productId,
+                        product.Name,
+                        product.Price,
+                        $"This is a detailed description of the {product.Name}. Features high quality components and excellent performance. Perfect for professionals and enthusiasts alike.",
+                        "Electronics",
+                        new Random().Next(5, 50),
+                        DateTime.Now,
+                        DateTime.Now.AddMinutes(5));
+                },
+                cacheFor: TimeSpan.FromMinutes(5));
+
+            Update(s => s with
+            {
+                ProductDetails = s.ProductDetails.SetItem(productId, details),
+                SelectedProductDetails = details,
+                LoadingDetails = s.LoadingDetails.Remove(productId),
+                CacheHits = wasAlreadyCached ? s.CacheHits + 1 : s.CacheHits
+            });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { LoadingDetails = s.LoadingDetails.Remove(productId) });
+            Console.WriteLine($"Error loading details: {ex.Message}");
+        }
+    }
+}

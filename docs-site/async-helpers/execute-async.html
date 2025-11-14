@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExecuteAsync - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Execute async actions with error handling">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="../" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="../" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="../getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="../core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="../state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="../components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="../performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="../async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="../async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="../async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="../devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="../persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="../middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="../best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="../migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="../examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="../api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <!-- Header -->
+            <div class="page-header">
+              <h1>ExecuteAsync</h1>
+              <p class="page-description">
+                Execute async actions with automatic error handling and lifecycle management
+              </p>
+            </div>
+
+            <!-- Overview -->
+            <section class="section">
+              <h2>What is ExecuteAsync?</h2>
+              <p>
+                <code>ExecuteAsync</code> is a helper method that eliminates try-catch boilerplate when executing async operations.
+                It automatically manages loading, success, and error states, reducing code by <strong>58%</strong> (from 12 lines to 5 lines).
+              </p>
+              <div class="info-box">
+                <div class="info-box-title">💡 Key Benefits</div>
+                <ul>
+                  <li>Automatic error handling with try-catch elimination</li>
+                  <li>Built-in loading/success/error state transitions</li>
+                  <li>Type-safe error callbacks</li>
+                  <li>Composable with AsyncData&lt;T&gt; pattern</li>
+                  <li>Reduces async boilerplate by 58%</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Code Reduction Stats -->
+            <section class="section">
+              <h2>Code Reduction Statistics</h2>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-value">58%</div>
+                  <div class="stat-label">Code Reduction</div>
+                  <div class="stat-description">12 lines → 5 lines</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">100%</div>
+                  <div class="stat-label">Try-Catch Elimination</div>
+                  <div class="stat-description">Automatic error handling</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-value">3</div>
+                  <div class="stat-label">State Transitions</div>
+                  <div class="stat-description">Loading → Success → Error</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Before/After Comparison -->
+            <section class="section">
+              <h2>Before & After Comparison</h2>
+              <p>See how ExecuteAsync eliminates try-catch boilerplate:</p>
+
+              <div class="code-comparison">
+                <div class="comparison-item">
+                  <div class="comparison-label comparison-label-before">❌ Before (12 lines)</div>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">async Task LoadData()
+{
+    await Update(s => s.StartLoading());
+    try
+    {
+        var data = await Service.LoadAsync();
+        await Update(s => s.Success(data));
+    }
+    catch (Exception ex)
+    {
+        await Update(s => s.Failure(ex.Message));
+    }
+}</code></pre>
+                  </div>
+                </div>
+
+                <div class="comparison-item">
+                  <div class="comparison-label comparison-label-after">✅ After (5 lines)</div>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">async Task LoadData() =>
+    await ExecuteAsync(
+        () => Service.LoadAsync(),
+        loading: s => s with { Data = s.Data.ToLoading() },
+        success: (s, data) => s with { Data = AsyncData.Success(data) },
+        error: (s, ex) => s with { Data = AsyncData.Failure(ex.Message) }
+    );</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Complete Example -->
+            <section class="section">
+              <h2>Complete Example</h2>
+              <p>Real-world authentication example showing loading, success, and error states:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define State with AsyncData&lt;T&gt;</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">AuthState.cs</div>
+                    <pre><code class="language-csharp">public record User(string Id, string Name, string Email);
+
+public record AuthState(AsyncData&lt;User&gt; CurrentUser)
+{
+    public static AuthState Initial => new(AsyncData&lt;User&gt;.NotAsked());
+    public bool IsAuthenticated => CurrentUser.HasData;
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Component with ExecuteAsync</h3>
+                  <div class="code-block">
+                    <div class="code-block-title">Login.razor</div>
+                    <pre><code class="language-csharp">@page "/login"
+@inherits StoreComponent&lt;AuthState&gt;
+@inject IAuthService AuthService
+
+@if (State.CurrentUser.IsLoading)
+{
+    &lt;p&gt;Logging in...&lt;/p&gt;
+}
+else if (State.IsAuthenticated)
+{
+    &lt;p&gt;Welcome, @State.CurrentUser.Data!.Name!&lt;/p&gt;
+    &lt;button @onclick="Logout"&gt;Logout&lt;/button&gt;
+}
+else
+{
+    &lt;input @bind="email" placeholder="Email" /&gt;
+    &lt;input @bind="password" type="password" /&gt;
+    &lt;button @onclick="Login"&gt;Login&lt;/button&gt;
+
+    @if (State.CurrentUser.HasError)
+    {
+        &lt;p class="error"&gt;@State.CurrentUser.Error&lt;/p&gt;
+    }
+}
+
+@code {
+    string email = "", password = "";
+
+    async Task Login() =>
+        await ExecuteAsync(
+            () => AuthService.LoginAsync(email, password),
+            loading: s => s with { CurrentUser = s.CurrentUser.ToLoading() },
+            success: (s, user) => s with { CurrentUser = AsyncData&lt;User&gt;.Success(user) },
+            error: (s, ex) => s with { CurrentUser = AsyncData&lt;User&gt;.Failure(ex.Message) }
+        );
+
+    async Task Logout() => await Update(s => AuthState.Initial);
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <div class="api-section">
+                <h3>ExecuteAsync&lt;T&gt;</h3>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task ExecuteAsync&lt;T&gt;(
+    Func&lt;Task&lt;T&gt;&gt; action,
+    Func&lt;TState, TState&gt; loading,
+    Func&lt;TState, T, TState&gt; success,
+    Func&lt;TState, Exception, TState&gt;? error = null
+)</code></pre>
+                </div>
+
+                <h4>Parameters</h4>
+                <table class="params-table">
+                  <thead>
+                    <tr>
+                      <th>Parameter</th>
+                      <th>Type</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>action</code></td>
+                      <td><code>Func&lt;Task&lt;T&gt;&gt;</code></td>
+                      <td>The async operation to execute (e.g., API call)</td>
+                    </tr>
+                    <tr>
+                      <td><code>loading</code></td>
+                      <td><code>Func&lt;TState, TState&gt;</code></td>
+                      <td>State transformation to apply when starting (loading state)</td>
+                    </tr>
+                    <tr>
+                      <td><code>success</code></td>
+                      <td><code>Func&lt;TState, T, TState&gt;</code></td>
+                      <td>State transformation when operation succeeds (receives result)</td>
+                    </tr>
+                    <tr>
+                      <td><code>error</code></td>
+                      <td><code>Func&lt;TState, Exception, TState&gt;?</code></td>
+                      <td>Optional error handler (if null, error is thrown)</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <h4>Returns</h4>
+                <p><code>Task</code> - Completes when the operation and all state updates finish</p>
+              </div>
+            </section>
+
+            <!-- Common Patterns -->
+            <section class="section">
+              <h2>Common Patterns</h2>
+
+              <h3>Pattern 1: With AsyncData&lt;T&gt; (Recommended)</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">public record ProductState(AsyncData&lt;Product&gt; Product);
+
+async Task LoadProduct(int id) =>
+    await ExecuteAsync(
+        () => ProductService.GetAsync(id),
+        loading: s => s with { Product = s.Product.ToLoading() },
+        success: (s, data) => s with { Product = AsyncData.Success(data) },
+        error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) }
+    );</code></pre>
+              </div>
+
+              <h3>Pattern 2: Without Error Handling (Throws on Error)</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">async Task SaveData() =>
+    await ExecuteAsync(
+        () => Service.SaveAsync(State.Data),
+        loading: s => s with { IsSaving = true },
+        success: (s, result) => s with { IsSaving = false, LastSaved = DateTime.Now }
+        // No error handler - exception will be thrown
+    );</code></pre>
+              </div>
+
+              <h3>Pattern 3: Multiple Operations</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">async Task LoadAllData()
+{
+    await ExecuteAsync(
+        () => UserService.GetCurrentUserAsync(),
+        loading: s => s with { User = s.User.ToLoading() },
+        success: (s, user) => s with { User = AsyncData.Success(user) }
+    );
+
+    await ExecuteAsync(
+        () => ProductService.GetAllAsync(),
+        loading: s => s with { Products = s.Products.ToLoading() },
+        success: (s, products) => s with { Products = AsyncData.Success(products) }
+    );
+}</code></pre>
+              </div>
+
+              <h3>Pattern 4: Transforming Results</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">async Task SearchProducts(string query) =>
+    await ExecuteAsync(
+        () => ProductService.SearchAsync(query),
+        loading: s => s with { Results = AsyncData&lt;ImmutableList&lt;Product&gt;&gt;.Loading() },
+        success: (s, results) => s with {
+            Results = AsyncData.Success(results.ToImmutableList()),
+            SearchQuery = query,
+            LastSearched = DateTime.Now
+        },
+        error: (s, ex) => s with {
+            Results = AsyncData&lt;ImmutableList&lt;Product&gt;&gt;.Failure(ex.Message),
+            LastError = ex.Message
+        }
+    );</code></pre>
+              </div>
+            </section>
+
+            <!-- Best Practices -->
+            <section class="section">
+              <h2>Best Practices</h2>
+
+              <div class="dos-donts">
+                <div class="dos">
+                  <h3>✅ Do</h3>
+                  <ul>
+                    <li>Combine with AsyncData&lt;T&gt; for complete async state management</li>
+                    <li>Use named parameters for clarity (loading:, success:, error:)</li>
+                    <li>Provide error handlers for user-facing operations</li>
+                    <li>Keep state transformations pure (no side effects)</li>
+                    <li>Use <code>with</code> expressions for immutable updates</li>
+                    <li>Chain multiple ExecuteAsync calls for sequential operations</li>
+                  </ul>
+                </div>
+
+                <div class="donts">
+                  <h3>❌ Don't</h3>
+                  <ul>
+                    <li>Don't nest try-catch inside ExecuteAsync (redundant)</li>
+                    <li>Don't mutate state in callbacks - use <code>with</code></li>
+                    <li>Don't forget to register utilities: <code>AddStoreWithUtilities()</code></li>
+                    <li>Don't perform side effects in state transformations</li>
+                    <li>Don't omit error handlers for critical operations</li>
+                    <li>Don't mix ExecuteAsync with manual try-catch</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <!-- Advanced Usage -->
+            <section class="section">
+              <h2>Advanced Usage</h2>
+
+              <h3>Combining with Other Async Helpers</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">@page "/products"
+@inherits StoreComponent&lt;ProductState&gt;
+
+&lt;!-- 1. Debounced search input --&gt;
+&lt;input @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"
+       placeholder="Search products..." /&gt;
+
+&lt;!-- 2. Search button with ExecuteAsync --&gt;
+&lt;button @onclick="Search"&gt;Search&lt;/button&gt;
+
+&lt;!-- 3. Display results with AsyncData --&gt;
+@if (State.Products.IsLoading) { &lt;p&gt;Loading...&lt;/p&gt; }
+@if (State.Products.HasData)
+{
+    @foreach (var product in State.Products.Data)
+    {
+        &lt;div @onclick="@(() => LoadDetails(product.Id))"&gt;@product.Name&lt;/div&gt;
+    }
+}
+
+@code {
+    async Task Search() =>
+        await ExecuteAsync(
+            () => ProductService.SearchAsync(State.Query),
+            loading: s => s with { Products = s.Products.ToLoading() },
+            success: (s, data) => s with { Products = AsyncData.Success(data) }
+        );
+
+    async Task LoadDetails(int id)
+    {
+        // 4. LazyLoad with caching
+        var details = await LazyLoad(
+            $"product-{id}",
+            () => ProductService.GetDetailsAsync(id),
+            TimeSpan.FromMinutes(5));
+
+        await Update(s => s.AddDetails(id, details));
+    }
+}</code></pre>
+              </div>
+
+              <h3>Custom Error Handling Logic</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">async Task SaveWithRetry() =>
+    await ExecuteAsync(
+        () => Service.SaveAsync(State.Data),
+        loading: s => s with { IsSaving = true },
+        success: (s, result) => s with { IsSaving = false, LastSaved = DateTime.Now },
+        error: (s, ex) =>
+        {
+            if (ex is UnauthorizedException)
+                return s with { Error = "Please login again", NeedsReauth = true };
+            else if (ex is ValidationException valEx)
+                return s with { ValidationErrors = valEx.Errors.ToImmutableList() };
+            else
+                return s with { Error = "An unexpected error occurred" };
+        }
+    );</code></pre>
+              </div>
+            </section>
+
+            <!-- Registration -->
+            <section class="section">
+              <h2>Registration</h2>
+              <p>ExecuteAsync requires async utilities to be registered:</p>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// Recommended: All-in-one registration
+builder.Services.AddStoreWithUtilities(
+    new MyState(),
+    (store, sp) => store.WithDefaults(sp, "MyStore"));
+
+// Manual registration (if needed)
+builder.Services.AddStoreUtilities();
+builder.Services.AddAsyncActionExecutor&lt;MyState&gt;();
+builder.Services.AddStore(new MyState(), ...);</code></pre>
+              </div>
+              <div class="warning-box">
+                <div class="warning-box-title">⚠️ Required Services</div>
+                <p>
+                  ExecuteAsync requires <code>IAsyncActionExecutor&lt;TState&gt;</code> to be registered.
+                  Use <code>AddStoreWithUtilities()</code> for automatic registration, or manually call
+                  <code>AddAsyncActionExecutor&lt;TState&gt;()</code> for each state type.
+                </p>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./async-data.html" class="next-step-card">
+                  <div class="next-step-icon">🔄</div>
+                  <div class="next-step-content">
+                    <div class="next-step-title">AsyncData&lt;T&gt;</div>
+                    <div class="next-step-description">Perfect companion for ExecuteAsync</div>
+                  </div>
+                </a>
+
+                <a href="./update-debounced.html" class="next-step-card">
+                  <div class="next-step-icon">⏱️</div>
+                  <div class="next-step-content">
+                    <div class="next-step-title">UpdateDebounced</div>
+                    <div class="next-step-description">Debounce frequent updates</div>
+                  </div>
+                </a>
+
+                <a href="./lazy-load.html" class="next-step-card">
+                  <div class="next-step-icon">📥</div>
+                  <div class="next-step-content">
+                    <div class="next-step-title">LazyLoad</div>
+                    <div class="next-step-description">Cache data with request deduplication</div>
+                  </div>
+                </a>
+
+                <a href="./index.html" class="next-step-card">
+                  <div class="next-step-icon">⚡</div>
+                  <div class="next-step-content">
+                    <div class="next-step-title">All Async Helpers</div>
+                    <div class="next-step-description">View complete overview</div>
+                  </div>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

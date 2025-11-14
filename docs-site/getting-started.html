@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Quick start guide for EasyAppDev.Blazor.Store">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Getting Started</h1>
+            <p class="hero-description">
+              Get up and running with EasyAppDev.Blazor.Store in less than 5 minutes. This guide walks you through installation, basic setup, and your first component.
+            </p>
+
+            <!-- Installation -->
+            <section class="section">
+              <h2>Installation</h2>
+              <p>Add the package to your Blazor project using the .NET CLI:</p>
+              <div class="code-block">
+                <pre><code class="language-bash">dotnet add package EasyAppDev.Blazor.Store</code></pre>
+              </div>
+            </section>
+
+            <!-- Requirements -->
+            <section class="section">
+              <h2>Requirements</h2>
+              <div class="alert alert-info">
+                <div class="alert-title">Prerequisites</div>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li>.NET 8.0 or higher</li>
+                  <li>Blazor Server or WebAssembly</li>
+                  <li>Package size: Only 38 KB gzipped (less than 0.1% of your app)</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section class="section">
+              <h2>Quick Start</h2>
+              <p>Follow these three simple steps to add state management to your Blazor application:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Define Your State</h3>
+                  <p>State is just a C# record with transformation methods. No actions, no reducers, no dispatch.</p>
+                  <div class="code-block">
+                    <div class="code-block-title">CounterState.cs</div>
+                    <pre><code class="language-csharp">public record CounterState(int Count)
+{
+    public CounterState Increment() => this with { Count = Count + 1 };
+    public CounterState Decrement() => this with { Count = Count - 1 };
+    public CounterState Reset() => this with { Count = 0 };
+}</code></pre>
+                  </div>
+                  <div class="alert alert-success">
+                    <div class="alert-title">Key Principle: Pure Functions</div>
+                    <p>State methods use the <code>with</code> expression to create new state instances. This ensures immutability and predictable updates.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Register in Program.cs</h3>
+                  <p>Register your store with all features enabled using a single line:</p>
+                  <div class="code-block">
+                    <div class="code-block-title">Program.cs</div>
+                    <pre><code class="language-csharp">// One-liner registration with all features
+builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));</code></pre>
+                  </div>
+                  <div class="alert alert-info">
+                    <div class="alert-title">What does this do?</div>
+                    <ul style="margin: 0.5rem 0 0 1.5rem;">
+                      <li><code>AddStoreWithUtilities()</code> - Includes async helpers (debounce, throttle, cache, etc.)</li>
+                      <li><code>WithDefaults()</code> - Adds Redux DevTools, logging, and JSRuntime integration</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Use in Components</h3>
+                  <p>Inherit from <code>StoreComponent&lt;TState&gt;</code> to get automatic reactivity:</p>
+                  <div class="code-block">
+                    <div class="code-block-title">Counter.razor</div>
+                    <pre><code class="language-csharp">@page "/counter"
+@inherits StoreComponent&lt;CounterState&gt;
+
+&lt;h1&gt;@State.Count&lt;/h1&gt;
+
+&lt;button @onclick="@(() => Update(s => s.Increment()))"&gt;+&lt;/button&gt;
+&lt;button @onclick="@(() => Update(s => s.Decrement()))"&gt;-&lt;/button&gt;
+&lt;button @onclick="@(() => Update(s => s.Reset()))"&gt;Reset&lt;/button&gt;</code></pre>
+                  </div>
+                  <div class="alert alert-success">
+                    <div class="alert-title">That's it!</div>
+                    <p>No actions, no reducers, no dispatch. Inherit from <code>StoreComponent&lt;T&gt;</code> and call <code>Update()</code>. The component automatically re-renders when state changes.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- What You Get -->
+            <section class="section">
+              <h2>What You Get Out of the Box</h2>
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">🔄</div>
+                  <h3>Automatic Reactivity</h3>
+                  <p>Components inherit from <code>StoreComponent&lt;T&gt;</code> and automatically update when state changes.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🔒</div>
+                  <h3>Immutability</h3>
+                  <p>C# records with <code>with</code> expressions ensure state is never mutated directly.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🛠️</div>
+                  <h3>Redux DevTools</h3>
+                  <p>Time-travel debugging and state inspection with the Redux DevTools browser extension.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">⚡</div>
+                  <h3>Async Helpers</h3>
+                  <p>Built-in utilities like <code>UpdateDebounced</code>, <code>AsyncData&lt;T&gt;</code>, and <code>ExecuteAsync</code> reduce boilerplate by 74%.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">📦</div>
+                  <h3>Persistence</h3>
+                  <p>Auto-save and restore state from LocalStorage or SessionStorage.</p>
+                </div>
+                <div class="feature-card">
+                  <div class="feature-icon">🧪</div>
+                  <h3>100% Testable</h3>
+                  <p>State methods are pure functions - easy to unit test without mocks.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <p>Now that you have a basic setup, explore these topics to get the most out of the library:</p>
+
+              <div class="next-steps-grid">
+                <a href="./core-concepts.html" class="next-step-card">
+                  <div class="next-step-icon">📚</div>
+                  <h3>Core Concepts</h3>
+                  <p>Learn about immutability, state patterns, and the update flow.</p>
+                </a>
+
+                <a href="./async-helpers/index.html" class="next-step-card">
+                  <div class="next-step-icon">⚡</div>
+                  <h3>Async Helpers</h3>
+                  <p>Discover how to reduce boilerplate with async utilities like UpdateDebounced and AsyncData&lt;T&gt;.</p>
+                </a>
+
+                <a href="./examples.html" class="next-step-card">
+                  <div class="next-step-icon">💻</div>
+                  <h3>Real-World Examples</h3>
+                  <p>See complete examples like Todo Lists, Shopping Carts, and Authentication flows.</p>
+                </a>
+
+                <a href="./performance.html" class="next-step-card">
+                  <div class="next-step-icon">📈</div>
+                  <h3>Performance Optimization</h3>
+                  <p>Learn about selectors and how to achieve 25x fewer re-renders.</p>
+                </a>
+
+                <a href="./devtools.html" class="next-step-card">
+                  <div class="next-step-icon">🛠️</div>
+                  <h3>DevTools Integration</h3>
+                  <p>Set up Redux DevTools for time-travel debugging and state inspection.</p>
+                </a>
+
+                <a href="./best-practices.html" class="next-step-card">
+                  <div class="next-step-icon">📖</div>
+                  <h3>Best Practices</h3>
+                  <p>Follow proven patterns and avoid common pitfalls.</p>
+                </a>
+              </div>
+            </section>
+
+            <!-- Additional Resources -->
+            <section class="section">
+              <h2>Need Help?</h2>
+              <div class="alert alert-info">
+                <div class="alert-title">Additional Resources</div>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li><strong>API Reference:</strong> <a href="./api-reference.html">Complete API documentation</a></li>
+                  <li><strong>GitHub:</strong> <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank">Source code and issue tracker</a></li>
+                  <li><strong>NuGet:</strong> <a href="https://www.nuget.org/packages/EasyAppDev.Blazor.Store/" target="_blank">Package downloads and versions</a></li>
+                </ul>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

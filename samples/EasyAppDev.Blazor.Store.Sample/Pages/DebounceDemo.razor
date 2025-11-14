@@ -1,0 +1,116 @@
+@page "/debounce-demo"
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<DebounceState>
+
+<PageTitle>Debounce & Throttle Demo</PageTitle>
+
+<div class="container mt-4">
+    <h1 class="mb-4">Debounce & Throttle Demo</h1>
+
+    <div class="alert alert-info">
+        <strong>What's the difference?</strong>
+        <ul class="mb-0">
+            <li><strong>Debounce:</strong> Waits until you stop typing/moving before updating (last event wins)</li>
+            <li><strong>Throttle:</strong> Updates at regular intervals while you're typing/moving (periodic updates)</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Debounced Search</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        <small>Wait 300ms after typing stops before searching</small>
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Search Input</label>
+                        <input class="form-control form-control-lg"
+                               @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"
+                               placeholder="Type to search..."
+                               value="@State.SearchQuery" />
+                    </div>
+
+                    <div class="alert alert-success">
+                        <strong>Current Query:</strong> @(string.IsNullOrEmpty(State.SearchQuery) ? "(none)" : State.SearchQuery)
+                        <br />
+                        <strong>Search Count:</strong> @State.SearchCount
+                        <br />
+                        <small class="text-muted">
+                            Updates only after 300ms pause in typing
+                        </small>
+                    </div>
+
+                    <div class="alert alert-light">
+                        <strong>Try this:</strong> Type quickly and notice the search count only updates
+                        after you pause for 300ms. This prevents excessive API calls while typing!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Throttled Mouse Tracking</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        <small>Updates at most every 100ms</small>
+                    </p>
+
+                    <div class="border rounded p-3 mb-3"
+                         style="height: 250px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); cursor: crosshair; position: relative;"
+                         @onmousemove="@(e => UpdateThrottled(s => s.SetMousePosition((int)e.OffsetX, (int)e.OffsetY), 100))">
+                        <div class="text-white text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                            <h5>Move your mouse here</h5>
+                            <p>Position updates are throttled</p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success">
+                        <strong>Position:</strong> X: @State.MouseX, Y: @State.MouseY
+                        <br />
+                        <strong>Update Count:</strong> @State.UpdateCount
+                        <br />
+                        <small class="text-muted">
+                            Throttled to max 10 updates/second (every 100ms)
+                        </small>
+                    </div>
+
+                    <div class="alert alert-light">
+                        <strong>Try this:</strong> Move your mouse rapidly and notice the update count
+                        increases at a steady rate. This prevents UI thrashing during high-frequency events!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">How It Works</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Debounce Example:</h5>
+                    <pre class="line-numbers"><code class="language-csharp">// Simple one-line debounced update
+@@oninput="@@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))"</code></pre>
+
+                    <h5 class="mt-4">Throttle Example:</h5>
+                    <pre class="line-numbers"><code class="language-csharp">// Simple one-line throttled update
+@@onmousemove="@@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))"</code></pre>
+
+                    <div class="alert alert-warning mt-3">
+                        <strong>Automatic Cleanup:</strong> When the component is disposed, all pending debounced
+                        and throttled actions are automatically cancelled. No memory leaks!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

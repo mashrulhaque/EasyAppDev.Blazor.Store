@@ -1,0 +1,529 @@
+using Microsoft.AspNetCore.Components;
+using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Utilities;
+using System.Runtime.CompilerServices;
+#if DEBUG
+using EasyAppDev.Blazor.Store.Diagnostics;
+using EasyAppDev.Blazor.Store.Diagnostics.Models;
+using Microsoft.Extensions.DependencyInjection;
+#endif
+
+namespace EasyAppDev.Blazor.Store.Blazor;
+
+/// <summary>
+/// Base component class that automatically re-renders when store state changes.
+/// </summary>
+/// <typeparam name="TState">The type of state managed by the store.</typeparam>
+public abstract class StoreComponent<TState> : ComponentBase, IDisposable
+    where TState : notnull
+{
+    private IDisposable? _subscription;
+    private bool _disposed;
+#if DEBUG
+    private Guid _subscriptionId;
+#endif
+
+    // Async helper managers (lazy-initialized)
+    private DebounceManager? _debounceManager;
+    private ThrottleManager? _throttleManager;
+    private LazyCache? _lazyCache;
+
+    // Lazy initialization properties
+    private DebounceManager DebounceManager => _debounceManager ??= new DebounceManager();
+    private ThrottleManager ThrottleManager => _throttleManager ??= new ThrottleManager();
+    private LazyCache LazyCache => _lazyCache ??= new LazyCache();
+
+    /// <summary>
+    /// Gets the injected store instance.
+    /// </summary>
+    [Inject]
+    protected IStore<TState> Store { get; set; } = default!;
+
+#if DEBUG
+    /// <summary>
+    /// Gets the injected service provider (DEBUG only).
+    /// </summary>
+    [Inject]
+    private IServiceProvider ServiceProvider { get; set; } = default!;
+
+    /// <summary>
+    /// Gets the diagnostics service if available (DEBUG only).
+    /// </summary>
+    protected IDiagnosticsService? DiagnosticsService { get; private set; }
+#endif
+
+    /// <summary>
+    /// Gets the current state from the store.
+    /// </summary>
+    protected TState State => Store.GetState();
+
+    /// <summary>
+    /// Updates the state using the provided updater function.
+    /// </summary>
+    /// <param name="updater">Function that transforms current state to new state.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    protected void UpdateState(Func<TState, TState> updater, string? action = null)
+    {
+        Store.Update(updater, action);
+    }
+
+    /// <summary>
+    /// Updates the state asynchronously.
+    /// </summary>
+    /// <param name="updater">Function that transforms current state to new state.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    protected Task UpdateStateAsync(Func<TState, TState> updater, string? action = null)
+    {
+        return Store.UpdateAsync(updater, action);
+    }
+
+    /// <summary>
+    /// Updates the state asynchronously using an async updater.
+    /// </summary>
+    /// <param name="asyncUpdater">Async function that transforms state.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    protected Task UpdateStateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null)
+    {
+        return Store.UpdateAsync(asyncUpdater, action);
+    }
+
+    /// <summary>
+    /// Updates the state using a transformation function (Zustand-style).
+    /// Action name is optional - if not provided, a generic name will be used.
+    /// </summary>
+    /// <param name="updater">Function that transforms current state to new state.</param>
+    /// <param name="action">Optional action name for debugging/DevTools.</param>
+    protected Task Update(Func<TState, TState> updater, string? action = null)
+    {
+        return Store.UpdateAsync(updater, action ?? "UPDATE");
+    }
+
+    /// <summary>
+    /// Updates the state using an async transformation function (Zustand-style).
+    /// Action name is optional - if not provided, a generic name will be used.
+    /// </summary>
+    /// <param name="asyncUpdater">Async function that transforms current state to new state.</param>
+    /// <param name="action">Optional action name for debugging/DevTools.</param>
+    protected Task UpdateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null)
+    {
+        return Store.UpdateAsync(asyncUpdater, action ?? "UPDATE_ASYNC");
+    }
+
+    /// <summary>
+    /// Updates state with debouncing, cancelling any pending updates with the same action name.
+    /// </summary>
+    /// <param name="updater">Function to transform the current state.</param>
+    /// <param name="delayMilliseconds">Delay in milliseconds before applying the update.</param>
+    /// <param name="action">Optional action name for debugging (auto-filled with caller method name).</param>
+    /// <returns>A task that represents the debounce operation.</returns>
+    /// <example>
+    /// <code>
+    /// // Debounce search input
+    /// &lt;input @oninput="@(e => UpdateDebounced(s => s.SetQuery(e.Value?.ToString() ?? ""), 300))" /&gt;
+    /// </code>
+    /// </example>
+    protected Task UpdateDebounced(
+        Func<TState, TState> updater,
+        int delayMilliseconds,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(updater);
+
+        var key = $"{GetType().Name}_{action ?? "update"}";
+        return DebounceManager.Debounce(key, async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await Store.UpdateAsync(updater, action);
+            });
+        }, delayMilliseconds);
+    }
+
+    /// <summary>
+    /// Updates state asynchronously with debouncing.
+    /// </summary>
+    /// <param name="asyncUpdater">Async function to transform the current state.</param>
+    /// <param name="delayMilliseconds">Delay in milliseconds before applying the update.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task that represents the debounce operation.</returns>
+    protected Task UpdateDebouncedAsync(
+        Func<TState, Task<TState>> asyncUpdater,
+        int delayMilliseconds,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(asyncUpdater);
+
+        var key = $"{GetType().Name}_{action ?? "update"}";
+        return DebounceManager.Debounce(key, async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await Store.UpdateAsync(asyncUpdater, action);
+            });
+        }, delayMilliseconds);
+    }
+
+    /// <summary>
+    /// Updates state with throttling, limiting update frequency.
+    /// </summary>
+    /// <param name="updater">Function to transform the current state.</param>
+    /// <param name="intervalMilliseconds">Minimum interval between updates in milliseconds.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task that represents the throttle operation.</returns>
+    /// <example>
+    /// <code>
+    /// // Throttle mouse move
+    /// &lt;div @onmousemove="@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))"&gt;
+    /// </code>
+    /// </example>
+    protected Task UpdateThrottled(
+        Func<TState, TState> updater,
+        int intervalMilliseconds,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(updater);
+
+        var key = $"{GetType().Name}_{action ?? "update"}";
+        return ThrottleManager.Throttle(key, async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await Store.UpdateAsync(updater, action);
+            });
+        }, intervalMilliseconds);
+    }
+
+    /// <summary>
+    /// Updates state asynchronously with throttling.
+    /// </summary>
+    /// <param name="asyncUpdater">Async function to transform the current state.</param>
+    /// <param name="intervalMilliseconds">Minimum interval between updates in milliseconds.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task that represents the throttle operation.</returns>
+    protected Task UpdateThrottledAsync(
+        Func<TState, Task<TState>> asyncUpdater,
+        int intervalMilliseconds,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(asyncUpdater);
+
+        var key = $"{GetType().Name}_{action ?? "update"}";
+        return ThrottleManager.Throttle(key, async () =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await Store.UpdateAsync(asyncUpdater, action);
+            });
+        }, intervalMilliseconds);
+    }
+
+    /// <summary>
+    /// Executes an async action with automatic loading, success, and error state handling.
+    /// </summary>
+    /// <typeparam name="TResult">The type of result from the async action.</typeparam>
+    /// <param name="asyncAction">The async action to execute.</param>
+    /// <param name="loading">Function to update state to loading.</param>
+    /// <param name="success">Function to update state on success with result.</param>
+    /// <param name="error">Optional function to update state on error. If not provided, logs error and keeps current state.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task representing the async operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// ExecuteAsync handles the full async operation lifecycle:
+    /// 1. Sets loading state
+    /// 2. Executes the async action
+    /// 3. On success: Updates state with result
+    /// 4. On error: Updates state with error (or logs if no handler provided)
+    /// </para>
+    /// <example>
+    /// <code>
+    /// await ExecuteAsync(
+    ///     () => UserService.GetUserAsync(userId),
+    ///     loading: s => s with { User = s.User.ToLoading() },
+    ///     success: (s, user) => s with { User = AsyncData&lt;User&gt;.Success(user) },
+    ///     error: (s, ex) => s with { User = AsyncData&lt;User&gt;.Failure(ex.Message) }
+    /// );
+    /// </code>
+    /// </example>
+    /// </remarks>
+    protected async Task ExecuteAsync<TResult>(
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TResult, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(asyncAction);
+        ArgumentNullException.ThrowIfNull(loading);
+        ArgumentNullException.ThrowIfNull(success);
+
+        // Set loading state
+        await Store.UpdateAsync(loading, $"{action}_LOADING");
+
+        try
+        {
+            // Execute async action
+            var result = await asyncAction();
+
+            // Set success state
+            await Store.UpdateAsync(s => success(s, result), $"{action}_SUCCESS");
+        }
+        catch (Exception ex)
+        {
+            // Set error state
+            if (error != null)
+            {
+                await Store.UpdateAsync(s => error(s, ex), $"{action}_ERROR");
+            }
+            else
+            {
+                // If no error handler provided, log and keep current state
+                Console.WriteLine($"Error in {action}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes an async action without a result value.
+    /// </summary>
+    /// <param name="asyncAction">The async action to execute.</param>
+    /// <param name="loading">Function to update state to loading.</param>
+    /// <param name="success">Function to update state on success.</param>
+    /// <param name="error">Optional function to update state on error.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task representing the async operation.</returns>
+    /// <example>
+    /// <code>
+    /// // For operations that don't return a value (e.g., delete, save)
+    /// await ExecuteAsync(
+    ///     () => UserService.DeleteUserAsync(userId),
+    ///     loading: s => s with { IsDeleting = true },
+    ///     success: s => s with { IsDeleting = false, User = AsyncData&lt;User&gt;.NotAsked() },
+    ///     error: (s, ex) => s with { IsDeleting = false, DeleteError = ex.Message }
+    /// );
+    /// </code>
+    /// </example>
+    protected async Task ExecuteAsync(
+        Func<Task> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        [CallerMemberName] string? action = null)
+    {
+        ArgumentNullException.ThrowIfNull(asyncAction);
+        ArgumentNullException.ThrowIfNull(loading);
+        ArgumentNullException.ThrowIfNull(success);
+
+        await Store.UpdateAsync(loading, $"{action}_LOADING");
+
+        try
+        {
+            await asyncAction();
+            await Store.UpdateAsync(success, $"{action}_SUCCESS");
+        }
+        catch (Exception ex)
+        {
+            if (error != null)
+            {
+                await Store.UpdateAsync(s => error(s, ex), $"{action}_ERROR");
+            }
+            else
+            {
+                Console.WriteLine($"Error in {action}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes an async action with simplified success handler (no result needed in handler).
+    /// </summary>
+    /// <typeparam name="TResult">The type of result from the async action.</typeparam>
+    /// <param name="asyncAction">The async action to execute.</param>
+    /// <param name="loading">Function to update state to loading.</param>
+    /// <param name="success">Function to update state on success (result discarded).</param>
+    /// <param name="error">Optional function to update state on error.</param>
+    /// <param name="action">Optional action name for debugging.</param>
+    /// <returns>A task representing the async operation.</returns>
+    /// <remarks>
+    /// Useful when you need to execute an async action but don't need the result in the success handler.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Execute action but don't need result
+    /// await ExecuteAsync(
+    ///     () => UserService.ValidateAsync(userId),
+    ///     loading: s => s with { IsValidating = true },
+    ///     success: s => s with { IsValidating = false, IsValid = true }
+    /// );
+    /// </code>
+    /// </example>
+    protected async Task ExecuteAsync<TResult>(
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        [CallerMemberName] string? action = null)
+    {
+        await ExecuteAsync(
+            asyncAction,
+            loading,
+            (s, _) => success(s),  // Discard result
+            error,
+            action);
+    }
+
+    /// <summary>
+    /// Loads data with automatic caching and request deduplication.
+    /// </summary>
+    /// <typeparam name="T">The type of data to load.</typeparam>
+    /// <param name="cacheKey">Unique cache key for this data.</param>
+    /// <param name="loader">Function to load data if not cached.</param>
+    /// <param name="cacheFor">Optional time to cache data. If null, caches indefinitely.</param>
+    /// <returns>The cached or freshly loaded data.</returns>
+    /// <remarks>
+    /// <para>
+    /// LazyLoad provides:
+    /// - Automatic caching with optional expiration
+    /// - Request deduplication (concurrent calls with same key share result)
+    /// - No manual cache management needed
+    /// </para>
+    /// <example>
+    /// <code>
+    /// // Load product details with 5-minute cache
+    /// var details = await LazyLoad(
+    ///     $"product-{productId}",
+    ///     () => ProductService.GetDetailsAsync(productId),
+    ///     cacheFor: TimeSpan.FromMinutes(5));
+    ///
+    /// Update(s => s.AddProductDetails(productId, details));
+    /// </code>
+    /// </example>
+    /// </remarks>
+    protected Task<T> LazyLoad<T>(
+        string cacheKey,
+        Func<Task<T>> loader,
+        TimeSpan? cacheFor = null)
+    {
+        ArgumentNullException.ThrowIfNull(cacheKey);
+        ArgumentNullException.ThrowIfNull(loader);
+
+        return LazyCache.GetOrLoadAsync(cacheKey, loader, cacheFor);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+#if DEBUG
+        // Try to resolve diagnostics service if available
+        DiagnosticsService = ServiceProvider.GetService(typeof(IDiagnosticsService)) as IDiagnosticsService;
+#endif
+
+        SubscribeToStore();
+    }
+
+#if DEBUG
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (DiagnosticsService is not null)
+        {
+            DiagnosticsService.RecordRender(new RenderEvent
+            {
+                ComponentName = GetType().Name,
+                Timestamp = DateTime.UtcNow,
+                IsFirstRender = firstRender,
+                StateType = typeof(TState),
+                Reason = firstRender ? "Initial Render" : "State Change"
+            });
+        }
+    }
+#endif
+
+    /// <summary>
+    /// Subscribes to store changes. Can be overridden for custom subscription logic.
+    /// </summary>
+    protected virtual void SubscribeToStore()
+    {
+#if DEBUG
+        _subscriptionId = Guid.NewGuid();
+
+        if (DiagnosticsService is not null)
+        {
+            DiagnosticsService.RecordSubscription(new SubscriptionInfo
+            {
+                SubscriptionId = _subscriptionId,
+                StateType = typeof(TState),
+                SubscriberName = GetType().Name,
+                SubscriptionType = "Full",
+                CreatedAt = DateTime.UtcNow,
+                NotificationCount = 0
+            });
+        }
+#endif
+
+        _subscription = Store.Subscribe(_ =>
+        {
+#if DEBUG
+            DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
+#endif
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    /// <summary>
+    /// Subscribes to a specific part of the state using a selector.
+    /// </summary>
+    /// <typeparam name="TSelected">The type of the selected value.</typeparam>
+    /// <param name="selector">Function to select a portion of the state.</param>
+    /// <param name="callback">Callback invoked when selected value changes.</param>
+    /// <returns>Disposable subscription.</returns>
+    protected IDisposable SubscribeToSelector<TSelected>(
+        Func<TState, TSelected> selector,
+        Action<TSelected>? callback = null)
+    {
+        return Store.Subscribe(
+            selector,
+            value =>
+            {
+                callback?.Invoke(value);
+                InvokeAsync(StateHasChanged);
+            });
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Disposes resources used by the component.
+    /// </summary>
+    /// <param name="disposing">True if disposing managed resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        if (disposing)
+        {
+#if DEBUG
+            DiagnosticsService?.RecordSubscriptionDisposed(_subscriptionId);
+#endif
+            _subscription?.Dispose();
+            _subscription = null;
+
+            // Dispose async helper managers
+            _debounceManager?.Dispose();
+            _throttleManager?.Dispose();
+            _lazyCache?.Dispose();
+        }
+
+        _disposed = true;
+    }
+}

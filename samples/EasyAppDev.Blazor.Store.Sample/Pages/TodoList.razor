@@ -1,0 +1,204 @@
+@page "/todos"
+@using EasyAppDev.Blazor.Store.Sample.State
+@inherits StoreComponent<TodoState>
+
+<PageTitle>Todo List</PageTitle>
+
+<div class="container mt-4">
+    <h1>📝 Todo List</h1>
+    <p class="lead">Demonstrates working with <strong>immutable collections</strong> (ImmutableList)</p>
+
+    <div class="alert alert-info">
+        <h5>💡 What This Demo Shows:</h5>
+        <ul class="mb-0">
+            <li><strong>ImmutableList</strong> operations (Add, Remove, SetItem)</li>
+            <li>Pure state transformation methods</li>
+            <li>Automatic subscription and re-rendering via <code>StoreComponent&lt;T&gt;</code></li>
+            <li>Computed properties (filtered lists, counts)</li>
+        </ul>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Add New Todo</h5>
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       placeholder="What needs to be done?"
+                       @bind="newTodoTitle"
+                       @onkeypress="HandleKeyPress" />
+                <button class="btn btn-primary" @onclick="AddTodo" disabled="@string.IsNullOrWhiteSpace(newTodoTitle)">
+                    Add Todo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <span class="badge bg-primary">@State.Todos.Count Total</span>
+                    <span class="badge bg-success">@State.ActiveCount Active</span>
+                    <span class="badge bg-secondary">@State.CompletedCount Completed</span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn @(State.Filter == "All" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="@(() => Update(s => s.SetFilter("All")))">
+                        All
+                    </button>
+                    <button class="btn @(State.Filter == "Active" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="@(() => Update(s => s.SetFilter("Active")))">
+                        Active
+                    </button>
+                    <button class="btn @(State.Filter == "Completed" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick="@(() => Update(s => s.SetFilter("Completed")))">
+                        Completed
+                    </button>
+                </div>
+            </div>
+
+            @if (!State.Todos.Any())
+            {
+                <div class="text-center text-muted py-5">
+                    <h4>No todos yet!</h4>
+                    <p>Add your first todo above to get started.</p>
+                </div>
+            }
+            else
+            {
+                var filteredTodos = State.GetFilteredTodos();
+                if (!filteredTodos.Any())
+                {
+                    <div class="text-center text-muted py-3">
+                        <p>No @State.Filter.ToLower() todos.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group">
+                        @foreach (var todo in filteredTodos)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div class="form-check flex-grow-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           checked="@todo.IsCompleted"
+                                           @onchange="@(() => Update(s => s.ToggleTodo(todo.Id)))"
+                                           id="@($"todo-{todo.Id}")">
+                                    <label class="form-check-label @(todo.IsCompleted ? "text-decoration-line-through text-muted" : "")"
+                                           for="@($"todo-{todo.Id}")">
+                                        @todo.Title
+                                        @if (todo.CreatedAt.HasValue)
+                                        {
+                                            <small class="text-muted ms-2">
+                                                (@todo.CreatedAt.Value.ToString("h:mm tt"))
+                                            </small>
+                                        }
+                                    </label>
+                                </div>
+                                <button class="btn btn-sm btn-danger"
+                                        @onclick="@(() => Update(s => s.RemoveTodo(todo.Id)))">
+                                    🗑️
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-sm btn-success"
+                            @onclick="@(() => Update(s => s.CompleteAll()))"
+                            disabled="@(State.ActiveCount == 0)">
+                        ✓ Complete All
+                    </button>
+                    <button class="btn btn-sm btn-warning"
+                            @onclick="@(() => Update(s => s.ClearCompleted()))"
+                            disabled="@(State.CompletedCount == 0)">
+                        Clear Completed
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>📖 Code Example</h5>
+        </div>
+        <div class="card-body">
+            <h6>State Definition (Record with ImmutableList):</h6>
+            <pre class="bg-light p-3"><code>public record TodoState(
+    ImmutableList&lt;TodoItem&gt; Todos,
+    string Filter = "All")
+{
+    // Pure state transformation methods
+    public TodoState AddTodo(string title) => this with
+    {
+        Todos = Todos.Add(new TodoItem(
+            Id: Guid.NewGuid(),
+            Title: title,
+            IsCompleted: false))
+    };
+
+    public TodoState ToggleTodo(Guid id)
+    {
+        var index = Todos.FindIndex(t => t.Id == id);
+        if (index &lt; 0) return this;
+
+        var todo = Todos[index];
+        return this with
+        {
+            Todos = Todos.SetItem(index,
+                todo with { IsCompleted = !todo.IsCompleted })
+        };
+    }
+
+    // Computed properties
+    public int ActiveCount => Todos.Count(t => !t.IsCompleted);
+}</code></pre>
+
+            <h6 class="mt-3">Component Usage:</h6>
+            <pre class="bg-light p-3"><code>@@inherits StoreComponent&lt;TodoState&gt;
+
+&lt;button @@onclick="@@(() => Update(s => s.AddTodo(newTitle)))"&gt;
+    Add Todo
+&lt;/button&gt;
+
+&lt;input type="checkbox"
+       checked="@@todo.IsCompleted"
+       @@onchange="@@(() => Update(s => s.ToggleTodo(todo.Id)))" /&gt;</code></pre>
+
+            <h6 class="mt-3">Key Principles:</h6>
+            <ul>
+                <li>✅ Always use <code>ImmutableList&lt;T&gt;</code> for collections</li>
+                <li>✅ State methods are pure functions (no side effects)</li>
+                <li>✅ Use <code>with</code> expressions for immutability</li>
+                <li>✅ <code>StoreComponent&lt;T&gt;</code> handles subscriptions automatically</li>
+                <li>❌ Never mutate collections directly (<code>list.Add()</code>)</li>
+                <li>❌ Never use <code>List&lt;T&gt;</code> or other mutable collections</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string newTodoTitle = "";
+
+    private void AddTodo()
+    {
+        if (!string.IsNullOrWhiteSpace(newTodoTitle))
+        {
+            Update(s => s.AddTodo(newTodoTitle.Trim()));
+            newTodoTitle = "";
+        }
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddTodo();
+        }
+    }
+}

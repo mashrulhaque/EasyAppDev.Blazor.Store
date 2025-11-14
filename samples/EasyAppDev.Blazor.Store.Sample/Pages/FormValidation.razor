@@ -1,0 +1,396 @@
+@page "/form-validation"
+@inherits StoreComponent<FormValidationState>
+@using EasyAppDev.Blazor.Store.Sample.State
+
+<PageTitle>Form Validation Demo</PageTitle>
+
+<div class="container mt-4">
+    <h3>Form Validation Demo</h3>
+    <p class="lead">
+        Demonstrates form state management with field-level validation, async validation, and form submission.
+    </p>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Registration Form</h5>
+                </div>
+                <div class="card-body">
+                    @if (State.SubmitSuccess)
+                    {
+                        <div class="alert alert-success">
+                            <strong>Success!</strong> @State.SubmitMessage
+                            <button class="btn btn-sm btn-link" @onclick="ResetForm">Create Another Account</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <form @onsubmit="HandleSubmit" @onsubmit:preventDefault="true">
+                            <!-- Username Field -->
+                            <div class="mb-3">
+                                <label for="username" class="form-label">
+                                    Username *
+                                    @if (State.IsCheckingUsername)
+                                    {
+                                        <span class="spinner-border spinner-border-sm ms-2" role="status"></span>
+                                    }
+                                </label>
+                                <input type="text"
+                                       class="form-control @GetFieldClass("Username")"
+                                       id="username"
+                                       value="@State.Username"
+                                       @oninput="@((e) => UpdateDebounced(s => s.SetUsername(e.Value?.ToString() ?? ""), 300))"
+                                       @onblur="@(() => ValidateField("Username"))"
+                                       disabled="@State.IsSubmitting"/>
+                                @if (HasError("Username"))
+                                {
+                                    <div class="invalid-feedback d-block">
+                                        @GetError("Username")
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(State.Username) && !State.IsCheckingUsername)
+                                {
+                                    <div class="valid-feedback d-block">
+                                        @if (State.IsUsernameAvailable)
+                                        {
+                                            <text>Username is available!</text>
+                                        }
+                                    </div>
+                                }
+                                <small class="form-text text-muted">
+                                    3-20 characters, letters, numbers, and underscores only
+                                </small>
+                            </div>
+
+                            <!-- Email Field -->
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email"
+                                       class="form-control @GetFieldClass("Email")"
+                                       id="email"
+                                       value="@State.Email"
+                                       @oninput="@((e) => Update(s => s.SetEmail(e.Value?.ToString() ?? "")))"
+                                       @onblur="@(() => ValidateField("Email"))"
+                                       disabled="@State.IsSubmitting"/>
+                                @if (HasError("Email"))
+                                {
+                                    <div class="invalid-feedback d-block">
+                                        @GetError("Email")
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Password Field -->
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password *</label>
+                                <input type="password"
+                                       class="form-control @GetFieldClass("Password")"
+                                       id="password"
+                                       value="@State.Password"
+                                       @oninput="@((e) => Update(s => s.SetPassword(e.Value?.ToString() ?? "")))"
+                                       @onblur="@(() => ValidateField("Password"))"
+                                       disabled="@State.IsSubmitting"/>
+                                @if (HasError("Password"))
+                                {
+                                    <div class="invalid-feedback d-block">
+                                        @GetError("Password")
+                                    </div>
+                                }
+                                <small class="form-text text-muted">
+                                    Min 8 characters, must include uppercase, lowercase, and number
+                                </small>
+                            </div>
+
+                            <!-- Confirm Password Field -->
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">Confirm Password *</label>
+                                <input type="password"
+                                       class="form-control @GetFieldClass("ConfirmPassword")"
+                                       id="confirmPassword"
+                                       value="@State.ConfirmPassword"
+                                       @oninput="@((e) => Update(s => s.SetConfirmPassword(e.Value?.ToString() ?? "")))"
+                                       @onblur="@(() => ValidateField("ConfirmPassword"))"
+                                       disabled="@State.IsSubmitting"/>
+                                @if (HasError("ConfirmPassword"))
+                                {
+                                    <div class="invalid-feedback d-block">
+                                        @GetError("ConfirmPassword")
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Agree to Terms Checkbox -->
+                            <div class="mb-3 form-check">
+                                <input type="checkbox"
+                                       class="form-check-input @(HasError("AgreeToTerms") ? "is-invalid" : "")"
+                                       id="agreeToTerms"
+                                       checked="@State.AgreeToTerms"
+                                       @onchange="@(() => Update(s => s.ToggleAgreeToTerms()))"
+                                       disabled="@State.IsSubmitting"/>
+                                <label class="form-check-label" for="agreeToTerms">
+                                    I agree to the terms and conditions *
+                                </label>
+                                @if (HasError("AgreeToTerms"))
+                                {
+                                    <div class="invalid-feedback d-block">
+                                        @GetError("AgreeToTerms")
+                                    </div>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(State.SubmitMessage) && !State.SubmitSuccess)
+                            {
+                                <div class="alert alert-danger">
+                                    @State.SubmitMessage
+                                </div>
+                            }
+
+                            <!-- Submit Button -->
+                            <div class="d-flex gap-2">
+                                <button type="submit"
+                                        class="btn btn-primary"
+                                        disabled="@(!State.IsValid || State.IsSubmitting || State.IsCheckingUsername)">
+                                    @if (State.IsSubmitting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        <text>Creating Account...</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Create Account</text>
+                                    }
+                                </button>
+                                <button type="button"
+                                        class="btn btn-secondary"
+                                        @onclick="ResetForm"
+                                        disabled="@State.IsSubmitting">
+                                    Reset
+                                </button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <!-- State Visualization -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Current State</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <th>Username:</th>
+                                <td>@(string.IsNullOrWhiteSpace(State.Username) ? "(empty)" : State.Username)</td>
+                            </tr>
+                            <tr>
+                                <th>Email:</th>
+                                <td>@(string.IsNullOrWhiteSpace(State.Email) ? "(empty)" : State.Email)</td>
+                            </tr>
+                            <tr>
+                                <th>Password:</th>
+                                <td>@(string.IsNullOrWhiteSpace(State.Password) ? "(empty)" : "•".PadRight(State.Password.Length, '•'))</td>
+                            </tr>
+                            <tr>
+                                <th>Agree to Terms:</th>
+                                <td>
+                                    @if (State.AgreeToTerms)
+                                    {
+                                        <span class="badge bg-success">Yes</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">No</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Form Valid:</th>
+                                <td>
+                                    @if (State.IsValid)
+                                    {
+                                        <span class="badge bg-success">Valid</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Invalid</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Error Count:</th>
+                                <td>@(State.Errors?.Count ?? 0)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Explanation -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Features Demonstrated</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <strong>✓ Field-Level Validation</strong>
+                            <br/>
+                            <small class="text-muted">Validates each field on blur with instant feedback</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Debounced Input</strong>
+                            <br/>
+                            <small class="text-muted">Username field uses debouncing to reduce updates</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Async Validation</strong>
+                            <br/>
+                            <small class="text-muted">Checks username availability against simulated API</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Form-Level Validation</strong>
+                            <br/>
+                            <small class="text-muted">Submit button disabled until all fields are valid</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Error State Management</strong>
+                            <br/>
+                            <small class="text-muted">Centralized error tracking per field</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Loading States</strong>
+                            <br/>
+                            <small class="text-muted">Visual feedback during async operations</small>
+                        </li>
+                        <li class="mb-2">
+                            <strong>✓ Form Submission</strong>
+                            <br/>
+                            <small class="text-muted">Simulated async form submission with success/error handling</small>
+                        </li>
+                    </ul>
+
+                    <hr/>
+
+                    <h6>Try These</h6>
+                    <ul class="small">
+                        <li>Type a username and watch async validation</li>
+                        <li>Try usernames: "admin", "test" (taken)</li>
+                        <li>Leave fields empty and blur to see errors</li>
+                        <li>Use weak password to see validation</li>
+                        <li>Mismatch passwords to see error</li>
+                        <li>Submit and see 20% chance of server error</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+    }
+
+    private bool HasError(string field) =>
+        State.Errors != null && State.Errors.ContainsKey(field);
+
+    private string? GetError(string field) =>
+        State.Errors != null && State.Errors.ContainsKey(field) ? State.Errors[field] : null;
+
+    private string GetFieldClass(string field)
+    {
+        if (State.Errors == null) return "";
+
+        if (field == "Username")
+        {
+            if (State.IsCheckingUsername) return "";
+            if (!State.IsUsernameAvailable) return "is-invalid";
+            if (!string.IsNullOrWhiteSpace(State.Username) && !State.Errors.ContainsKey(field))
+                return "is-valid";
+        }
+
+        if (State.Errors.ContainsKey(field))
+            return "is-invalid";
+
+        // Show valid state for non-empty fields without errors
+        var value = field switch
+        {
+            "Username" => State.Username,
+            "Email" => State.Email,
+            "Password" => State.Password,
+            "ConfirmPassword" => State.ConfirmPassword,
+            _ => null
+        };
+
+        return !string.IsNullOrWhiteSpace(value) ? "is-valid" : "";
+    }
+
+    private async Task ValidateField(string field)
+    {
+        var newState = field switch
+        {
+            "Username" => State.ValidateUsername(),
+            "Email" => State.ValidateEmail(),
+            "Password" => State.ValidatePassword(),
+            "ConfirmPassword" => State.ValidateConfirmPassword(),
+            "AgreeToTerms" => State.ValidateAgreeToTerms(),
+            _ => State
+        };
+
+        Update(_ => newState);
+
+        // If username field and no validation errors, check availability
+        if (field == "Username" && !HasError("Username") && !string.IsNullOrWhiteSpace(State.Username))
+        {
+            await CheckUsernameAvailability();
+        }
+    }
+
+    private async Task CheckUsernameAvailability()
+    {
+        Update(s => s.StartCheckingUsername());
+
+        var isAvailable = await FormValidationState.CheckUsernameAvailability(State.Username);
+
+        Update(s => s.CompleteUsernameCheck(isAvailable));
+    }
+
+    private async Task HandleSubmit()
+    {
+        // Validate all fields first
+        Update(s => s.ValidateAll());
+
+        // Check if form is valid
+        if (!State.IsValid)
+        {
+            Update(s => s.CompleteSubmitFailure("Please fix the errors above"));
+            return;
+        }
+
+        // Start submission
+        Update(s => s.StartSubmit());
+
+        // Simulate form submission
+        var (success, message) = await FormValidationState.SubmitForm(State);
+
+        if (success)
+        {
+            Update(s => s.CompleteSubmitSuccess(message));
+        }
+        else
+        {
+            Update(s => s.CompleteSubmitFailure(message));
+        }
+    }
+
+    private void ResetForm()
+    {
+        Update(_ => new FormValidationState());
+    }
+}
