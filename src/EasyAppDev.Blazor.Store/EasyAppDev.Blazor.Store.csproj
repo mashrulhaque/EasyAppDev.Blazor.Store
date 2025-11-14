@@ -15,8 +15,8 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>1.0.5</Version>
-    <Authors>Mashrul Hossain</Authors>
+    <Version>1.0.6</Version>
+    <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
     <Description>Type-safe state management for Blazor using C# records. Includes async helpers, Redux DevTools integration, persistence, and granular selectors. Inspired by Zustand.</Description>
@@ -28,7 +28,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v1.0.5 - Initial Release
+v1.0.6 - Initial Release
 
 Type-safe state management for Blazor using C# records. Features include async helpers, Redux DevTools integration, persistence, and granular selectors.
 
