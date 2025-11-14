@@ -15,20 +15,20 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Authors>Mashrul Hossain</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
     <Description>Type-safe state management for Blazor using C# records. Includes async helpers, Redux DevTools integration, persistence, and granular selectors. Inspired by Zustand.</Description>
     <PackageTags>blazor;state-management;redux;zustand;devtools;reactive;solid;dependency-injection</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/YOUR_USERNAME/EasyAppDev.Blazor.Store</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/YOUR_USERNAME/EasyAppDev.Blazor.Store</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/mashrulhaque/EasyAppDev.Blazor.Store</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mashrulhaque/EasyAppDev.Blazor.Store</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v1.0.4 - Initial Release
+v1.0.5 - Initial Release
 
 Type-safe state management for Blazor using C# records. Features include async helpers, Redux DevTools integration, persistence, and granular selectors.
 
