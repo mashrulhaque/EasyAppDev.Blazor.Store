@@ -1,0 +1,18 @@
+﻿@page "/counter"
+@rendermode InteractiveServer
+@using EasyAppDev.Blazor.Store.Blazor
+@inherits StoreComponent<CounterState>
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @State.Count</p>
+<p>Last action: @State.LastAction</p>
+
+<button class="btn btn-primary" @onclick="@(() => Update(s => s.Increment()))">Increment</button>
+<button class="btn btn-secondary" @onclick="@(() => Update(s => s.Decrement()))">Decrement</button>
+<button class="btn btn-warning" @onclick="@(() => Update(s => s.Reset()))">Reset</button>
+
+@code {
+}
