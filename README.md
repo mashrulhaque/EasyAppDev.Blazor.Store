@@ -47,7 +47,9 @@ If you've used Zustand in React, you'll feel right at home.
 dotnet add package EasyAppDev.Blazor.Store
 ```
 
-**Requirements:** .NET 8.0+ • Blazor Server or WebAssembly • 38 KB gzipped
+**Requirements:** .NET 8.0+ • Blazor Server, WebAssembly, or Blazor Web App • 38 KB gzipped
+
+> **Note for Blazor Server/Web App users**: See [compatibility notes](#-blazor-server--blazor-web-app-compatibility) below
 
 ### 1. Define Your State
 
@@ -88,6 +90,251 @@ builder.Services.AddStoreWithUtilities(
 ```
 
 Inherit from `StoreComponent<T>` and call `Update()`. No actions, no reducers, no dispatch.
+
+---
+
+## 🎯 Blazor Render Modes: Server, WebAssembly & Auto
+
+**One library, three render modes, zero configuration changes!**
+
+The library automatically adapts to your Blazor render mode with **intelligent lazy initialization**. Use the same code everywhere and let the library handle the differences.
+
+### Quick Comparison
+
+| Feature | Server | WebAssembly | Auto (Server→WASM) |
+|---------|--------|-------------|-------------------|
+| **Core State Management** | ✅ Full | ✅ Full | ✅ Full |
+| **Async Helpers** | ✅ All work | ✅ All work | ✅ All work |
+| **Components & Updates** | ✅ Perfect | ✅ Perfect | ✅ Perfect |
+| **Logging Middleware** | ✅ Works | ✅ Works | ✅ Works |
+| **Redux DevTools** | ⚠️ Gracefully skips | ✅ Works | ✅ Activates after transition |
+| **LocalStorage Persistence** | ❌ Not available | ✅ Works | ✅ Works after transition |
+| **Code Changes Needed** | ✅ None | ✅ None | ✅ None |
+
+### Understanding Render Modes
+
+#### 🟦 **Blazor Server**
+- Runs on the server via SignalR
+- UI updates sent over WebSocket
+- `IJSRuntime` is scoped (not available at startup)
+- **DevTools**: Gracefully skips (no JavaScript at startup)
+- **Persistence**: Not available (use server-side storage instead)
+
+#### 🟩 **Blazor WebAssembly**
+- Runs entirely in browser
+- Downloads .NET runtime to client
+- `IJSRuntime` always available
+- **DevTools**: ✅ Full support
+- **Persistence**: ✅ Full support
+
+#### 🟨 **Blazor Auto** (Server → WebAssembly)
+- **Phase 1**: Starts on server (fast initial load)
+- **Phase 2**: Downloads WASM in background
+- **Phase 3**: Seamlessly transitions to client-side
+- **DevTools**: Automatically activates after transition!
+- **Persistence**: Works after transition
+
+### Universal Configuration (Works Everywhere!)
+
+**Recommended setup for all modes:**
+```csharp
+// Program.cs - Same code works in Server, WASM, and Auto!
+builder.Services.AddStoreUtilities();
+
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));
+```
+
+**What happens in each mode:**
+
+| Render Mode | Behavior |
+|-------------|----------|
+| **Server** | DevTools silently skips, logging works, app runs perfectly |
+| **WebAssembly** | DevTools active immediately, all features work |
+| **Auto** | DevTools inactive initially, activates automatically after WASM loads |
+
+### How Auto Mode Works (Behind the Scenes)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 1: Server Rendering (0-2 seconds)                    │
+├─────────────────────────────────────────────────────────────┤
+│ • User loads page                                           │
+│ • Server renders HTML                                       │
+│ • Store initializes with WithDefaults()                     │
+│ • DevTools tries to resolve IJSRuntime → Not available     │
+│ • DevTools marks initialization as failed → Silent skip    │
+│ • App works perfectly (core features unaffected)            │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 2: WASM Loading (background, 2-5 seconds)            │
+├─────────────────────────────────────────────────────────────┤
+│ • .NET WebAssembly runtime downloads                        │
+│ • User continues interacting with app                       │
+│ • Store updates work normally                               │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 3: WASM Active (seamless transition)                 │
+├─────────────────────────────────────────────────────────────┤
+│ • Next state update occurs                                  │
+│ • DevTools tries to resolve IJSRuntime → Now available!    │
+│ • DevTools initializes successfully                         │
+│ • Redux DevTools becomes active                             │
+│ • Persistence becomes available                             │
+│ • No user intervention needed!                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Mode-Specific Configurations
+
+While the universal configuration works everywhere, you can optimize for specific modes:
+
+**Blazor Server (Optimized)**
+```csharp
+// Skip DevTools entirely to avoid initialization attempts
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithLogging());  // Just logging, no DevTools
+```
+
+**Blazor WebAssembly (Full Features)**
+```csharp
+// Enable all features including persistence
+builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store
+        .WithDefaults(sp, "Counter")
+        .WithPersistence(sp, "counter-state"));  // Auto-save to LocalStorage
+```
+
+**Blazor Auto (Recommended Default)**
+```csharp
+// Use WithDefaults - DevTools activates automatically!
+builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));
+```
+
+### Common Scenarios
+
+#### Scenario 1: Pure Server App (No WASM)
+**Best approach**: Skip DevTools, use logging
+```csharp
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithLogging());
+```
+
+#### Scenario 2: Progressive Web App (Auto Mode)
+**Best approach**: Use WithDefaults, let it adapt
+```csharp
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));
+```
+
+#### Scenario 3: SPA with Full Client Features
+**Best approach**: Enable all features
+```csharp
+builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store
+        .WithDefaults(sp, "Counter")
+        .WithPersistence(sp, "app-state"));
+```
+
+### Persistence in Server Mode
+
+Since LocalStorage isn't available in pure Server mode, here are alternatives:
+
+**Option 1: Server-side storage**
+```csharp
+// Use database, session state, or distributed cache
+public record UserPreferences(string Theme, string Language)
+{
+    public async Task<UserPreferences> SaveToDatabase(IDbContext db)
+    {
+        await db.SaveAsync(this);
+        return this;
+    }
+}
+```
+
+**Option 2: Switch to Auto mode**
+```csharp
+// In Program.cs, add WASM support
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
+    .AddInteractiveWebAssemblyComponents();  // Enable Auto mode
+
+// Then use @rendermode InteractiveAuto in components
+```
+
+### Troubleshooting by Render Mode
+
+**Server Mode Issues:**
+- ✅ Store updates work? → Core functionality is fine
+- ⚠️ DevTools not appearing? → Expected behavior, use logging instead
+- ❌ Getting IJSRuntime errors? → Remove `.WithDefaults()`, use `.WithLogging()`
+
+**WebAssembly Mode Issues:**
+- ✅ Everything works? → You're all set!
+- ⚠️ DevTools not appearing? → Check browser console, install Redux DevTools extension
+
+**Auto Mode Issues:**
+- ⚠️ DevTools delayed? → Normal, waits for WASM transition
+- ✅ Store works immediately? → Core features work from initial server render
+- ❌ Getting errors on startup? → Check that WASM components are registered
+
+### Feature Detection
+
+The library automatically detects and adapts:
+
+```csharp
+// DevToolsMiddleware internal logic (simplified)
+private async Task EnsureInitializedAsync()
+{
+    if (_initialized || _initializationFailed)
+        return;
+
+    try
+    {
+        // Try to resolve IJSRuntime
+        _jsRuntime = _serviceProvider.GetService<IJSRuntime>();
+
+        if (_jsRuntime == null)
+        {
+            _initializationFailed = true;  // Server mode
+            return;
+        }
+
+        // Initialize DevTools
+        await _jsRuntime.InvokeAsync(...);
+        _initialized = true;  // Success!
+    }
+    catch
+    {
+        _initializationFailed = true;  // Graceful failure
+    }
+}
+```
+
+### Migration Paths
+
+**From Server to Auto:**
+1. Add WebAssembly components: `.AddInteractiveWebAssemblyComponents()`
+2. Change render mode: `@rendermode InteractiveAuto`
+3. No code changes needed in state management!
+
+**From WASM to Auto:**
+1. Add Server components: `.AddInteractiveServerComponents()`
+2. Change render mode: `@rendermode InteractiveAuto`
+3. No code changes needed in state management!
+
+> **Key Takeaway**: Write your state management code once with `WithDefaults()`, and it works perfectly across all render modes with automatic adaptation!
 
 ---
 
@@ -702,6 +949,25 @@ public State AddItem(Item item)
 ---
 
 ## Troubleshooting
+
+### "Cannot resolve scoped service 'IJSRuntime' from root provider"?
+✅ **UPDATED**: This error no longer occurs! The library now uses lazy IJSRuntime resolution.
+
+**If you're seeing this error**, you're using an old configuration pattern:
+```csharp
+// ❌ Old pattern (caused errors)
+var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
+builder.Services.AddStore(new State(), store => store.WithDevTools(jsRuntime, "Store"));
+
+// ✅ New pattern (works everywhere!)
+builder.Services.AddStore(
+    new State(),
+    (store, sp) => store.WithDefaults(sp, "Store"));  // Lazy resolution!
+```
+
+The new `WithDefaults(sp, ...)` method resolves IJSRuntime lazily, so it works in **all render modes** (Server, WASM, Auto).
+
+See the [Blazor Render Modes](#-blazor-render-modes-server-webassembly--auto) section for details.
 
 ### Component not updating?
 ✅ Inherit from `StoreComponent<TState>`

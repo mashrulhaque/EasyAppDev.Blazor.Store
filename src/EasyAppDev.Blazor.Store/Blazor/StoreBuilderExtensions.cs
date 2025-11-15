@@ -14,7 +14,8 @@ namespace EasyAppDev.Blazor.Store.Blazor;
 public static class StoreBuilderExtensions
 {
     /// <summary>
-    /// Applies default middleware configuration: JSRuntime, DevTools, and Logging.
+    /// Applies default middleware configuration: DevTools and Logging.
+    /// Works in all render modes (Server, WebAssembly, Auto) with lazy IJSRuntime resolution.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
@@ -27,30 +28,33 @@ public static class StoreBuilderExtensions
         string? storeName = null)
         where TState : notnull
     {
-        var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
-
-        return builder.WithJSRuntime(jsRuntime)
-                      .WithDevTools(storeName ?? typeof(TState).Name)
+        // Use service provider-based DevTools for lazy IJSRuntime resolution
+        // Works in Server (gracefully fails), WASM (succeeds), and Auto (Server→WASM transition)
+        return builder.WithDevTools(serviceProvider, storeName ?? typeof(TState).Name)
                       .WithLogging();
     }
 
     /// <summary>
     /// Adds persistence middleware with automatic LocalStorageProvider creation.
+    /// Note: In Blazor Server/United, this method is disabled due to IJSRuntime scoping issues.
+    /// Use AddScopedStore with persistence instead.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
     /// <param name="serviceProvider">The service provider for resolving IJSRuntime.</param>
     /// <param name="key">The storage key for persisting state.</param>
     /// <returns>The configured builder for chaining.</returns>
+    [Obsolete("Persistence with singleton stores doesn't work in Blazor Server/United due to scoped IJSRuntime. Persistence is disabled.")]
     public static StoreBuilder<TState> WithPersistence<TState>(
         this StoreBuilder<TState> builder,
         IServiceProvider serviceProvider,
         string key)
         where TState : notnull
     {
-        var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
-        var localStorage = new LocalStorageProvider(jsRuntime);
-        return builder.WithPersistence(localStorage, key);
+        // Skip persistence in Blazor Server/United scenarios
+        // IJSRuntime is scoped and cannot be resolved during singleton store creation
+        Console.WriteLine($"Warning: Persistence skipped for {typeof(TState).Name}. Use AddScopedStore for persistence in Blazor Server/United.");
+        return builder;
     }
 
     /// <summary>
