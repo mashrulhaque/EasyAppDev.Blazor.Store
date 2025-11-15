@@ -45,7 +45,7 @@ public class DevToolsMiddlewareTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new DevToolsMiddleware<TestState>(null!, "TestStore"));
+            new DevToolsMiddleware<TestState>((IJSRuntime)null!, "TestStore"));
     }
 
     [Fact]
@@ -184,16 +184,21 @@ public class DevToolsMiddlewareTests
     }
 
     [Fact]
-    public void WithDevTools_WithoutJSRuntime_ThrowsInvalidOperationException()
+    public void WithDevTools_WithoutJSRuntime_SilentlySkipsDevTools()
     {
         // Arrange
         var builder = StoreBuilder<TestState>
             .Create(new TestState(0, "Initial"));
 
-        // Act & Assert
-        var act = () => builder.WithDevTools("TestStore");
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*JSRuntime must be provided*");
+        // Act - should not throw, just skip DevTools
+#pragma warning disable CS0618 // Type or member is obsolete
+        var result = builder.WithDevTools("TestStore");
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        // Assert - builder should still be usable, just without DevTools
+        result.Should().NotBeNull();
+        var store = result.Build();
+        store.Should().NotBeNull();
     }
 
     [Fact]

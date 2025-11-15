@@ -155,22 +155,44 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
-    /// Enables Redux DevTools integration.
+    /// Enables Redux DevTools integration with lazy IJSRuntime resolution.
+    /// Works in all render modes: Server, WebAssembly, and Auto (Server → WASM).
     /// </summary>
+    /// <param name="serviceProvider">Service provider to resolve IJSRuntime on-demand.</param>
     /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
     /// <returns>The builder instance for chaining.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when JSRuntime has not been set.</exception>
-    public StoreBuilder<TState> WithDevTools(string? storeName = null)
+    public StoreBuilder<TState> WithDevTools(IServiceProvider serviceProvider, string? storeName = null)
     {
-        if (_jsRuntime == null)
-            throw new InvalidOperationException(
-                "JSRuntime must be provided. Use WithJSRuntime() first or pass IJSRuntime to WithDevTools().");
+        ArgumentNullException.ThrowIfNull(serviceProvider);
 
         var devToolsMiddleware = new DevToolsMiddleware<TState>(
-            _jsRuntime,
+            serviceProvider,
             storeName ?? typeof(TState).Name);
 
         return WithMiddleware(devToolsMiddleware);
+    }
+
+    /// <summary>
+    /// Enables Redux DevTools integration.
+    /// Note: This overload is deprecated. Use WithDevTools(IServiceProvider, string?) instead.
+    /// </summary>
+    /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    [Obsolete("Use WithDevTools(IServiceProvider serviceProvider, string? storeName) instead for better compatibility with all render modes.")]
+    public StoreBuilder<TState> WithDevTools(string? storeName = null)
+    {
+        // Skip DevTools if JSRuntime is not available (Blazor Server scenario)
+        // DevTools middleware will be added later if needed
+        if (_jsRuntime != null)
+        {
+            var devToolsMiddleware = new DevToolsMiddleware<TState>(
+                _jsRuntime,
+                storeName ?? typeof(TState).Name);
+
+            return WithMiddleware(devToolsMiddleware);
+        }
+
+        return this;
     }
 
     /// <summary>
