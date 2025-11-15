@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blazor Render Modes - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Server, WebAssembly, and Auto render mode support">
+  <link rel="stylesheet" href="./assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="./" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v1.0.0</span>
+          <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+              <li><a href="./render-modes.html" class="nav-link active"><span class="nav-icon">🎯</span><span>Render Modes</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="./state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="./components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="./performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="./async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="./best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="./migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="./examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="./api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <h1>Blazor Render Modes: Server, WebAssembly & Auto</h1>
+            <p class="lead">
+              <strong>One library, three render modes, zero configuration changes!</strong>
+            </p>
+            <p>
+              The library automatically adapts to your Blazor render mode with intelligent lazy initialization.
+              Use the same code everywhere and let the library handle the differences.
+            </p>
+
+            <!-- Quick Comparison -->
+            <section class="section">
+              <h2>Quick Comparison</h2>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Feature</th>
+                    <th>Server</th>
+                    <th>WebAssembly</th>
+                    <th>Auto (Server→WASM)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Core State Management</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Async Helpers</strong></td>
+                    <td>✅ All work</td>
+                    <td>✅ All work</td>
+                    <td>✅ All work</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Components & Updates</strong></td>
+                    <td>✅ Perfect</td>
+                    <td>✅ Perfect</td>
+                    <td>✅ Perfect</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Logging Middleware</strong></td>
+                    <td>✅ Works</td>
+                    <td>✅ Works</td>
+                    <td>✅ Works</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Redux DevTools</strong></td>
+                    <td>⚠️ Gracefully skips</td>
+                    <td>✅ Works</td>
+                    <td>✅ Activates after transition</td>
+                  </tr>
+                  <tr>
+                    <td><strong>LocalStorage Persistence</strong></td>
+                    <td>❌ Not available</td>
+                    <td>✅ Works</td>
+                    <td>✅ Works after transition</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Code Changes Needed</strong></td>
+                    <td>✅ None</td>
+                    <td>✅ None</td>
+                    <td>✅ None</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <!-- Understanding Render Modes -->
+            <section class="section">
+              <h2>Understanding Render Modes</h2>
+
+              <div class="step">
+                <div class="step-number">🟦</div>
+                <div class="step-content">
+                  <h3>Blazor Server</h3>
+                  <ul>
+                    <li>Runs on the server via SignalR</li>
+                    <li>UI updates sent over WebSocket</li>
+                    <li><code>IJSRuntime</code> is scoped (not available at startup)</li>
+                    <li><strong>DevTools:</strong> Gracefully skips (no JavaScript at startup)</li>
+                    <li><strong>Persistence:</strong> Not available (use server-side storage instead)</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">🟩</div>
+                <div class="step-content">
+                  <h3>Blazor WebAssembly</h3>
+                  <ul>
+                    <li>Runs entirely in browser</li>
+                    <li>Downloads .NET runtime to client</li>
+                    <li><code>IJSRuntime</code> always available</li>
+                    <li><strong>DevTools:</strong> ✅ Full support</li>
+                    <li><strong>Persistence:</strong> ✅ Full support</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">🟨</div>
+                <div class="step-content">
+                  <h3>Blazor Auto (Server → WebAssembly)</h3>
+                  <ul>
+                    <li><strong>Phase 1:</strong> Starts on server (fast initial load)</li>
+                    <li><strong>Phase 2:</strong> Downloads WASM in background</li>
+                    <li><strong>Phase 3:</strong> Seamlessly transitions to client-side</li>
+                    <li><strong>DevTools:</strong> Automatically activates after transition!</li>
+                    <li><strong>Persistence:</strong> Works after transition</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <!-- Universal Configuration -->
+            <section class="section">
+              <h2>Universal Configuration (Works Everywhere!)</h2>
+              <p><strong>Recommended setup for all modes:</strong></p>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Same code works in Server, WASM, and Auto!</div>
+                <pre><code class="language-csharp">builder.Services.AddStoreUtilities();
+
+builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));</code></pre>
+              </div>
+
+              <h3>What happens in each mode:</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Render Mode</th>
+                    <th>Behavior</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Server</strong></td>
+                    <td>DevTools silently skips, logging works, app runs perfectly</td>
+                  </tr>
+                  <tr>
+                    <td><strong>WebAssembly</strong></td>
+                    <td>DevTools active immediately, all features work</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Auto</strong></td>
+                    <td>DevTools inactive initially, activates automatically after WASM loads</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <!-- How Auto Mode Works -->
+            <section class="section">
+              <h2>How Auto Mode Works (Behind the Scenes)</h2>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Phase 1: Server Rendering (0-2 seconds)</div>
+                <ul>
+                  <li>User loads page</li>
+                  <li>Server renders HTML</li>
+                  <li>Store initializes with WithDefaults()</li>
+                  <li>DevTools tries to resolve IJSRuntime → Not available</li>
+                  <li>DevTools marks initialization as failed → Silent skip</li>
+                  <li>App works perfectly (core features unaffected)</li>
+                </ul>
+              </div>
+
+              <div class="flow-arrow">↓</div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Phase 2: WASM Loading (background, 2-5 seconds)</div>
+                <ul>
+                  <li>.NET WebAssembly runtime downloads</li>
+                  <li>User continues interacting with app</li>
+                  <li>Store updates work normally</li>
+                </ul>
+              </div>
+
+              <div class="flow-arrow">↓</div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Phase 3: WASM Active (seamless transition)</div>
+                <ul>
+                  <li>Next state update occurs</li>
+                  <li>DevTools tries to resolve IJSRuntime → Now available!</li>
+                  <li>DevTools initializes successfully</li>
+                  <li>Redux DevTools becomes active</li>
+                  <li>Persistence becomes available</li>
+                  <li>No user intervention needed!</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Mode-Specific Configurations -->
+            <section class="section">
+              <h2>Mode-Specific Configurations</h2>
+              <p>While the universal configuration works everywhere, you can optimize for specific modes:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Blazor Server (Optimized)</h3>
+                  <p>Skip DevTools entirely to avoid initialization attempts:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithLogging());  // Just logging, no DevTools</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Blazor WebAssembly (Full Features)</h3>
+                  <p>Enable all features including persistence:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store
+        .WithDefaults(sp, "Counter")
+        .WithPersistence(sp, "counter-state"));  // Auto-save to LocalStorage</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Blazor Auto (Recommended Default)</h3>
+                  <p>Use WithDefaults - DevTools activates automatically:</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Common Scenarios -->
+            <section class="section">
+              <h2>Common Scenarios</h2>
+
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">🖥️</div>
+                  <h3>Scenario 1: Pure Server App</h3>
+                  <p><strong>Best approach:</strong> Skip DevTools, use logging</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithLogging());</code></pre>
+                  </div>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🔄</div>
+                  <h3>Scenario 2: Progressive Web App</h3>
+                  <p><strong>Best approach:</strong> Use WithDefaults, let it adapt</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStore(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));</code></pre>
+                  </div>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">💻</div>
+                  <h3>Scenario 3: SPA with Full Features</h3>
+                  <p><strong>Best approach:</strong> Enable all features</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store
+        .WithDefaults(sp, "Counter")
+        .WithPersistence(sp, "app-state"));</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Persistence in Server Mode -->
+            <section class="section">
+              <h2>Persistence in Server Mode</h2>
+              <p>Since LocalStorage isn't available in pure Server mode, here are alternatives:</p>
+
+              <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Option 1: Server-side storage</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// Use database, session state, or distributed cache
+public record UserPreferences(string Theme, string Language)
+{
+    public async Task&lt;UserPreferences&gt; SaveToDatabase(IDbContext db)
+    {
+        await db.SaveAsync(this);
+        return this;
+    }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Option 2: Switch to Auto mode</h3>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// In Program.cs, add WASM support
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
+    .AddInteractiveWebAssemblyComponents();  // Enable Auto mode
+
+// Then use @rendermode InteractiveAuto in components</code></pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section class="section">
+              <h2>Troubleshooting by Render Mode</h2>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Server Mode Issues</div>
+                <ul>
+                  <li>✅ Store updates work? → Core functionality is fine</li>
+                  <li>⚠️ DevTools not appearing? → Expected behavior, use logging instead</li>
+                  <li>❌ Getting IJSRuntime errors? → Remove <code>.WithDefaults()</code>, use <code>.WithLogging()</code></li>
+                </ul>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">WebAssembly Mode Issues</div>
+                <ul>
+                  <li>✅ Everything works? → You're all set!</li>
+                  <li>⚠️ DevTools not appearing? → Check browser console, install Redux DevTools extension</li>
+                </ul>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Auto Mode Issues</div>
+                <ul>
+                  <li>⚠️ DevTools delayed? → Normal, waits for WASM transition</li>
+                  <li>✅ Store works immediately? → Core features work from initial server render</li>
+                  <li>❌ Getting errors on startup? → Check that WASM components are registered</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- Migration Paths -->
+            <section class="section">
+              <h2>Migration Paths</h2>
+
+              <div class="feature-list">
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <strong>From Server to Auto:</strong>
+                  </div>
+                  <ol>
+                    <li>Add WebAssembly components: <code>.AddInteractiveWebAssemblyComponents()</code></li>
+                    <li>Change render mode: <code>@rendermode InteractiveAuto</code></li>
+                    <li>No code changes needed in state management!</li>
+                  </ol>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <strong>From WASM to Auto:</strong>
+                  </div>
+                  <ol>
+                    <li>Add Server components: <code>.AddInteractiveServerComponents()</code></li>
+                    <li>Change render mode: <code>@rendermode InteractiveAuto</code></li>
+                    <li>No code changes needed in state management!</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Key Takeaway</div>
+                <p>Write your state management code once with <code>WithDefaults()</code>, and it works perfectly across all render modes with automatic adaptation!</p>
+              </div>
+            </section>
+
+            <!-- Next Steps -->
+            <section class="section">
+              <h2>Next Steps</h2>
+              <div class="next-steps-grid">
+                <a href="./getting-started.html" class="next-step-card">
+                  <div class="next-step-icon">⚡</div>
+                  <h3>Quick Start</h3>
+                  <p>Set up your first store with the recommended configuration.</p>
+                </a>
+
+                <a href="./devtools.html" class="next-step-card">
+                  <div class="next-step-icon">🛠️</div>
+                  <h3>DevTools Setup</h3>
+                  <p>Learn more about Redux DevTools integration.</p>
+                </a>
+
+                <a href="./persistence.html" class="next-step-card">
+                  <div class="next-step-icon">📦</div>
+                  <h3>Persistence</h3>
+                  <p>Explore auto-save and restore options.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="./assets/js/main.js"></script>
+</body>
+</html>

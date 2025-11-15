@@ -22,7 +22,7 @@
         </a>
         <div class="header-actions">
           <span class="version-badge">v1.0.0</span>
-          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+          <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
         </div>
@@ -40,6 +40,7 @@
               <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
               <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
               <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+              <li><a href="./render-modes.html" class="nav-link"><span class="nav-icon">🎯</span><span>Render Modes</span></a></li>
             </ul>
           </div>
 
@@ -116,6 +117,22 @@
                   <li>Zero boilerplate - just one line of configuration</li>
                   <li>JSON serialization with full type safety</li>
                 </ul>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Render Mode Compatibility</div>
+                <p>
+                  <strong>LocalStorage persistence works in:</strong>
+                </p>
+                <ul>
+                  <li>✅ Blazor WebAssembly (full support)</li>
+                  <li>✅ Blazor Auto mode (works after WASM transition)</li>
+                  <li>❌ Blazor Server (LocalStorage not available)</li>
+                </ul>
+                <p>
+                  For Blazor Server apps, consider using server-side storage (database, session state, or distributed cache) instead.
+                  See the <a href="./render-modes.html">Render Modes guide</a> for more details and alternatives.
+                </p>
               </div>
             </section>
 

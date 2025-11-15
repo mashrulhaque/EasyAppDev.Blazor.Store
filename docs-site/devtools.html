@@ -22,7 +22,7 @@
         </a>
         <div class="header-actions">
           <span class="version-badge">v1.0.0</span>
-          <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+          <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
         </div>
@@ -40,6 +40,7 @@
               <li><a href="./" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
               <li><a href="./getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
               <li><a href="./core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+              <li><a href="./render-modes.html" class="nav-link"><span class="nav-icon">🎯</span><span>Render Modes</span></a></li>
             </ul>
           </div>
 
@@ -144,6 +145,23 @@
                 <li><a href="https://microsoftedge.microsoft.com/addons/detail/redux-devtools/nnkgneoiohoecpdiaponcejilbhhikei" target="_blank" rel="noopener noreferrer">Edge Extension</a></li>
               </ul>
               <p>More information: <a href="https://github.com/reduxjs/redux-devtools" target="_blank" rel="noopener noreferrer">Redux DevTools GitHub</a></p>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Render Mode Compatibility</div>
+                <p>
+                  <strong>Redux DevTools works in:</strong>
+                </p>
+                <ul>
+                  <li>✅ Blazor WebAssembly (full support)</li>
+                  <li>✅ Blazor Auto mode (activates automatically after WASM transition)</li>
+                  <li>⚠️ Blazor Server (gracefully skips - use logging middleware instead)</li>
+                </ul>
+                <p>
+                  The library automatically detects the render mode and adapts accordingly. DevTools integration
+                  will silently skip initialization in Blazor Server mode without causing errors.
+                  See the <a href="./render-modes.html">Render Modes guide</a> for detailed information.
+                </p>
+              </div>
 
               <h3>Usage</h3>
               <p>Enable DevTools by using <code>WithDefaults()</code> when registering your store:</p>

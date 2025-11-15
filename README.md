@@ -7,7 +7,11 @@
 [![NuGet](https://img.shields.io/nuget/v/EasyAppDev.Blazor.Store.svg)](https://www.nuget.org/packages/EasyAppDev.Blazor.Store/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**[📚 View Full Documentation →](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/)**
+<div align="center">
+  <a href="https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/">
+    <img src="https://img.shields.io/badge/📚_View_Full_Documentation-4A90E2?style=for-the-badge&logoColor=white" alt="View Documentation" />
+  </a>
+</div>
 
 ---
 
