@@ -426,6 +426,129 @@ builder.Services.AddRazorComponents()
               </div>
             </section>
 
+            <!-- Scoped Stores for Blazor Server -->
+            <section class="section">
+              <h2 id="scoped-stores">Scoped Stores for Blazor Server (Now with Redux DevTools! 🎉)</h2>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Major Breakthrough!</div>
+                <p>Scoped stores in Blazor Server <strong>now support Redux DevTools</strong>! This was previously thought impossible, but we've made it work.</p>
+              </div>
+
+              <h3>The Problem</h3>
+              <p>In Blazor Server, singleton stores are shared across all SignalR circuits (all connected users). This means every client sees the same state, which is not ideal for user-specific data.</p>
+
+              <h3>The Solution</h3>
+              <p>Use <strong>scoped stores</strong> for per-circuit (per-user) isolation. Each user gets their own instance of the store.</p>
+
+              <h3>When to Use Scoped Stores</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Store Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>User-specific data</strong> (cart, preferences, session)</td>
+                    <td>✅ Scoped</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Shared app data</strong> (product catalog, config)</td>
+                    <td>✅ Singleton</td>
+                  </tr>
+                  <tr>
+                    <td><strong>WebAssembly apps</strong></td>
+                    <td>✅ Singleton (no sharing issue)</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>Scoped Store Registration</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Blazor Server with per-user isolation AND Redux DevTools!</div>
+                <pre><code class="language-csharp">builder.Services.AddStoreUtilities();
+
+// Scoped store with DevTools - each user gets their own instance
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")  // ✅ Redux DevTools work!
+        .WithLogging());
+
+// Or with utilities (async helpers) + full features
+builder.Services.AddScopedStoreWithUtilities(
+    new ShoppingCartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Shopping Cart")  // DevTools + Logging
+        .WithMiddleware(customMiddleware));</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Key Breakthrough</div>
+                <p>Scoped stores now accept <code>IServiceProvider</code> in the configure callback, which enables:</p>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li>✅ <strong>Redux DevTools</strong> (IJSRuntime resolved per-circuit!)</li>
+                  <li>✅ Access to scoped services (middleware, validators)</li>
+                  <li>✅ Full feature parity with WebAssembly mode</li>
+                </ul>
+              </div>
+
+              <h3>Why DevTools Work with Scoped Stores</h3>
+              <p>The key difference:</p>
+              <ul>
+                <li><strong>Singleton stores:</strong> Created at app startup before any circuits exist → No IJSRuntime available</li>
+                <li><strong>Scoped stores:</strong> Created when SignalR circuits are established → IJSRuntime is available!</li>
+              </ul>
+
+              <div class="code-block">
+                <div class="code-block-title">Complete Example with All Features</div>
+                <pre><code class="language-csharp">// ✅ DevTools WORK with scoped stores!
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")  // ✅ Works perfectly!
+        .WithLogging());
+
+// ✅ Complete example with all features
+builder.Services.AddScopedStore(
+    new ShoppingCartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Shopping Cart")  // Includes DevTools + Logging
+        .WithMiddleware(customMiddleware));</code></pre>
+              </div>
+
+              <h3>Accessing Scoped Services</h3>
+              <p>The new signature enables dependency injection:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">// Register scoped validator
+builder.Services.AddScoped&lt;IStateValidator&lt;CartState&gt;, CartValidator&gt;();
+
+// Access it in configure callback
+builder.Services.AddScopedStore(
+    new CartState(),
+    (store, sp) =>
+    {
+        var validator = sp.GetRequiredService&lt;IStateValidator&lt;CartState&gt;&gt;();
+        return store.WithMiddleware(new ValidationMiddleware&lt;CartState&gt;(validator));
+    });</code></pre>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Limitations</div>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                  <li>⚠️ LocalStorage persistence has limitations (sessions don't persist across reconnects)</li>
+                  <li>⚠️ Singleton stores still can't use DevTools (created before IJSRuntime exists)</li>
+                </ul>
+              </div>
+
+              <div class="alert alert-success">
+                <div class="alert-title">Working Demo</div>
+                <p>See the <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store/tree/main/samples/EasyAppDev.Blazor.Store.ServerSample" target="_blank">Blazor Server Sample</a> for a working demonstration of scoped stores with Redux DevTools!</p>
+              </div>
+            </section>
+
             <!-- Troubleshooting -->
             <section class="section">
               <h2>Troubleshooting by Render Mode</h2>
