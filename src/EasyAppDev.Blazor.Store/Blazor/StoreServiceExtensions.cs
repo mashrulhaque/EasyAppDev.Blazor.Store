@@ -72,11 +72,14 @@ public static class StoreServiceExtensions
     public static IServiceCollection AddScopedStoreWithUtilities<TState>(
         this IServiceCollection services,
         TState initialState,
-        Action<StoreBuilder<TState>>? configure = null)
+        Action<StoreBuilder<TState>, IServiceProvider>? configure = null)
         where TState : notnull
     {
         services.AddStoreUtilities();
-        services.AddScopedStore(initialState, configure);
+        services.AddScopedStore(initialState, (builder, sp) =>
+        {
+            configure?.Invoke(builder, sp);
+        });
 
         // Register IStateWriter<TState> as an alias for IStore<TState> (required by AsyncActionExecutor)
         services.AddScoped<IStateWriter<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
@@ -96,7 +99,7 @@ public static class StoreServiceExtensions
     public static IServiceCollection AddScopedStoreWithUtilities<TState>(
         this IServiceCollection services,
         Func<IServiceProvider, TState> stateFactory,
-        Action<StoreBuilder<TState>>? configure = null)
+        Action<StoreBuilder<TState>, IServiceProvider>? configure = null)
         where TState : notnull
     {
         services.AddStoreUtilities();
@@ -170,13 +173,13 @@ public static class StoreServiceExtensions
     public static IServiceCollection AddScopedStore<TState>(
         this IServiceCollection services,
         TState initialState,
-        Action<StoreBuilder<TState>>? configure = null)
+        Action<StoreBuilder<TState>, IServiceProvider>? configure = null)
         where TState : notnull
     {
         services.AddScoped<IStore<TState>>(sp =>
         {
             var builder = StoreBuilder<TState>.Create(initialState);
-            configure?.Invoke(builder);
+            configure?.Invoke(builder, sp);
             return builder.Build();
         });
 
@@ -194,14 +197,14 @@ public static class StoreServiceExtensions
     public static IServiceCollection AddScopedStore<TState>(
         this IServiceCollection services,
         Func<IServiceProvider, TState> stateFactory,
-        Action<StoreBuilder<TState>>? configure = null)
+        Action<StoreBuilder<TState>, IServiceProvider>? configure = null)
         where TState : notnull
     {
         services.AddScoped<IStore<TState>>(sp =>
         {
             var initialState = stateFactory(sp);
             var builder = StoreBuilder<TState>.Create(initialState);
-            configure?.Invoke(builder);
+            configure?.Invoke(builder, sp);
             return builder.Build();
         });
 

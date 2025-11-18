@@ -1,8 +1,8 @@
-using EasyAppDev.Blazor.Store.AsyncActions;
-using EasyAppDev.Blazor.Store.Blazor;
-using EasyAppDev.Blazor.Store.Core;
-using EasyAppDev.Blazor.Store.Utilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
+
+using EasyAppDev.Blazor.Store.AsyncActions;
+using EasyAppDev.Blazor.Store.Utilities;
 
 namespace EasyAppDev.Blazor.Store.Tests.Blazor;
 
@@ -196,7 +196,7 @@ public class StoreServiceExtensionsTests
         // Act
         services.AddTransientStore<TestState>(
             sp => new TestState(0, "Test"),
-            builder =>
+            (builder) =>
             {
                 configureInvoked = true;
                 builder.WithComparer(comparer);
@@ -399,6 +399,45 @@ public class StoreServiceExtensionsTests
         provider.GetService<IDebounceManager>().Should().NotBeNull();
         provider.GetService<IThrottleManager>().Should().NotBeNull();
         provider.GetService<ILazyCache>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AddScopedStore_WithConfigure_CalledWithDevTools_LoadsJavascriptModule()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var initialState = new TestState(0, "Scoped");
+        var jsRuntimeMock = new Mock<IJSRuntime>();
+        var jsModuleMock = new Mock<IJSObjectReference>();
+
+        jsRuntimeMock
+            .Setup(x => x.InvokeAsync<IJSObjectReference>(
+                "import",
+                It.IsAny<object[]>()))
+            .ReturnsAsync(jsModuleMock.Object);
+
+        // Register IJSRuntime so configure can pick it up from the service provider
+        services.AddScoped(_ => jsRuntimeMock.Object);
+
+        // Act - configure the scoped store to use JS runtime and enable DevTools
+        services.AddScopedStore<TestState>(
+            initialState,
+            (builder, sp) => builder.WithDevTools(sp)
+        );
+
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IStore<TestState>>();
+
+        // Trigger an update to cause DevTools middleware to initialize and import the JS module
+        await store.UpdateAsync(state => state with { Counter = 1 }, "INCREMENT");
+
+        // Assert - JS module import should have been invoked
+        jsRuntimeMock.Verify(
+            x => x.InvokeAsync<IJSObjectReference>(
+                "import",
+                It.IsAny<object[]>()),
+            Times.Once);
     }
 
     private class TestStateComparer : IEqualityComparer<TestState>
