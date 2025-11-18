@@ -21,6 +21,7 @@ public record TestDiState(int Counter);
 /// Comprehensive integration tests that validate the complete DI setup works correctly.
 /// These tests ensure all service registrations work together, preventing DI errors at runtime.
 /// </summary>
+[Collection("Sequential")]
 public class DependencyInjectionTests : TestContext
 {
     /// <summary>

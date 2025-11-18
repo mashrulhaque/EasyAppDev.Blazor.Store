@@ -130,4 +130,19 @@ builder.Services.AddStore(
     (store, sp) => store.WithDefaults(sp, "Form Validation Store")
                         .WithDiagnosticsIfAvailable(sp));
 
+// ============================================================================
+// Cross-Store Demo Stores - Demonstrates Phase 1 updates
+// Auth and Cart stores for showcasing cross-store update patterns
+// Shows proper use of UpdateAsync to prevent deadlocks!
+// ============================================================================
+builder.Services.AddStore(
+    AuthDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "Auth Demo Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
+builder.Services.AddStore(
+    CartDemoState.Empty,
+    (store, sp) => store.WithDefaults(sp, "Cart Demo Store")
+                        .WithDiagnosticsIfAvailable(sp));
+
 await builder.Build().RunAsync();

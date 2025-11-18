@@ -67,12 +67,12 @@ public static class StoreServiceExtensions
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="initialState">The initial state.</param>
-    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <param name="configure">Optional configuration for the store builder. Receives the builder and service provider, returns configured builder.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddScopedStoreWithUtilities<TState>(
         this IServiceCollection services,
         TState initialState,
-        Action<StoreBuilder<TState>>? configure = null)
+        Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>>? configure = null)
         where TState : notnull
     {
         services.AddStoreUtilities();
@@ -91,12 +91,12 @@ public static class StoreServiceExtensions
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="stateFactory">Factory to create the initial state.</param>
-    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <param name="configure">Optional configuration for the store builder. Receives the builder and service provider, returns configured builder.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddScopedStoreWithUtilities<TState>(
         this IServiceCollection services,
         Func<IServiceProvider, TState> stateFactory,
-        Action<StoreBuilder<TState>>? configure = null)
+        Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>>? configure = null)
         where TState : notnull
     {
         services.AddStoreUtilities();
@@ -165,12 +165,38 @@ public static class StoreServiceExtensions
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="initialState">The initial state.</param>
-    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <param name="configure">Optional configuration for the store builder. Receives the builder and service provider, returns configured builder.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddScopedStore<TState>(
         this IServiceCollection services,
         TState initialState,
-        Action<StoreBuilder<TState>>? configure = null)
+        Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>>? configure = null)
+        where TState : notnull
+    {
+        services.AddScoped<IStore<TState>>(sp =>
+        {
+            var builder = StoreBuilder<TState>.Create(initialState);
+            if (configure != null)
+                builder = configure(builder, sp);
+            return builder.Build();
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a scoped store to the service collection (legacy overload for backward compatibility).
+    /// </summary>
+    /// <typeparam name="TState">The type of state.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="initialState">The initial state.</param>
+    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <returns>The service collection for chaining.</returns>
+    [Obsolete("Use the overload that accepts Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>> for access to scoped services like IJSRuntime.")]
+    public static IServiceCollection AddScopedStore<TState>(
+        this IServiceCollection services,
+        TState initialState,
+        Action<StoreBuilder<TState>>? configure)
         where TState : notnull
     {
         services.AddScoped<IStore<TState>>(sp =>
@@ -189,12 +215,39 @@ public static class StoreServiceExtensions
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="stateFactory">Factory to create the initial state.</param>
-    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <param name="configure">Optional configuration for the store builder. Receives the builder and service provider, returns configured builder.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddScopedStore<TState>(
         this IServiceCollection services,
         Func<IServiceProvider, TState> stateFactory,
-        Action<StoreBuilder<TState>>? configure = null)
+        Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>>? configure = null)
+        where TState : notnull
+    {
+        services.AddScoped<IStore<TState>>(sp =>
+        {
+            var initialState = stateFactory(sp);
+            var builder = StoreBuilder<TState>.Create(initialState);
+            if (configure != null)
+                builder = configure(builder, sp);
+            return builder.Build();
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a scoped store to the service collection using a factory (legacy overload for backward compatibility).
+    /// </summary>
+    /// <typeparam name="TState">The type of state.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="stateFactory">Factory to create the initial state.</param>
+    /// <param name="configure">Optional configuration for the store builder.</param>
+    /// <returns>The service collection for chaining.</returns>
+    [Obsolete("Use the overload that accepts Func<StoreBuilder<TState>, IServiceProvider, StoreBuilder<TState>> for access to scoped services like IJSRuntime.")]
+    public static IServiceCollection AddScopedStore<TState>(
+        this IServiceCollection services,
+        Func<IServiceProvider, TState> stateFactory,
+        Action<StoreBuilder<TState>>? configure)
         where TState : notnull
     {
         services.AddScoped<IStore<TState>>(sp =>

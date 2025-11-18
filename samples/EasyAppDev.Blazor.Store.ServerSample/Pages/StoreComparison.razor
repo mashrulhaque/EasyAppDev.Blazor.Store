@@ -1,0 +1,136 @@
+@page "/comparison"
+@inherits StoreComponent<ScopedCounterState>
+@inject IStore<SingletonCounterState> SingletonStore
+
+<PageTitle>Store Comparison</PageTitle>
+
+<div class="container mt-4">
+    <h1>🔄 Singleton vs Scoped Stores</h1>
+    <p class="lead">Open this page in <strong>two different browser windows</strong> to see the difference!</p>
+
+    <div class="alert alert-warning">
+        <strong>Experiment:</strong> Open this page in multiple tabs/windows and click the buttons. Watch how:
+        <ul class="mb-0">
+            <li>The <strong>Singleton Counter</strong> is shared across all windows (everyone sees the same value)</li>
+            <li>The <strong>Scoped Counter</strong> is isolated per window (each has its own value)</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Singleton Store -->
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚠️ Singleton Store (Shared)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h2 class="display-3">@SingletonState.Count</h2>
+                        <small class="text-muted">Last Action: @(SingletonState.LastAction ?? "None")</small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-lg btn-primary" @onclick="IncrementSingleton">
+                            Increment Singleton
+                        </button>
+                        <button class="btn btn-lg btn-secondary" @onclick="DecrementSingleton">
+                            Decrement Singleton
+                        </button>
+                        <button class="btn btn-lg btn-outline-danger" @onclick="ResetSingleton">
+                            Reset Singleton
+                        </button>
+                    </div>
+
+                    <div class="alert alert-danger mt-3">
+                        <strong>Problem:</strong> All users see and affect the same counter!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scoped Store -->
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">✅ Scoped Store (Isolated)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h2 class="display-3">@State.Count</h2>
+                        <small class="text-muted">Last Action: @(State.LastAction ?? "None")</small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-lg btn-success" @onclick="IncrementScoped">
+                            Increment Scoped
+                        </button>
+                        <button class="btn btn-lg btn-secondary" @onclick="DecrementScoped">
+                            Decrement Scoped
+                        </button>
+                        <button class="btn btn-lg btn-outline-danger" @onclick="ResetScoped">
+                            Reset Scoped
+                        </button>
+                    </div>
+
+                    <div class="alert alert-success mt-3">
+                        <strong>Solution:</strong> Each user has their own counter!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">🔍 Redux DevTools</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Open Redux DevTools:</strong></p>
+            <ul>
+                <li>Press <kbd>F12</kbd> and go to the <strong>Redux</strong> tab</li>
+                <li>Use the dropdown to switch between stores:
+                    <ul>
+                        <li><strong>Scoped Counter</strong> - Your personal counter (has DevTools!)</li>
+                        <li><strong>Scoped User Session</strong> - Your session data</li>
+                    </ul>
+                </li>
+                <li>Notice: <strong>Singleton stores don't appear</strong> (DevTools disabled for singletons in Server mode)</li>
+            </ul>
+
+            <div class="alert alert-info">
+                <strong>Why DevTools work with scoped stores:</strong><br />
+                The <code>IServiceProvider</code> parameter allows resolving <code>IJSRuntime</code> when the scoped store is created per-circuit, not at app startup!
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SingletonCounterState SingletonState => SingletonStore.GetState();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Subscribe to singleton store changes to trigger re-render
+        SingletonStore.Subscribe(_ => InvokeAsync(StateHasChanged));
+    }
+
+    private async Task IncrementSingleton() =>
+        await SingletonStore.UpdateAsync(s => s.Increment(), "INCREMENT");
+
+    private async Task DecrementSingleton() =>
+        await SingletonStore.UpdateAsync(s => s.Decrement(), "DECREMENT");
+
+    private async Task ResetSingleton() =>
+        await SingletonStore.UpdateAsync(s => s.Reset(), "RESET");
+
+    private async Task IncrementScoped() =>
+        await Update(s => s.Increment(), "INCREMENT");
+
+    private async Task DecrementScoped() =>
+        await Update(s => s.Decrement(), "DECREMENT");
+
+    private async Task ResetScoped() =>
+        await Update(s => s.Reset(), "RESET");
+}

@@ -1,0 +1,87 @@
+@page "/singleton-counter"
+@inject IStore<SingletonCounterState> SingletonStore
+
+<PageTitle>Singleton Counter</PageTitle>
+
+<div class="container mt-4">
+    <h1>⚠️ Singleton Counter (The Problem)</h1>
+    <p class="lead">This counter is <strong>shared across all users</strong></p>
+
+    <div class="alert alert-danger">
+        <h5 class="alert-heading">⚠️ Warning: Data Sharing Issue</h5>
+        <p>Open this page in multiple browser windows or tabs. You'll see:</p>
+        <ul class="mb-0">
+            <li>All windows show the <strong>same counter value</strong></li>
+            <li>Clicking in one window <strong>updates all windows</strong></li>
+            <li>This is a <strong>privacy and security concern</strong> for user data!</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6 offset-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h2 class="display-1 mb-4">@State.Count</h2>
+                    <p class="text-muted">Last Action: @(State.LastAction ?? "None")</p>
+
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-lg btn-primary" @onclick="Increment">
+                            <span class="oi oi-plus"></span> Increment
+                        </button>
+                        <button class="btn btn-lg btn-secondary" @onclick="Decrement">
+                            <span class="oi oi-minus"></span> Decrement
+                        </button>
+                        <button class="btn btn-lg btn-outline-danger" @onclick="Reset">
+                            <span class="oi oi-reload"></span> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">🔧 Technical Details</h5>
+        </div>
+        <div class="card-body">
+            <h6>Registration in Program.cs:</h6>
+            <pre class="bg-light p-3 rounded"><code>// ❌ Singleton - shared across all users
+builder.Services.AddStore(
+    new SingletonCounterState(),
+    (store, sp) => store.WithLogging());
+</code></pre>
+
+            <h6 class="mt-3">Why DevTools Don't Work:</h6>
+            <ul>
+                <li><code>IJSRuntime</code> is scoped (per-circuit)</li>
+                <li>Singleton stores are created at app startup</li>
+                <li>No circuit/user context exists yet</li>
+                <li>Result: DevTools initialization fails silently</li>
+            </ul>
+
+            <div class="alert alert-warning">
+                <strong>Use Case for Singletons:</strong> Only use singleton stores for truly global data that should be shared (e.g., app configuration, feature flags). Never for user-specific data!
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SingletonCounterState State => SingletonStore.GetState();
+
+    protected override void OnInitialized()
+    {
+        // Subscribe to store changes
+        SingletonStore.Subscribe(_ => InvokeAsync(StateHasChanged));
+    }
+
+    private async Task Increment() =>
+        await SingletonStore.UpdateAsync(s => s.Increment(), "INCREMENT");
+
+    private async Task Decrement() =>
+        await SingletonStore.UpdateAsync(s => s.Decrement(), "DECREMENT");
+
+    private async Task Reset() =>
+        await SingletonStore.UpdateAsync(s => s.Reset(), "RESET");
+}

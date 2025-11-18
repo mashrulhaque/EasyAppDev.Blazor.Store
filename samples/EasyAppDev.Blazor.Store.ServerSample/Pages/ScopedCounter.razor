@@ -1,0 +1,86 @@
+@page "/scoped-counter"
+@inherits StoreComponent<ScopedCounterState>
+
+<PageTitle>Scoped Counter</PageTitle>
+
+<div class="container mt-4">
+    <h1>✅ Scoped Counter (The Solution)</h1>
+    <p class="lead">This counter is <strong>isolated per user</strong></p>
+
+    <div class="alert alert-success">
+        <h5 class="alert-heading">✅ Data Isolation Achieved</h5>
+        <p>Open this page in multiple browser windows or tabs. You'll see:</p>
+        <ul class="mb-0">
+            <li>Each window has its <strong>own counter value</strong></li>
+            <li>Clicking in one window <strong>only affects that window</strong></li>
+            <li>Complete <strong>privacy and data isolation</strong>!</li>
+            <li><strong>Redux DevTools work!</strong> (Check F12 → Redux tab)</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6 offset-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h2 class="display-1 mb-4">@State.Count</h2>
+                    <p class="text-muted">Last Action: @(State.LastAction ?? "None")</p>
+
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-lg btn-success" @onclick="Increment">
+                            <span class="oi oi-plus"></span> Increment
+                        </button>
+                        <button class="btn btn-lg btn-secondary" @onclick="Decrement">
+                            <span class="oi oi-minus"></span> Decrement
+                        </button>
+                        <button class="btn btn-lg btn-outline-danger" @onclick="Reset">
+                            <span class="oi oi-reload"></span> Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">🔧 Technical Details</h5>
+        </div>
+        <div class="card-body">
+            <h6>Registration in Program.cs:</h6>
+            <pre class="bg-light p-3 rounded"><code>// ✅ Scoped - isolated per user/circuit
+builder.Services.AddScopedStore(
+    new ScopedCounterState(),
+    (store, sp) => store
+        .WithDevTools(sp, "Scoped Counter")  // ✅ DevTools work!
+        .WithLogging());
+</code></pre>
+
+            <h6 class="mt-3">Why DevTools Work:</h6>
+            <ul>
+                <li><code>IServiceProvider</code> parameter in configure callback</li>
+                <li>Store created per-circuit (when user connects)</li>
+                <li><code>IJSRuntime</code> is available in circuit scope</li>
+                <li>Result: DevTools initialize successfully! 🎉</li>
+            </ul>
+
+            <div class="alert alert-info">
+                <strong>Open Redux DevTools:</strong> Press F12 → Go to Redux tab → Select "Scoped Counter" from the dropdown. You'll see all actions and state changes for YOUR session only!
+            </div>
+
+            <div class="alert alert-success">
+                <strong>The Breakthrough:</strong> Adding <code>IServiceProvider</code> to the configure callback was the key discovery that made this work!
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task Increment() =>
+        await Update(s => s.Increment(), "INCREMENT");
+
+    private async Task Decrement() =>
+        await Update(s => s.Decrement(), "DECREMENT");
+
+    private async Task Reset() =>
+        await Update(s => s.Reset(), "RESET");
+}

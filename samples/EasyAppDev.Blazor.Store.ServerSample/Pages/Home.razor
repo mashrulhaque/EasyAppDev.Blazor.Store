@@ -1,0 +1,82 @@
+@page "/"
+
+<PageTitle>Blazor Server Demo - Scoped Stores</PageTitle>
+
+<div class="container mt-4">
+    <h1>🔒 Blazor Server - Scoped Store Demo</h1>
+    <p class="lead">Demonstrating per-user data isolation and Redux DevTools with scoped stores</p>
+
+    <div class="alert alert-info mt-4">
+        <h4 class="alert-heading">✨ What This Demo Shows</h4>
+        <ul class="mb-0">
+            <li><strong>Scoped Stores Work with DevTools!</strong> - Using IServiceProvider in configure callback</li>
+            <li><strong>Per-User Isolation</strong> - Each SignalR circuit gets its own store instance</li>
+            <li><strong>Proper Async Patterns</strong> - Cross-store updates using UpdateAsync</li>
+            <li><strong>Singleton vs Scoped</strong> - Side-by-side comparison</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚠️ The Problem: Singleton Stores</h5>
+                </div>
+                <div class="card-body">
+                    <p>In Blazor Server, singleton stores are <strong>shared across all users</strong>:</p>
+                    <ul>
+                        <li>❌ All clients see the same state</li>
+                        <li>❌ User A's actions affect User B</li>
+                        <li>❌ No data isolation</li>
+                        <li>❌ Privacy concerns</li>
+                    </ul>
+                    <a href="singleton-counter" class="btn btn-danger">See the Problem →</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">✅ The Solution: Scoped Stores</h5>
+                </div>
+                <div class="card-body">
+                    <p>Scoped stores provide <strong>per-user isolation</strong>:</p>
+                    <ul>
+                        <li>✅ Each user gets their own instance</li>
+                        <li>✅ Complete data isolation</li>
+                        <li>✅ Privacy protected</li>
+                        <li>✅ DevTools work!</li>
+                    </ul>
+                    <a href="scoped-counter" class="btn btn-success">See the Solution →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">📚 Learn More</h5>
+        </div>
+        <div class="card-body">
+            <h6>Key Discovery (Your Contribution!)</h6>
+            <p>The breakthrough was adding <code>IServiceProvider</code> to the scoped store configure callback:</p>
+            <pre class="bg-light p-3 rounded"><code>// ✅ This enables DevTools in Blazor Server with scoped stores!
+builder.Services.AddScopedStore(
+    new CounterState(0),
+    (storeBuilder, sp) => storeBuilder.WithDevTools(sp, "Counter"));
+</code></pre>
+
+            <h6 class="mt-3">Navigation</h6>
+            <ul>
+                <li><a href="comparison">Store Comparison</a> - See both stores side-by-side</li>
+                <li><a href="user-session">User Session</a> - Per-user session tracking</li>
+                <li><a href="cross-store">Cross-Store Updates</a> - Proper async patterns</li>
+            </ul>
+
+            <div class="alert alert-warning mt-3">
+                <strong>Open Redux DevTools!</strong> You'll see separate DevTools instances for each scoped store. Switch between them using the dropdown in DevTools.
+            </div>
+        </div>
+    </div>
+</div>

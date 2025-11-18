@@ -18,6 +18,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     private readonly MiddlewarePipeline<TState>? _middlewarePipeline;
     private readonly ILogger<Store<TState>>? _logger;
     private bool _disposed;
+    private readonly AsyncLocal<int> _updateDepth = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Store{TState}"/> class.
@@ -58,6 +59,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     }
 
     /// <inheritdoc />
+    [Obsolete("Synchronous Update can cause deadlock with cross-store updates. Use UpdateAsync instead to ensure proper async flow and avoid reentrancy issues.")]
     public void Update(Func<TState, TState> updater, string? action = null)
     {
         UpdateAsync(updater, action).GetAwaiter().GetResult();
@@ -69,38 +71,67 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
         ArgumentNullException.ThrowIfNull(updater);
         ThrowIfDisposed();
 
-        await _lock.WaitAsync().ConfigureAwait(false);
+        _updateDepth.Value++;
         try
         {
-            var previousState = _state;
-
-            if (_middlewarePipeline != null)
+            if (_updateDepth.Value > 1)
             {
-                await _middlewarePipeline.ExecuteBeforeUpdateAsync(previousState, action)
-                    .ConfigureAwait(false);
+                _logger?.LogWarning(
+                    "Reentrancy detected in Store<{StateType}>. Update depth: {Depth}. " +
+                    "This may indicate cross-store updates or nested update calls. " +
+                    "Consider using UpdateAsync and ensuring proper async flow.",
+                    typeof(TState).Name,
+                    _updateDepth.Value);
             }
 
-            var newState = updater(_state);
-
-            if (newState is null)
-                throw new InvalidOperationException("Updater function returned null.");
-
-            if (_comparer.Equals(previousState, newState))
-                return;
-
-            _state = newState;
-
-            if (_middlewarePipeline != null)
+            bool shouldNotify;
+            await _lock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await _middlewarePipeline.ExecuteAfterUpdateAsync(previousState, _state, action)
-                    .ConfigureAwait(false);
+                var previousState = _state;
+
+                if (_middlewarePipeline != null)
+                {
+                    await _middlewarePipeline.ExecuteBeforeUpdateAsync(previousState, action)
+                        .ConfigureAwait(false);
+                }
+
+                var newState = updater(_state);
+
+                if (newState is null)
+                    throw new InvalidOperationException("Updater function returned null.");
+
+                if (_comparer.Equals(previousState, newState))
+                {
+                    shouldNotify = false;
+                }
+                else
+                {
+                    _state = newState;
+
+                    if (_middlewarePipeline != null)
+                    {
+                        await _middlewarePipeline.ExecuteAfterUpdateAsync(previousState, _state, action)
+                            .ConfigureAwait(false);
+                    }
+
+                    shouldNotify = true;
+                }
+            }
+            finally
+            {
+                _lock.Release();
             }
 
-            NotifySubscribers();
+            // Notify subscribers AFTER releasing lock to prevent reentrancy deadlocks
+            if (shouldNotify)
+            {
+                NotifySubscribers();
+            }
         }
         finally
         {
-            _lock.Release();
+            _updateDepth.Value--;
         }
     }
 
@@ -110,38 +141,67 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
         ArgumentNullException.ThrowIfNull(asyncUpdater);
         ThrowIfDisposed();
 
-        await _lock.WaitAsync().ConfigureAwait(false);
+        _updateDepth.Value++;
         try
         {
-            var previousState = _state;
-
-            if (_middlewarePipeline != null)
+            if (_updateDepth.Value > 1)
             {
-                await _middlewarePipeline.ExecuteBeforeUpdateAsync(previousState, action)
-                    .ConfigureAwait(false);
+                _logger?.LogWarning(
+                    "Reentrancy detected in Store<{StateType}>. Update depth: {Depth}. " +
+                    "This may indicate cross-store updates or nested update calls. " +
+                    "Consider using UpdateAsync and ensuring proper async flow.",
+                    typeof(TState).Name,
+                    _updateDepth.Value);
             }
 
-            var newState = await asyncUpdater(_state).ConfigureAwait(false);
-
-            if (newState is null)
-                throw new InvalidOperationException("Updater function returned null.");
-
-            if (_comparer.Equals(previousState, newState))
-                return;
-
-            _state = newState;
-
-            if (_middlewarePipeline != null)
+            bool shouldNotify;
+            await _lock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await _middlewarePipeline.ExecuteAfterUpdateAsync(previousState, _state, action)
-                    .ConfigureAwait(false);
+                var previousState = _state;
+
+                if (_middlewarePipeline != null)
+                {
+                    await _middlewarePipeline.ExecuteBeforeUpdateAsync(previousState, action)
+                        .ConfigureAwait(false);
+                }
+
+                var newState = await asyncUpdater(_state).ConfigureAwait(false);
+
+                if (newState is null)
+                    throw new InvalidOperationException("Updater function returned null.");
+
+                if (_comparer.Equals(previousState, newState))
+                {
+                    shouldNotify = false;
+                }
+                else
+                {
+                    _state = newState;
+
+                    if (_middlewarePipeline != null)
+                    {
+                        await _middlewarePipeline.ExecuteAfterUpdateAsync(previousState, _state, action)
+                            .ConfigureAwait(false);
+                    }
+
+                    shouldNotify = true;
+                }
+            }
+            finally
+            {
+                _lock.Release();
             }
 
-            NotifySubscribers();
+            // Notify subscribers AFTER releasing lock to prevent reentrancy deadlocks
+            if (shouldNotify)
+            {
+                NotifySubscribers();
+            }
         }
         finally
         {
-            _lock.Release();
+            _updateDepth.Value--;
         }
     }
 

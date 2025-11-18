@@ -33,7 +33,7 @@ This library uses C# records with pure transformation methods—no actions, redu
 - **Request deduplication** - Automatic caching prevents redundant API calls
 
 **Developer Experience:**
-- **Redux DevTools** - Time-travel debugging
+- **Redux DevTools** - Time-travel debugging (works in Server mode with scoped stores!)
 - **Diagnostics** - Built-in monitoring (DEBUG only, zero production overhead)
 - **Middleware** - Extensible hooks for logging, validation, custom logic
 - **SOLID architecture** - Interface segregation, dependency injection throughout
@@ -88,12 +88,12 @@ builder.Services.AddStoreWithUtilities(
 
 <h1>@State.Count</h1>
 
-<button @onclick="@(() => Update(s => s.Increment()))">+</button>
-<button @onclick="@(() => Update(s => s.Decrement()))">-</button>
-<button @onclick="@(() => Update(s => s.Reset()))">Reset</button>
+<button @onclick="@(() => UpdateAsync(s => s.Increment()))">+</button>
+<button @onclick="@(() => UpdateAsync(s => s.Decrement()))">-</button>
+<button @onclick="@(() => UpdateAsync(s => s.Reset()))">Reset</button>
 ```
 
-Inherit from `StoreComponent<T>` and call `Update()`. No actions, no reducers, no dispatch.
+Inherit from `StoreComponent<T>` and call `UpdateAsync()`. No actions, no reducers, no dispatch.
 
 ---
 
@@ -105,24 +105,25 @@ The library automatically adapts to your Blazor render mode with **intelligent l
 
 ### Quick Comparison
 
-| Feature | Server | WebAssembly | Auto (Server→WASM) |
-|---------|--------|-------------|-------------------|
-| **Core State Management** | ✅ Full | ✅ Full | ✅ Full |
-| **Async Helpers** | ✅ All work | ✅ All work | ✅ All work |
-| **Components & Updates** | ✅ Perfect | ✅ Perfect | ✅ Perfect |
-| **Logging Middleware** | ✅ Works | ✅ Works | ✅ Works |
-| **Redux DevTools** | ⚠️ Gracefully skips | ✅ Works | ✅ Activates after transition |
-| **LocalStorage Persistence** | ❌ Not available | ✅ Works | ✅ Works after transition |
-| **Code Changes Needed** | ✅ None | ✅ None | ✅ None |
+| Feature | Server (Singleton) | Server (Scoped) | WebAssembly | Auto (Server→WASM) |
+|---------|-------------------|----------------|-------------|-------------------|
+| **Core State Management** | ✅ Full | ✅ Full | ✅ Full | ✅ Full |
+| **Async Helpers** | ✅ All work | ✅ All work | ✅ All work | ✅ All work |
+| **Components & Updates** | ✅ Perfect | ✅ Perfect | ✅ Perfect | ✅ Perfect |
+| **Logging Middleware** | ✅ Works | ✅ Works | ✅ Works | ✅ Works |
+| **Redux DevTools** | ⚠️ Gracefully skips | ✅ **Works!** | ✅ Works | ✅ Activates after transition |
+| **LocalStorage Persistence** | ❌ Not available | ⚠️ Limited | ✅ Works | ✅ Works after transition |
+| **Code Changes Needed** | ✅ None | ✅ None | ✅ None | ✅ None |
 
 ### Understanding Render Modes
 
 #### 🟦 **Blazor Server**
 - Runs on the server via SignalR
 - UI updates sent over WebSocket
-- `IJSRuntime` is scoped (not available at startup)
-- **DevTools**: Gracefully skips (no JavaScript at startup)
-- **Persistence**: Not available (use server-side storage instead)
+- `IJSRuntime` is scoped (not available at app startup)
+- **DevTools (Singleton stores)**: Gracefully skips (no IJSRuntime at startup)
+- **DevTools (Scoped stores)**: ✅ **Works!** (IJSRuntime available per-circuit)
+- **Persistence**: Limited (use server-side storage for production)
 
 #### 🟩 **Blazor WebAssembly**
 - Runs entirely in browser
@@ -196,12 +197,22 @@ builder.Services.AddStore(
 
 While the universal configuration works everywhere, you can optimize for specific modes:
 
-**Blazor Server (Optimized)**
+**Blazor Server (Singleton Stores)**
 ```csharp
-// Skip DevTools entirely to avoid initialization attempts
+// Singleton stores: Skip DevTools (no IJSRuntime at app startup)
 builder.Services.AddStore(
     new CounterState(0),
-    (store, sp) => store.WithLogging());  // Just logging, no DevTools
+    (store, sp) => store.WithLogging());  // Just logging
+```
+
+**Blazor Server (Scoped Stores with DevTools!)**
+```csharp
+// Scoped stores: DevTools work! (IJSRuntime available per-circuit)
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")  // ✅ Full DevTools support!
+        .WithLogging());
 ```
 
 **Blazor WebAssembly (Full Features)**
@@ -225,10 +236,16 @@ builder.Services.AddStoreWithUtilities(
 ### Common Scenarios
 
 #### Scenario 1: Pure Server App (No WASM)
-**Best approach**: Skip DevTools, use logging
+**Best approach**: Use scoped stores for DevTools support
 ```csharp
+// For per-user data with DevTools
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store.WithDevTools(sp, "Session"));
+
+// For shared app data (no DevTools)
 builder.Services.AddStore(
-    new CounterState(0),
+    new AppConfigState(),
     (store, sp) => store.WithLogging());
 ```
 
@@ -342,9 +359,107 @@ private async Task EnsureInitializedAsync()
 
 ---
 
+## 🔒 Scoped Stores for Blazor Server (Now with Redux DevTools! 🎉)
+
+**Problem**: In Blazor Server, singleton stores are shared across all SignalR circuits (all connected users). This means every client sees the same state.
+
+**Solution**: Use scoped stores for per-circuit (per-user) isolation.
+
+**Breakthrough**: Scoped stores now support Redux DevTools in Blazor Server! See [working demo →](./samples/EasyAppDev.Blazor.Store.ServerSample/)
+
+### When to Use Scoped Stores
+
+| Scenario | Store Type |
+|----------|-----------|
+| **User-specific data** (cart, preferences, session) | ✅ Scoped |
+| **Shared app data** (product catalog, config) | ✅ Singleton |
+| **WebAssembly apps** | ✅ Singleton (no sharing issue) |
+
+### Scoped Store Registration
+
+```csharp
+// Program.cs - Blazor Server with per-user isolation AND Redux DevTools!
+builder.Services.AddStoreUtilities();
+
+// Scoped store with DevTools - each user gets their own instance
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")  // ✅ Redux DevTools work!
+        .WithLogging());
+
+// Or with utilities (async helpers) + full features
+builder.Services.AddScopedStoreWithUtilities(
+    new ShoppingCartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Shopping Cart")  // DevTools + Logging
+        .WithMiddleware(customMiddleware));
+```
+
+**Key breakthrough**: Scoped stores now accept `IServiceProvider` in the configure callback, which enables:
+- ✅ **Redux DevTools** (IJSRuntime resolved per-circuit!)
+- ✅ Access to scoped services (middleware, validators)
+- ✅ Full feature parity with WebAssembly mode
+
+### Scoped Stores with Redux DevTools - The Breakthrough! 🎉
+
+**Major Discovery**: Scoped stores in Blazor Server **DO support Redux DevTools**!
+
+The key is that `IJSRuntime` is available when scoped stores are created (per-circuit), unlike singleton stores which are created at app startup before any circuits exist.
+
+```csharp
+// ✅ DevTools WORK with scoped stores!
+builder.Services.AddScopedStore(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")  // ✅ Works perfectly!
+        .WithLogging());
+
+// ✅ Complete example with all features
+builder.Services.AddScopedStore(
+    new ShoppingCartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Shopping Cart")  // Includes DevTools + Logging
+        .WithMiddleware(customMiddleware));
+```
+
+**Why this works**:
+1. Scoped stores are created when SignalR circuits are established
+2. `IJSRuntime` is available at that point (scoped per-circuit)
+3. `IServiceProvider` parameter enables resolving `IJSRuntime`
+4. Result: Full Redux DevTools support in Blazor Server! 🎊
+
+**Limitations**:
+- ⚠️ LocalStorage persistence has limitations (sessions don't persist across reconnects)
+- ✅ Singleton stores still can't use DevTools (created before IJSRuntime exists)
+
+**See the [Blazor Server Sample](./samples/EasyAppDev.Blazor.Store.ServerSample/) for a working demo!**
+
+### Accessing Scoped Services
+
+The new signature enables dependency injection:
+
+```csharp
+// Register scoped validator
+builder.Services.AddScoped<IStateValidator<CartState>, CartValidator>();
+
+// Access it in configure callback
+builder.Services.AddScopedStore(
+    new CartState(),
+    (store, sp) =>
+    {
+        var validator = sp.GetRequiredService<IStateValidator<CartState>>();
+        return store.WithMiddleware(new ValidationMiddleware<CartState>(validator));
+    });
+```
+
+---
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Blazor Render Modes](#-blazor-render-modes-server-webassembly--auto)
+- [Scoped Stores for Blazor Server](#-scoped-stores-for-blazor-server)
 - [Core Concepts](#core-concepts)
 - [Real-World Examples](#real-world-examples)
 - [Async Helpers](#async-helpers)
@@ -353,6 +468,7 @@ private async Task EnsureInitializedAsync()
 - [API Reference](#api-reference)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
+- [Advanced Patterns](#advanced-patterns)
 - [Documentation](#documentation)
 
 ---
@@ -389,7 +505,7 @@ public record TodoState(ImmutableList<Todo> Todos)
 Inherit from `StoreComponent<TState>` to get:
 - Automatic subscription to state changes
 - Access to `State` property
-- `Update()` method for state transformations
+- `UpdateAsync()` method for state transformations
 - Automatic cleanup on disposal
 
 ```csharp
@@ -398,14 +514,14 @@ Inherit from `StoreComponent<TState>` to get:
 <button @onclick="AddTodo">Add</button>
 
 @code {
-    async Task AddTodo() => await Update(s => s.AddTodo("New task"));
+    async Task AddTodo() => await UpdateAsync(s => s.AddTodo("New task"));
 }
 ```
 
 ### Update Flow
 
 ```
-Component calls Update(s => s.Method())
+Component calls UpdateAsync(s => s.Method())
     ↓
 Store applies transformation
     ↓
@@ -461,9 +577,9 @@ builder.Services.AddStoreWithUtilities(
     <div>
         <input type="checkbox"
                checked="@todo.Completed"
-               @onchange="@(() => Update(s => s.ToggleTodo(todo.Id)))" />
+               @onchange="@(() => UpdateAsync(s => s.ToggleTodo(todo.Id)))" />
         <span class="@(todo.Completed ? "completed" : "")">@todo.Text</span>
-        <button @onclick="@(() => Update(s => s.RemoveTodo(todo.Id)))">🗑️</button>
+        <button @onclick="@(() => UpdateAsync(s => s.RemoveTodo(todo.Id)))">🗑️</button>
     </div>
 }
 
@@ -474,7 +590,7 @@ builder.Services.AddStoreWithUtilities(
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newTodo))
         {
-            await Update(s => s.AddTodo(newTodo));
+            await UpdateAsync(s => s.AddTodo(newTodo));
             newTodo = "";
         }
     }
@@ -530,7 +646,7 @@ else
             error: (s, ex) => s with { CurrentUser = AsyncData<User>.Failure(ex.Message) }
         );
 
-    async Task Logout() => await Update(s => AuthState.Initial);
+    async Task Logout() => await UpdateAsync(s => AuthState.Initial);
 }
 ```
 
@@ -588,7 +704,7 @@ private Timer? _timer;
 void OnInput(ChangeEventArgs e) {
     _timer?.Stop();
     _timer = new Timer(300);
-    _timer.Elapsed += async (_, _) => await Update(...);
+    _timer.Elapsed += async (_, _) => await UpdateAsync(...);
     _timer.Start();
 }
 public void Dispose() => _timer?.Dispose();
@@ -622,12 +738,12 @@ public record UserState(AsyncData<User> User);
 
 ```csharp
 // Before: 12 lines of try-catch
-await Update(s => s.StartLoading());
+await UpdateAsync(s => s.StartLoading());
 try {
     var data = await Service.LoadAsync();
-    await Update(s => s.Success(data));
+    await UpdateAsync(s => s.Success(data));
 } catch (Exception ex) {
-    await Update(s => s.Failure(ex.Message));
+    await UpdateAsync(s => s.Failure(ex.Message));
 }
 
 // After: 5 lines with automatic error handling
@@ -704,7 +820,7 @@ var user = await LazyLoad(
             () => ProductService.GetDetailsAsync(id),
             TimeSpan.FromMinutes(5));
 
-        await Update(s => s.AddDetails(id, details));
+        await UpdateAsync(s => s.AddDetails(id, details));
     }
 }
 ```
@@ -837,9 +953,12 @@ public abstract class StoreComponent<TState> : ComponentBase
     // State access
     protected TState State { get; }
 
-    // Core updates
-    protected Task Update(Func<TState, TState> updater, string? action = null);
+    // Core updates (always prefer UpdateAsync)
+    protected Task UpdateAsync(Func<TState, TState> updater, string? action = null);
     protected Task UpdateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null);
+
+    [Obsolete("Use UpdateAsync to prevent deadlock risks")]
+    protected void Update(Func<TState, TState> updater, string? action = null);
 
     // Async helpers
     protected Task UpdateDebounced(Func<TState, TState> updater, int delayMs, string? action = null);
@@ -865,14 +984,14 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase
     protected abstract object SelectState(TState state);
 
     // Update methods (no async helpers)
-    protected Task Update(Func<TState, TState> updater, string? action = null);
+    protected Task UpdateAsync(Func<TState, TState> updater, string? action = null);
 }
 ```
 
 ### Registration Methods
 
 ```csharp
-// Recommended: All-in-one
+// Recommended: All-in-one with utilities
 builder.Services.AddStoreWithUtilities(
     new MyState(),
     (store, sp) => store.WithDefaults(sp, "MyStore"));
@@ -882,12 +1001,28 @@ builder.Services.AddStoreUtilities();  // Required for async helpers
 builder.Services.AddAsyncActionExecutor<MyState>();  // Required for ExecuteAsync
 builder.Services.AddStore(new MyState(), (store, sp) => store.WithDefaults(sp, "MyStore"));
 
-// Scoped stores (Blazor Server)
-builder.Services.AddScopedStoreWithUtilities(new SessionState(), ...);
+// Scoped stores (Blazor Server per-user isolation)
+builder.Services.AddScopedStore(
+    new SessionState(),
+    (store, sp) => store.WithLogging());  // IServiceProvider now available!
+
+// Scoped stores with utilities
+builder.Services.AddScopedStoreWithUtilities(
+    new SessionState(),
+    (store, sp) => store.WithLogging());
+
+// Scoped with factory (for dependency injection)
+builder.Services.AddScopedStore(
+    sp => new CartState(sp.GetRequiredService<IUserContext>().UserId),
+    (store, sp) => store.WithMiddleware(customMiddleware));
 
 // Transient stores
 builder.Services.AddTransientStoreWithUtilities(() => new TempState(), ...);
 ```
+
+**Note**: The configure callback signature changed to accept `IServiceProvider`:
+- **Old**: `Action<StoreBuilder<T>>` (obsolete but still supported)
+- **New**: `Func<StoreBuilder<T>, IServiceProvider, StoreBuilder<T>>`
 
 ### StoreBuilder Configuration
 
@@ -921,7 +1056,10 @@ public record State(ImmutableList<Item> Items);
 public State AddItem(Item item) => this with { Items = Items.Add(item) };
 
 // ✅ Batch updates when possible
-await Update(s => s.SetLoading(true).ClearErrors().ResetForm());
+await UpdateAsync(s => s.SetLoading(true).ClearErrors().ResetForm());
+
+// ✅ Always use UpdateAsync (not the obsolete Update)
+await UpdateAsync(s => s.Increment());
 ```
 
 ### ❌ Don't
@@ -940,15 +1078,29 @@ public State AddItem(Item item)
     return this with { Items = Items.Add(item) };
 }
 
+// ❌ Don't use synchronous Update() for cross-store updates
+AuthStore.Subscribe(state =>
+{
+    CartStore.Update(s => s.Clear());  // Deadlock risk!
+});
+
 // ✅ Do side effects in components instead
 @code {
     async Task AddItem(Item item)
     {
         Logger.LogInformation("Adding item");
-        await Update(s => s.AddItem(item));
+        await UpdateAsync(s => s.AddItem(item));
     }
 }
+
+// ✅ Use UpdateAsync for cross-store updates
+AuthStore.Subscribe(state =>
+{
+    _ = Task.Run(async () => await CartStore.UpdateAsync(s => s.Clear()));
+});
 ```
+
+**Important**: The synchronous `Update()` method is marked as obsolete. Always prefer `UpdateAsync()` to avoid deadlock risks, especially in cross-store scenarios.
 
 ---
 
@@ -985,11 +1137,24 @@ See the [Blazor Render Modes](#-blazor-render-modes-server-webassembly--auto) se
 ### Async operations failing?
 ✅ Use `UpdateAsync` not `Update` for async state methods
 
+### Cross-store updates causing deadlock?
+✅ Use `UpdateAsync` with `Task.Run()` pattern (never synchronous `Update`)
+✅ Check logs for "Reentrancy detected" warnings
+
+### Seeing "Update() is obsolete" warnings?
+✅ Replace `Update()` calls with `UpdateAsync()` throughout your code
+✅ For cross-store scenarios, use fire-and-forget pattern: `_ = Task.Run(async () => ...)`
+
 ### ExecuteAsync not available?
 ✅ Register services: `builder.Services.AddStoreWithUtilities(...)`
 
 ### UpdateDebounced/Throttle/LazyLoad not available?
 ✅ Register utilities: `builder.Services.AddStoreUtilities()` (or use `AddStoreWithUtilities`)
+
+### Scoped store not working in Blazor Server?
+✅ Use new signature: `AddScopedStore(state, (store, sp) => ...)`
+✅ **DevTools DO work with scoped stores!** Use `.WithDevTools(sp, "StoreName")`
+✅ Singleton stores can't use DevTools (use `.WithLogging()` instead)
 
 ---
 
@@ -1010,6 +1175,65 @@ builder.Services.AddStore(new CartState());
 <p>Cart: @CartStore.GetState().ItemCount items</p>
 ```
 
+### Cross-Store Updates
+
+**⚠️ Important**: When updating one store from another store's subscriber, always use `UpdateAsync` (never synchronous `Update`) to prevent deadlocks.
+
+```csharp
+// ✅ CORRECT: Use UpdateAsync with fire-and-forget pattern
+@inject IStore<AuthState> AuthStore
+@inject IStore<CartStore> CartStore
+
+protected override void OnInitialized()
+{
+    // When user logs out, clear cart asynchronously
+    AuthStore.Subscribe(authState =>
+    {
+        if (authState.CurrentUser == null)
+        {
+            // Fire-and-forget async update prevents deadlock
+            _ = Task.Run(async () =>
+                await CartStore.UpdateAsync(s => s.Clear()));
+        }
+    });
+}
+
+// ❌ WRONG: Synchronous Update causes deadlock
+AuthStore.Subscribe(authState =>
+{
+    if (authState.CurrentUser == null)
+        CartStore.Update(s => s.Clear());  // Deadlock! Don't do this
+});
+```
+
+**Why this matters**:
+- Synchronous `Update()` is now obsolete due to deadlock risks
+- Always use `UpdateAsync()` for cross-store scenarios
+- The library detects reentrancy and logs warnings when nested updates occur
+
+**Pattern for cross-store coordination**:
+```csharp
+// Component coordinates multiple stores
+async Task ProcessCheckout()
+{
+    // Update cart first
+    await CartStore.UpdateAsync(s => s.SetProcessing());
+
+    try
+    {
+        var order = await PaymentService.ProcessAsync(CartStore.GetState());
+
+        // Update both stores after successful payment
+        await OrderStore.UpdateAsync(s => s.AddOrder(order));
+        await CartStore.UpdateAsync(s => s.Clear());
+    }
+    catch (Exception ex)
+    {
+        await CartStore.UpdateAsync(s => s.SetError(ex.Message));
+    }
+}
+```
+
 ### Derived State
 
 ```csharp
@@ -1027,12 +1251,12 @@ public record TodoState(ImmutableList<Todo> Todos)
 async Task DeleteOptimistically(Guid id)
 {
     var original = State;
-    await Update(s => s.RemoveTodo(id));  // Optimistic
+    await UpdateAsync(s => s.RemoveTodo(id));  // Optimistic
 
     try {
         await _api.DeleteAsync(id);
     } catch {
-        await Update(_ => original);  // Rollback
+        await UpdateAsync(_ => original);  // Rollback
     }
 }
 ```
@@ -1082,9 +1306,22 @@ Interactive guides, examples, and API reference with search and navigation.
 
 ---
 
-## What's New in v1.0.0
+## What's New
 
-**Async Helpers** - Reduce async boilerplate with 5 helper methods
+**Redux DevTools in Blazor Server! 🎉** (Latest)
+- Scoped stores now support Redux DevTools in Blazor Server mode
+- `IServiceProvider` parameter enables IJSRuntime resolution per-circuit
+- Full feature parity with WebAssembly mode for scoped stores
+- See [Blazor Server Sample](./samples/EasyAppDev.Blazor.Store.ServerSample/) for demo
+
+**Cross-Store Deadlock Prevention**
+- Synchronous `Update()` marked as obsolete
+- Always use `UpdateAsync()` to prevent deadlocks
+- Reentrancy detection with warnings
+- Fire-and-forget pattern for cross-store coordination
+
+**v1.0.0 - Async Helpers**
+- Reduce async boilerplate with 5 helper methods
 - `UpdateDebounced`, `AsyncData<T>`, `ExecuteAsync`, `UpdateThrottled`, `LazyLoad`
 - 98% test pass rate (299/305 tests)
 - Production-ready with live demos

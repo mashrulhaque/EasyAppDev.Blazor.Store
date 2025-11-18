@@ -1,0 +1,101 @@
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Blazor Server Demo</a>
+    </div>
+</div>
+
+<nav class="flex-column">
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <span class="oi oi-home" aria-hidden="true"></span> Home
+        </NavLink>
+    </div>
+
+    <div class="nav-item px-3 mt-3">
+        <small class="text-muted ps-2">SCOPED VS SINGLETON</small>
+    </div>
+
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="comparison">
+            <span class="oi oi-dashboard" aria-hidden="true"></span> Store Comparison
+        </NavLink>
+    </div>
+
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="singleton-counter">
+            <span class="oi oi-warning" aria-hidden="true"></span> Singleton Counter
+        </NavLink>
+    </div>
+
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="scoped-counter">
+            <span class="oi oi-check" aria-hidden="true"></span> Scoped Counter
+        </NavLink>
+    </div>
+
+    <div class="nav-item px-3 mt-3">
+        <small class="text-muted ps-2">ADVANCED</small>
+    </div>
+
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="user-session">
+            <span class="oi oi-person" aria-hidden="true"></span> User Session
+        </NavLink>
+    </div>
+
+    <div class="nav-item px-3">
+        <NavLink class="nav-link" href="cross-store">
+            <span class="oi oi-transfer" aria-hidden="true"></span> Cross-Store Updates
+        </NavLink>
+    </div>
+</nav>
+
+<style>
+    .sidebar {
+        background-color: #343a40;
+    }
+
+    .top-row {
+        background-color: #212529;
+        border-bottom: 1px solid #444;
+        justify-content: flex-end;
+        height: 3.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+
+    .oi {
+        width: 1rem;
+        font-size: 1.1rem;
+        vertical-align: text-top;
+        top: -2px;
+    }
+
+    .nav-item {
+        font-size: 0.9rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .nav-link {
+        border-radius: 4px;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        line-height: 3rem;
+        color: #d7d7d7;
+    }
+
+    .nav-link:hover {
+        background-color: rgba(255,255,255,0.1);
+        color: white;
+    }
+
+    .nav-link.active {
+        background-color: rgba(255,255,255,0.25);
+        color: white;
+    }
+</style>

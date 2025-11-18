@@ -1,0 +1,108 @@
+@page "/user-session"
+@inherits StoreComponent<UserSessionState>
+
+<PageTitle>User Session</PageTitle>
+
+<div class="container mt-4">
+    <h1>👤 User Session Tracking</h1>
+    <p class="lead">Demonstrating per-user data with unique session IDs</p>
+
+    <div class="alert alert-info">
+        <strong>Experiment:</strong> Open this page in multiple browser windows. Each window will have a different Session ID, proving complete isolation!
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📊 Your Session Data</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th style="width: 40%">Session ID</th>
+                                <td><code>@State.SessionId</code></td>
+                            </tr>
+                            <tr>
+                                <th>Connected At</th>
+                                <td>@State.ConnectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            </tr>
+                            <tr>
+                                <th>Actions Performed</th>
+                                <td><strong>@State.ActionCount</strong></td>
+                            </tr>
+                            <tr>
+                                <th>Last Action</th>
+                                <td>@(State.LastAction ?? "None")</td>
+                            </tr>
+                            <tr>
+                                <th>Session Duration</th>
+                                <td>@GetSessionDuration()</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-primary" @onclick="PerformAction">
+                            Perform Action (Increments Counter)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">🔍 How It Works</h5>
+        </div>
+        <div class="card-body">
+            <h6>Factory Function Creates Unique Sessions:</h6>
+            <pre class="bg-light p-3 rounded"><code>// Program.cs
+builder.Services.AddScopedStore(
+    sp => UserSessionState.Create(),  // ✅ Factory creates unique session
+    (store, sp) => store
+        .WithDevTools(sp, "User Session")
+        .WithLogging());
+
+// State/UserSessionState.cs
+public static UserSessionState Create() => new(
+    SessionId: Guid.NewGuid().ToString("N")[..8],  // Unique per circuit
+    ConnectedAt: DateTime.UtcNow
+);
+</code></pre>
+
+            <div class="alert alert-success">
+                <strong>Key Benefits:</strong>
+                <ul class="mb-0">
+                    <li>Each SignalR circuit gets its own session</li>
+                    <li>Session data is isolated and private</li>
+                    <li>Perfect for user-specific data (preferences, cart, etc.)</li>
+                    <li>Redux DevTools show YOUR session data only</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-info">
+                <strong>Redux DevTools:</strong> Check the "User Session" store in DevTools. Your Session ID will be unique to your browser window!
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task PerformAction()
+    {
+        await Update(s => s.IncrementActionCount($"ACTION_{DateTime.Now:HHmmss}"), "PERFORM_ACTION");
+    }
+
+    private string GetSessionDuration()
+    {
+        var duration = DateTime.UtcNow - State.ConnectedAt;
+        if (duration.TotalMinutes < 1)
+            return $"{(int)duration.TotalSeconds} seconds";
+        if (duration.TotalHours < 1)
+            return $"{(int)duration.TotalMinutes} minutes";
+        return $"{(int)duration.TotalHours} hours {duration.Minutes} minutes";
+    }
+}

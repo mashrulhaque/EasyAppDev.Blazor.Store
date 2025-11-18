@@ -1,0 +1,306 @@
+@page "/cross-store-demo"
+@using EasyAppDev.Blazor.Store.Sample.State
+@using EasyAppDev.Blazor.Store.Core
+@inherits StoreComponent<AuthDemoState>
+@inject IStore<CartDemoState> CartStore
+
+<PageTitle>Cross-Store Updates Demo</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">🔄 Cross-Store Updates Demo</h1>
+            <p class="lead">
+                This demo showcases the <strong>Phase 1 updates</strong>: proper cross-store update patterns using <code>UpdateAsync</code>.
+            </p>
+
+            <div class="alert alert-info">
+                <h5 class="alert-heading">✨ What's New in Phase 1</h5>
+                <ul class="mb-0">
+                    <li><strong>Scoped Store Support:</strong> Configure callbacks now receive <code>IServiceProvider</code></li>
+                    <li><strong>Deadlock Prevention:</strong> Lock released before notifications</li>
+                    <li><strong>Reentrancy Detection:</strong> Automatic warnings for nested updates</li>
+                    <li><strong>Obsolete Update():</strong> Synchronous <code>Update()</code> marked as obsolete</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Auth Store Panel -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🔐 Auth Store</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Status:</strong>
+                        @if (State.IsAuthenticated)
+                        {
+                            <span class="badge bg-success">Authenticated</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Not Authenticated</span>
+                        }
+                    </div>
+
+                    @if (State.IsAuthenticated)
+                    {
+                        <div class="mb-3">
+                            <strong>User:</strong> <code>@State.Username</code>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <strong>Last Action:</strong> <code>@(State.LastAction ?? "None")</code>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        @if (!State.IsAuthenticated)
+                        {
+                            <button class="btn btn-primary" @onclick="Login">
+                                Login
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-danger" @onclick="Logout">
+                                Logout
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart Store Panel -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🛒 Cart Store</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Items:</strong>
+                        <span class="badge bg-info">@CartState.ItemCount</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Last Action:</strong> <code>@(CartState.LastAction ?? "None")</code>
+                    </div>
+
+                    @if (CartState.Items.Any())
+                    {
+                        <div class="mb-3">
+                            <strong>Cart Contents:</strong>
+                            <ul class="list-group">
+                                @foreach (var item in CartState.Items)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        @item
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="@(() => RemoveFromCart(item))">
+                                            ×
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" @onclick="AddToCart">
+                            Add Item
+                        </button>
+                        @if (CartState.Items.Any())
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearCart">
+                                Clear Cart
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cross-Store Pattern Explanation -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">⚠️ Cross-Store Update Pattern</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Problem:</strong> When one store's subscriber updates another store, synchronous <code>Update()</code> causes deadlocks.</p>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-danger">❌ Wrong (Deadlock Risk)</h6>
+                            <pre class="bg-light p-3 rounded"><code>AuthStore.Subscribe(state =>
+{
+    if (!state.IsAuthenticated)
+        CartStore.Update(s => s.Clear()); // Deadlock!
+});</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success">✅ Correct (No Deadlock)</h6>
+                            <pre class="bg-light p-3 rounded"><code>AuthStore.Subscribe(state =>
+{
+    if (!state.IsAuthenticated)
+        _ = Task.Run(async () =>
+            await CartStore.UpdateAsync(s => s.Clear()));
+});</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success mt-3">
+                        <strong>How it works:</strong>
+                        <ol class="mb-0">
+                            <li>Store releases lock BEFORE notifying subscribers</li>
+                            <li>Fire-and-forget async pattern (<code>Task.Run</code>) prevents blocking</li>
+                            <li>Reentrancy detection logs warnings if nesting occurs</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Demo Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🎬 Try It Yourself</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Automatic Cross-Store Coordination:</strong></p>
+                    <ul>
+                        <li><strong>When you logout:</strong> Cart is automatically cleared via cross-store update</li>
+                        <li><strong>No deadlock:</strong> Uses <code>UpdateAsync</code> with <code>Task.Run</code></li>
+                        <li><strong>Reentrancy detection:</strong> Check browser console for warnings</li>
+                    </ul>
+
+                    <div class="alert alert-warning">
+                        <strong>Developer Tip:</strong> Open your browser's Redux DevTools to see both stores updating in real-time!
+                    </div>
+
+                    @if (logMessages.Any())
+                    {
+                        <div class="mt-3">
+                            <h6>📋 Action Log</h6>
+                            <div class="bg-dark text-light p-3 rounded" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
+                                @foreach (var msg in logMessages.TakeLast(10))
+                                {
+                                    <div>@msg</div>
+                                }
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary mt-2" @onclick="ClearLog">
+                                Clear Log
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CartDemoState CartState => CartStore.GetState();
+    private int itemCounter = 1;
+    private List<string> logMessages = new();
+    private bool wasAuthenticated = false;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Track initial auth state
+        wasAuthenticated = State.IsAuthenticated;
+
+        // Subscribe to cart changes to log them
+        CartStore.Subscribe(_ =>
+        {
+            LogMessage($"[CartStore] Updated: {CartState.ItemCount} items");
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Subscribe to auth state changes for cross-store coordination
+        // ✅ CORRECT: Using UpdateAsync with Task.Run to prevent deadlock
+        Store.Subscribe(authState =>
+        {
+            // Detect logout event (was authenticated, now not)
+            if (wasAuthenticated && !authState.IsAuthenticated && CartState.Items.Any())
+            {
+                LogMessage("[Cross-Store] User logged out - clearing cart asynchronously");
+                // Fire-and-forget async update prevents deadlock
+                _ = Task.Run(async () =>
+                {
+                    await CartStore.UpdateAsync(s => s.Clear(), "CLEAR_ON_LOGOUT");
+                    await InvokeAsync(() =>
+                    {
+                        LogMessage("[Cross-Store] Cart cleared successfully");
+                        StateHasChanged();
+                    });
+                });
+            }
+            wasAuthenticated = authState.IsAuthenticated;
+        });
+    }
+
+    private async Task Login()
+    {
+        LogMessage("[AuthStore] Logging in...");
+        await Update(s => s.Login($"user{DateTime.Now:HHmmss}"), "LOGIN");
+        LogMessage($"[AuthStore] Logged in as {State.Username}");
+    }
+
+    private async Task Logout()
+    {
+        LogMessage("[AuthStore] Logging out...");
+        await Update(s => s.Logout(), "LOGOUT");
+        LogMessage("[AuthStore] Logged out");
+    }
+
+    private async Task AddToCart()
+    {
+        var item = $"Item {itemCounter++}";
+        LogMessage($"[CartStore] Adding {item}...");
+        await CartStore.UpdateAsync(s => s.AddItem(item), "ADD_TO_CART");
+        LogMessage($"[CartStore] Added {item}");
+    }
+
+    private async Task RemoveFromCart(string item)
+    {
+        LogMessage($"[CartStore] Removing {item}...");
+        await CartStore.UpdateAsync(s => s.RemoveItem(item), "REMOVE_FROM_CART");
+        LogMessage($"[CartStore] Removed {item}");
+    }
+
+    private async Task ClearCart()
+    {
+        LogMessage("[CartStore] Clearing cart...");
+        await CartStore.UpdateAsync(s => s.Clear(), "CLEAR_CART");
+        LogMessage("[CartStore] Cart cleared");
+    }
+
+    private void ClearLog()
+    {
+        logMessages.Clear();
+        StateHasChanged();
+    }
+
+    private void LogMessage(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+        logMessages.Add($"[{timestamp}] {message}");
+        if (logMessages.Count > 50)
+        {
+            logMessages.RemoveAt(0);
+        }
+    }
+}

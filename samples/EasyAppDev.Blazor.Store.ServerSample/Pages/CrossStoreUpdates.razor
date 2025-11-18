@@ -1,0 +1,155 @@
+@page "/cross-store"
+@inherits StoreComponent<UserSessionState>
+@inject IStore<ScopedCartState> CartStore
+
+<PageTitle>Cross-Store Updates</PageTitle>
+
+<div class="container mt-4">
+    <h1>🔄 Cross-Store Updates</h1>
+    <p class="lead">Demonstrating proper async patterns for updating multiple stores</p>
+
+    <div class="alert alert-warning">
+        <h5 class="alert-heading">⚠️ Important Discovery</h5>
+        <p>When one store's subscriber updates another store:</p>
+        <ul class="mb-0">
+            <li>❌ Synchronous <code>Update()</code> causes deadlocks</li>
+            <li>✅ Async <code>UpdateAsync()</code> works perfectly</li>
+        </ul>
+    </div>
+
+    <div class="row mt-4">
+        <!-- User Session -->
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👤 User Session</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Session ID:</strong> <code>@State.SessionId</code></p>
+                    <p><strong>Actions:</strong> @State.ActionCount</p>
+                    <p><strong>Last Action:</strong> @(State.LastAction ?? "None")</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart -->
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🛒 Shopping Cart (@CartState.ItemCount items)</h5>
+                </div>
+                <div class="card-body">
+                    @if (CartState.Items.Any())
+                    {
+                        <ul class="list-group mb-3">
+                            @foreach (var item in CartState.Items)
+                            {
+                                <li class="list-group-item d-flex justify-content-between">
+                                    @item
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="@(() => RemoveItem(item))">×</button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Cart is empty</p>
+                    }
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" @onclick="AddItem">Add Item</button>
+                        @if (CartState.Items.Any())
+                        {
+                            <button class="btn btn-outline-secondary" @onclick="ClearCart">Clear Cart</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">✅ Proper Cross-Store Pattern</h5>
+        </div>
+        <div class="card-body">
+            <p>This demo shows coordinated updates across two stores:</p>
+            <ol>
+                <li>Cart actions increment the session action counter</li>
+                <li>Using <code>UpdateAsync</code> prevents deadlocks</li>
+                <li>Both stores maintain their own state independently</li>
+            </ol>
+
+            <h6 class="mt-3">Code Example:</h6>
+            <pre class="bg-light p-3 rounded"><code>// ✅ CORRECT: Using UpdateAsync
+private async Task AddItem()
+{
+    var item = $"Item {itemCounter++}";
+
+    // Update cart store
+    await CartStore.UpdateAsync(s => s.AddItem(item), "ADD_TO_CART");
+
+    // Update session store
+    await Update(s => s.IncrementActionCount("ADD_TO_CART"), "TRACK_ACTION");
+}
+
+// ❌ WRONG: Using synchronous Update causes deadlock
+private void AddItemWrong()
+{
+    CartStore.Update(s => s.AddItem("Item"));  // Deadlock!
+    Store.Update(s => s.IncrementActionCount("ADD"));  // Never executes
+}
+</code></pre>
+
+            <div class="alert alert-success">
+                <strong>The Fix:</strong> Always use <code>UpdateAsync</code> when coordinating multiple stores. The library releases locks before notifying subscribers, preventing deadlocks!
+            </div>
+
+            <div class="alert alert-info">
+                <strong>Redux DevTools:</strong> Switch between "User Session" and "Scoped Cart" stores in DevTools to see both updating independently!
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ScopedCartState CartState => CartStore.GetState();
+    private int itemCounter = 1;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Subscribe to cart changes to keep UI in sync
+        CartStore.Subscribe(_ => InvokeAsync(StateHasChanged));
+    }
+
+    private async Task AddItem()
+    {
+        var item = $"Item {itemCounter++}";
+
+        // ✅ Update cart store (async)
+        await CartStore.UpdateAsync(s => s.AddItem(item), "ADD_TO_CART");
+
+        // ✅ Update session store (async)
+        await Update(s => s.IncrementActionCount("ADD_TO_CART"), "TRACK_ACTION");
+    }
+
+    private async Task RemoveItem(string item)
+    {
+        // ✅ Update cart store (async)
+        await CartStore.UpdateAsync(s => s.RemoveItem(item), "REMOVE_FROM_CART");
+
+        // ✅ Update session store (async)
+        await Update(s => s.IncrementActionCount("REMOVE_FROM_CART"), "TRACK_ACTION");
+    }
+
+    private async Task ClearCart()
+    {
+        // ✅ Update cart store (async)
+        await CartStore.UpdateAsync(s => s.Clear(), "CLEAR_CART");
+
+        // ✅ Update session store (async)
+        await Update(s => s.IncrementActionCount("CLEAR_CART"), "TRACK_ACTION");
+    }
+}

@@ -4,6 +4,7 @@ using Xunit;
 
 namespace EasyAppDev.Blazor.Store.Tests.Utilities;
 
+[Collection("Sequential")]
 public class DebounceManagerTests
 {
     [Fact]

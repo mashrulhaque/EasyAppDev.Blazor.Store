@@ -7,6 +7,7 @@ using EasyAppDev.Blazor.Store.Tests.TestUtilities;
 
 namespace EasyAppDev.Blazor.Store.Tests.Blazor;
 
+[Collection("Sequential")]
 public class LazyLoadTests : TestContext
 {
     [Fact]
