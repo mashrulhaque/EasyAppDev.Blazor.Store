@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.0</span>
+          <span class="version-badge">v1.0.8</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -185,13 +185,13 @@ builder.Services.AddStoreWithUtilities(
 
 &lt;h1&gt;@State.Count&lt;/h1&gt;
 
-&lt;button @onclick="@(() => Update(s => s.Increment()))"&gt;+&lt;/button&gt;
-&lt;button @onclick="@(() => Update(s => s.Decrement()))"&gt;-&lt;/button&gt;
-&lt;button @onclick="@(() => Update(s => s.Reset()))"&gt;Reset&lt;/button&gt;</code></pre>
+&lt;button @onclick="@(() => UpdateAsync(s => s.Increment()))"&gt;+&lt;/button&gt;
+&lt;button @onclick="@(() => UpdateAsync(s => s.Decrement()))"&gt;-&lt;/button&gt;
+&lt;button @onclick="@(() => UpdateAsync(s => s.Reset()))"&gt;Reset&lt;/button&gt;</code></pre>
                   </div>
                   <div class="alert alert-success">
                     <div class="alert-title">That's it!</div>
-                    <p>No actions, no reducers, no dispatch. Inherit from <code>StoreComponent&lt;T&gt;</code> and call <code>Update()</code>. The component automatically re-renders when state changes.</p>
+                    <p>No actions, no reducers, no dispatch. Inherit from <code>StoreComponent&lt;T&gt;</code> and call <code>UpdateAsync()</code>. The component automatically re-renders when state changes.</p>
                   </div>
                 </div>
               </div>
@@ -285,7 +285,7 @@ builder.Services.AddStoreWithUtilities(
                 <div class="alert-title">Additional Resources</div>
                 <ul style="margin: 0.5rem 0 0 1.5rem;">
                   <li><strong>API Reference:</strong> <a href="./api-reference.html">Complete API documentation</a></li>
-                  <li><strong>GitHub:</strong> <a href="https://github.com/mashmawy/EasyAppDev.Blazor.Store" target="_blank">Source code and issue tracker</a></li>
+                  <li><strong>GitHub:</strong> <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank">Source code and issue tracker</a></li>
                   <li><strong>NuGet:</strong> <a href="https://www.nuget.org/packages/EasyAppDev.Blazor.Store/" target="_blank">Package downloads and versions</a></li>
                 </ul>
               </div>

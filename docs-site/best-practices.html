@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.0</span>
+          <span class="version-badge">v1.0.8</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -151,7 +151,7 @@
                   <p>Chain multiple state transformations into a single update to minimize re-renders.</p>
                   <div class="code-block">
                     <div class="code-block-title">✅ Correct</div>
-                    <pre><code class="language-csharp">await Update(s => s.SetLoading(true).ClearErrors().ResetForm());</code></pre>
+                    <pre><code class="language-csharp">await UpdateAsync(s => s.SetLoading(true).ClearErrors().ResetForm());</code></pre>
                   </div>
                 </div>
               </div>
@@ -209,7 +209,7 @@
     async Task AddItem(Item item)
     {
         Logger.LogInformation("Adding item");
-        await Update(s => s.AddItem(item));
+        await UpdateAsync(s => s.AddItem(item));
     }
 }</code></pre>
                   </div>
@@ -264,7 +264,7 @@ return this;</code></pre>
 await UpdateAsync(async s => await s.LoadDataAsync());
 
 // ❌ Wrong
-await Update(async s => await s.LoadDataAsync());</code></pre>
+await UpdateAsync(async s => await s.LoadDataAsync());</code></pre>
                 </div>
               </div>
 

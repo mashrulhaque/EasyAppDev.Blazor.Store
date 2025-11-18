@@ -1308,7 +1308,13 @@ Interactive guides, examples, and API reference with search and navigation.
 
 ## What's New
 
-**Redux DevTools in Blazor Server! 🎉** (Latest)
+**v1.0.8 - Enhanced Documentation & Stability** (Latest)
+- Comprehensive README with detailed Blazor render mode compatibility guide
+- Improved NuGet package documentation
+- Full support for Server, WebAssembly, and Auto modes with intelligent lazy initialization
+- Production-ready with proven stability
+
+**Redux DevTools in Blazor Server! 🎉**
 - Scoped stores now support Redux DevTools in Blazor Server mode
 - `IServiceProvider` parameter enables IJSRuntime resolution per-circuit
 - Full feature parity with WebAssembly mode for scoped stores

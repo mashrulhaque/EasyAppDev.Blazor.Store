@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.0</span>
+          <span class="version-badge">v1.0.8</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.0</span></div>
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -98,7 +98,7 @@
             <section class="hero">
               <div class="hero-badge">
                 <span class="badge-icon">⚡</span>
-                <span>v1.0.0 Released - Async Helpers Now Available!</span>
+                <span>v1.0.8 Released - Async Helpers Now Available!</span>
               </div>
 
               <h1 class="hero-title">
@@ -201,9 +201,9 @@ builder.Services.AddStoreWithUtilities(
     &lt;h1&gt;@State.Count&lt;/h1&gt;
     &lt;p&gt;@State.LastAction&lt;/p&gt;
 
-    &lt;button @onclick="@(() => Update(s => s.Increment()))"&gt;➕ Increment&lt;/button&gt;
-    &lt;button @onclick="@(() => Update(s => s.Decrement()))"&gt;➖ Decrement&lt;/button&gt;
-    &lt;button @onclick="@(() => Update(s => s.Reset()))"&gt;🔄 Reset&lt;/button&gt;
+    &lt;button @onclick="@(() => UpdateAsync(s => s.Increment()))"&gt;➕ Increment&lt;/button&gt;
+    &lt;button @onclick="@(() => UpdateAsync(s => s.Decrement()))"&gt;➖ Decrement&lt;/button&gt;
+    &lt;button @onclick="@(() => UpdateAsync(s => s.Reset()))"&gt;🔄 Reset&lt;/button&gt;
 &lt;/div&gt;</code></pre>
                   </div>
                 </div>
@@ -211,7 +211,7 @@ builder.Services.AddStoreWithUtilities(
 
               <div class="alert alert-success">
                 <div class="alert-title">That's it!</div>
-                <p>No actions, no reducers, no dispatch. Just call <code>Update()</code> with your state method.</p>
+                <p>No actions, no reducers, no dispatch. Just call <code>UpdateAsync()</code> with your state method.</p>
               </div>
             </section>
 
@@ -254,11 +254,11 @@ builder.Services.AddStoreWithUtilities(
 
             <!-- What's New -->
             <section class="section">
-              <h2>What's New in v1.0.0</h2>
+              <h2>What's New in v1.0.8</h2>
 
               <div class="alert alert-info">
                 <div class="alert-title">Async Helpers - Major Update</div>
-                <p>v1.0.0 introduces powerful async helpers that eliminate 74% of boilerplate code on average!</p>
+                <p>v1.0.8 introduces powerful async helpers that eliminate 74% of boilerplate code on average!</p>
               </div>
 
               <div class="feature-list">

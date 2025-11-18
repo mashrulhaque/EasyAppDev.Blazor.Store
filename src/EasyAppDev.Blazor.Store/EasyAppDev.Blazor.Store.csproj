@@ -15,7 +15,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>1.0.7</Version>
+    <Version>1.0.8</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -28,9 +28,9 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v1.0.7 - Latest Release
+v1.0.8 - Latest Release
 
-Type-safe state management for Blazor using C# records. Features include async helpers, Redux DevTools integration, persistence, and granular selectors. Improved Blazor Server/WebAssembly/Auto mode compatibility with lazy initialization.
+Type-safe state management for Blazor using C# records. Features include async helpers, Redux DevTools integration, persistence, and granular selectors. Full support for Blazor Server, WebAssembly, and Auto modes with intelligent lazy initialization.
 
 See CHANGELOG.md for full details.
     </PackageReleaseNotes>
