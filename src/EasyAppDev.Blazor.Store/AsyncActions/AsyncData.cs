@@ -21,7 +21,12 @@ namespace EasyAppDev.Blazor.Store.AsyncActions;
 /// }
 /// </code>
 /// </example>
-public class AsyncData<T>
+/// <remarks>
+/// This is a record type providing value equality semantics. Two AsyncData instances
+/// are equal if all their properties have the same values. Use <c>with</c> expressions
+/// for creating modified copies.
+/// </remarks>
+public record AsyncData<T>
 {
     /// <summary>
     /// Gets the data if the operation succeeded, otherwise null.

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace EasyAppDev.Blazor.Store.Persistence;
@@ -6,17 +7,29 @@ namespace EasyAppDev.Blazor.Store.Persistence;
 /// Persistence provider using browser LocalStorage.
 /// Data persists across browser sessions.
 /// </summary>
+/// <remarks>
+/// This provider wraps browser localStorage API through JavaScript interop.
+/// Operations are async due to Blazor's JS interop requirements.
+/// Errors are logged at Warning level and don't throw exceptions to ensure
+/// application stability when storage is unavailable or quota exceeded.
+/// </remarks>
 public class LocalStorageProvider : IPersistenceProvider
 {
     private readonly IJSRuntime _jsRuntime;
+    private readonly ILogger<LocalStorageProvider>? _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalStorageProvider"/> class.
     /// </summary>
     /// <param name="jsRuntime">The JS runtime for interop.</param>
-    public LocalStorageProvider(IJSRuntime jsRuntime)
+    /// <param name="logger">Optional logger for diagnostic output.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="jsRuntime"/> is null.
+    /// </exception>
+    public LocalStorageProvider(IJSRuntime jsRuntime, ILogger<LocalStorageProvider>? logger = null)
     {
         _jsRuntime = jsRuntime ?? throw new ArgumentNullException(nameof(jsRuntime));
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -31,7 +44,7 @@ public class LocalStorageProvider : IPersistenceProvider
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading from localStorage: {ex.Message}");
+            _logger?.LogWarning(ex, "Failed to load from localStorage key: {Key}", key);
             return null;
         }
     }
@@ -49,7 +62,7 @@ public class LocalStorageProvider : IPersistenceProvider
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error saving to localStorage: {ex.Message}");
+            _logger?.LogWarning(ex, "Failed to save to localStorage key: {Key}", key);
         }
     }
 
@@ -65,7 +78,7 @@ public class LocalStorageProvider : IPersistenceProvider
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error removing from localStorage: {ex.Message}");
+            _logger?.LogWarning(ex, "Failed to remove localStorage key: {Key}", key);
         }
     }
 

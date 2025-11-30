@@ -15,7 +15,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>1.0.8</Version>
+    <Version>1.1.0</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -28,11 +28,15 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v1.0.8 - Latest Release
+v1.1.0 - Phase 1: Bug Fixes and Polish
 
-Type-safe state management for Blazor using C# records. Features include async helpers, Redux DevTools integration, persistence, and granular selectors. Full support for Blazor Server, WebAssembly, and Auto modes with intelligent lazy initialization.
+- AsyncData&lt;T&gt; converted from class to record for value equality and immutability consistency
+- MemoizedSelector thread-safety with lock-free volatile pattern for Blazor Server scenarios
+- Proper logging for persistence hydration errors (was silently swallowed)
+- ILogger integration for LocalStorageProvider and SessionStorageProvider
+- Enhanced XML documentation across public APIs
 
-See CHANGELOG.md for full details.
+No breaking changes from 1.0.x.
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

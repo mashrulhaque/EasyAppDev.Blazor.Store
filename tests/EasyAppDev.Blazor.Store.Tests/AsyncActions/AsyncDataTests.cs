@@ -323,6 +323,150 @@ public class AsyncDataTests
 
     #endregion
 
+    #region Value Equality Tests (Record Behavior)
+
+    [Fact]
+    public void AsyncData_ShouldHaveValueEquality_Success()
+    {
+        // Arrange
+        var a = AsyncData<int>.Success(42);
+        var b = AsyncData<int>.Success(42);
+
+        // Assert
+        a.Should().Be(b);
+        (a == b).Should().BeTrue();
+        a.GetHashCode().Should().Be(b.GetHashCode());
+    }
+
+    [Fact]
+    public void AsyncData_ShouldHaveValueEquality_Loading()
+    {
+        // Arrange
+        var a = AsyncData<int>.Loading();
+        var b = AsyncData<int>.Loading();
+
+        // Assert
+        a.Should().Be(b);
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AsyncData_ShouldHaveValueEquality_NotAsked()
+    {
+        // Arrange
+        var a = AsyncData<int>.NotAsked();
+        var b = AsyncData<int>.NotAsked();
+
+        // Assert
+        a.Should().Be(b);
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AsyncData_ShouldHaveValueEquality_Failure()
+    {
+        // Arrange
+        var a = AsyncData<int>.Failure("error");
+        var b = AsyncData<int>.Failure("error");
+
+        // Assert
+        a.Should().Be(b);
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AsyncData_DifferentStates_ShouldNotBeEqual()
+    {
+        // Arrange
+        var loading = AsyncData<int>.Loading();
+        var notAsked = AsyncData<int>.NotAsked();
+
+        // Assert
+        loading.Should().NotBe(notAsked);
+        (loading == notAsked).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AsyncData_DifferentData_ShouldNotBeEqual()
+    {
+        // Arrange
+        var a = AsyncData<int>.Success(42);
+        var b = AsyncData<int>.Success(100);
+
+        // Assert
+        a.Should().NotBe(b);
+        (a == b).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AsyncData_DifferentErrors_ShouldNotBeEqual()
+    {
+        // Arrange
+        var a = AsyncData<int>.Failure("error1");
+        var b = AsyncData<int>.Failure("error2");
+
+        // Assert
+        a.Should().NotBe(b);
+        (a == b).Should().BeFalse();
+    }
+
+    #endregion
+
+    #region With Expression Tests (Record Behavior)
+
+    [Fact]
+    public void AsyncData_WithExpression_ShouldCreateNewInstance()
+    {
+        // Arrange
+        var loading = AsyncData<int>.Loading();
+
+        // Act - Using with expression to modify record
+        var success = loading with { HasData = true, Data = 42, IsLoading = false };
+
+        // Assert
+        success.HasData.Should().BeTrue();
+        success.Data.Should().Be(42);
+        success.IsLoading.Should().BeFalse();
+
+        // Original should be unchanged
+        loading.IsLoading.Should().BeTrue();
+        loading.HasData.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AsyncData_WithExpression_ShouldPreserveUnchangedProperties()
+    {
+        // Arrange
+        var failure = AsyncData<string>.Failure("original error");
+
+        // Act - Only change error message
+        var updated = failure with { Error = "updated error" };
+
+        // Assert
+        updated.HasError.Should().BeTrue();
+        updated.Error.Should().Be("updated error");
+        updated.IsLoading.Should().BeFalse();
+        updated.IsNotAsked.Should().BeFalse();
+        updated.HasData.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AsyncData_WithExpression_ShouldNotMutateOriginal()
+    {
+        // Arrange
+        var original = AsyncData<int>.Success(100);
+
+        // Act
+        var modified = original with { Data = 200 };
+
+        // Assert
+        original.Data.Should().Be(100);
+        modified.Data.Should().Be(200);
+        ReferenceEquals(original, modified).Should().BeFalse();
+    }
+
+    #endregion
+
     // Test helper record
     private record User(int Id, string Name, string Email);
 }

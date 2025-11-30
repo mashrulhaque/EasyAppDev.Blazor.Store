@@ -281,7 +281,9 @@ public class StoreBuilder<TState> where TState : notnull
         }
         catch (Exception ex)
         {
-            _ = ex;
+            // Log at Debug level - user can enable diagnostics if needed
+            System.Diagnostics.Debug.WriteLine(
+                $"[EasyAppDev.Store] Failed to hydrate state for {typeof(TState).Name} from key '{key}': {ex.Message}");
         }
 
         return this;
@@ -328,7 +330,9 @@ public class StoreBuilder<TState> where TState : notnull
         }
         catch (Exception ex)
         {
-            _ = ex;
+            // Log at Debug level - user can enable diagnostics if needed
+            System.Diagnostics.Debug.WriteLine(
+                $"[EasyAppDev.Store] Failed to async hydrate state for {typeof(TState).Name} from key '{key}': {ex.Message}");
         }
 
         return this;

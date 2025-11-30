@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using EasyAppDev.Blazor.Store.Selectors;
 using StoreSel = EasyAppDev.Blazor.Store.Selectors.Selectors;
 
@@ -345,4 +346,162 @@ public class SelectorTests
         callCount1.Should().Be(1); // selector1 memoized
         callCount2.Should().Be(1); // selector2 memoized
     }
+
+    #region Thread Safety Tests
+
+    [Fact]
+    public async Task MemoizedSelector_ShouldBeThreadSafe_ConcurrentReads()
+    {
+        // Arrange
+        var callCount = 0;
+        var selector = StoreSel.Create<TodoState, int>(state =>
+        {
+            Interlocked.Increment(ref callCount);
+            return state.Todos.Count;
+        });
+
+        var state = new TodoState(new List<TodoItem> { new(1, "Task 1", false) });
+
+        // Prime the cache first to ensure stable behavior
+        selector.Select(state);
+        callCount = 0; // Reset after priming
+
+        // Act - Concurrent reads with same state (cache is now primed)
+        var tasks = Enumerable.Range(0, 100)
+            .Select(_ => Task.Run(() => selector.Select(state)));
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert - All results should be correct
+        results.Should().AllSatisfy(r => r.Should().Be(1));
+        // With primed cache and same state reference, should use cache
+        // Note: Lock-free implementation may have some recomputation under
+        // initial contention, but once cache is stable, reads should be cached
+        callCount.Should().BeLessOrEqualTo(5, "most reads should hit cache after priming");
+    }
+
+    [Fact]
+    public async Task MemoizedSelector_ShouldBeThreadSafe_ConcurrentDifferentStates()
+    {
+        // Arrange
+        var selector = StoreSel.Create<TodoState, int>(state => state.Todos.Count);
+
+        var states = Enumerable.Range(0, 10)
+            .Select(i => new TodoState(Enumerable.Range(0, i + 1)
+                .Select(j => new TodoItem(j, $"Task {j}", false)).ToList()))
+            .ToList();
+
+        // Act - Concurrent reads with different states
+        var tasks = Enumerable.Range(0, 100)
+            .Select(i => Task.Run(() => selector.Select(states[i % 10])));
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert - Should not throw and return consistent results
+        var grouped = results.GroupBy(r => r).ToDictionary(g => g.Key, g => g.Count());
+        grouped.Should().HaveCount(10); // 10 different states
+    }
+
+    [Fact]
+    public async Task MemoizedSelector_ShouldBeThreadSafe_InterleavedReadWriteReset()
+    {
+        // Arrange
+        var selector = StoreSel.Create<TodoState, int>(state => state.Todos.Count);
+        var results = new ConcurrentBag<int>();
+        var errors = new ConcurrentBag<Exception>();
+
+        var states = Enumerable.Range(1, 5)
+            .Select(i => new TodoState(Enumerable.Range(0, i)
+                .Select(j => new TodoItem(j, $"Task {j}", false)).ToList()))
+            .ToList();
+
+        // Act - Concurrent operations with Reset() calls interleaved
+        var cts = new CancellationTokenSource();
+        var readTasks = Enumerable.Range(0, 50).Select(_ => Task.Run(() =>
+        {
+            try
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    var state = states[i % states.Count];
+                    var result = selector.Select(state);
+                    results.Add(result);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex);
+            }
+        }));
+
+        var resetTasks = Enumerable.Range(0, 5).Select(_ => Task.Run(async () =>
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                selector.Reset();
+                await Task.Delay(1);
+            }
+        }));
+
+        await Task.WhenAll(readTasks.Concat(resetTasks));
+
+        // Assert
+        errors.Should().BeEmpty("no exceptions should occur during concurrent access");
+        results.Should().NotBeEmpty();
+        results.Should().AllSatisfy(r => r.Should().BeInRange(1, 5));
+    }
+
+    [Fact]
+    public async Task MemoizedSelector_ShouldProduceConsistentResults_UnderHighContention()
+    {
+        // Arrange - Create selector that tracks all computed values
+        var computedValues = new ConcurrentBag<(TodoState State, int Result)>();
+        var selector = StoreSel.Create<TodoState, int>(state =>
+        {
+            var result = state.Todos.Count;
+            computedValues.Add((state, result));
+            return result;
+        });
+
+        var state1 = new TodoState(new List<TodoItem> { new(1, "A", false) });
+        var state2 = new TodoState(new List<TodoItem> { new(1, "A", false), new(2, "B", false) });
+
+        // Act - High contention with alternating states
+        var tasks = Enumerable.Range(0, 1000)
+            .Select(i => Task.Run(() =>
+            {
+                var state = i % 2 == 0 ? state1 : state2;
+                return selector.Select(state);
+            }));
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        var state1Results = results.Where((_, i) => i % 2 == 0);
+        var state2Results = results.Where((_, i) => i % 2 != 0);
+
+        state1Results.Should().AllSatisfy(r => r.Should().Be(1));
+        state2Results.Should().AllSatisfy(r => r.Should().Be(2));
+    }
+
+    [Fact]
+    public async Task MemoizedSelector_Reset_ShouldBeThreadSafe()
+    {
+        // Arrange
+        var selector = StoreSel.Create<TodoState, int>(state => state.Todos.Count);
+        var state = new TodoState(new List<TodoItem> { new(1, "Task", false) });
+
+        // Prime the cache
+        selector.Select(state);
+
+        // Act - Concurrent resets should not throw
+        var resetActions = Enumerable.Range(0, 100)
+            .Select(_ => Task.Run(() => selector.Reset()));
+
+        // Assert
+        var act = async () => await Task.WhenAll(resetActions);
+        await act.Should().NotThrowAsync();
+    }
+
+    #endregion
 }
