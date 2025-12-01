@@ -23,10 +23,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="bUnit" Version="1.26.64" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EasyAppDev.Blazor.Store\EasyAppDev.Blazor.Store.csproj" />
+    <ProjectReference Include="..\..\src\EasyAppDev.Blazor.Store.Generators\EasyAppDev.Blazor.Store.Generators.csproj" />
   </ItemGroup>
 
 </Project>

@@ -15,7 +15,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -28,26 +28,25 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v2.0.0 - Phase 3: Core Enhancements
+v2.1.0 - Phase 4: Advanced Features
 
 New Features:
-- ISelector subscription: Subscribe to stores using memoized selectors (store.Subscribe(MySelectors.Total, callback))
-- Functional middleware: Add inline middleware with .Use() and conditional .UseWhen() syntax
-- MiddlewareContext: Rich context object passed to middleware with phase info, services, and state
-- PersistenceOptions: Full configuration for persistence with callbacks (OnHydrationSuccess, OnHydrationFailure, etc.)
-- Structured error handling: StoreError&lt;T&gt; record with ErrorLocation enum for centralized error management
-- OnError handler: Register error handlers in StoreBuilder for unified error tracking
+- Optimistic updates: UpdateOptimistic() and UpdateOptimisticWithConfirm() for instant UI feedback with automatic rollback
+- Undo/Redo: IStoreHistory&lt;T&gt; with UndoAsync/RedoAsync, grouping, and exclusion filters
+- Type-safe actions: IAction interface, IActionDispatcher&lt;T&gt;, reducer pattern with pattern matching
+- Cross-tab sync: WithTabSync() middleware for BroadcastChannel-based state synchronization (WebAssembly)
+- Source generators: [Store] attribute generates SetX, UpdateX methods and optional actions
 
-Breaking Changes:
-- Middleware now receives MiddlewareContext instead of raw parameters (for functional middleware)
-- IStateObservable has new Subscribe overload for ISelector
+New Packages:
+- EasyAppDev.Blazor.Store.Generators: Source generators for reducing boilerplate
 
-Migration Guide:
-- Add .OnError() to StoreBuilder for centralized error handling
-- Use new PersistenceOptions for advanced persistence control
-- Consider using .Use() for simple inline middleware
+Usage Examples:
+- Optimistic: await store.UpdateOptimistic(s =&gt; s.AddItem(item), () =&gt; api.AddAsync())
+- Undo/Redo: builder.WithHistory(out history); await history.UndoAsync()
+- Actions: dispatcher.Register&lt;Increment&gt;((s, a) =&gt; s with { Count = s.Count + 1 })
+- TabSync: store.WithTabSync(sp, opts =&gt; opts.Channel("cart"))
 
-v1.2.0 - Phase 2: Cleanup and Simplification
+v2.0.0 - Phase 3: Core Enhancements
 (See previous release notes)
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -55,6 +54,10 @@ v1.2.0 - Phase 2: Cleanup and Simplification
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EasyAppDev.Blazor.Store.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
