@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -310,135 +333,51 @@ public record CartState(ImmutableList&lt;CartItem&gt; Items)
             </section>
 
             <!-- Optimistic Updates -->
-            <section class="section">
+            <section class="section" id="optimistic-updates">
               <h2>Optimistic Updates</h2>
               <p>
                 Update the UI immediately while an async operation is in progress, then rollback if the operation fails.
-                This provides instant feedback and a snappier user experience.
+                The built-in <code>UpdateOptimistic()</code> extension handles this pattern elegantly.
               </p>
 
-              <h3>Basic Pattern</h3>
+              <h3>Basic Usage</h3>
+              <div class="code-block">
+                <div class="code-block-title">One-liner optimistic update</div>
+                <pre><code class="language-csharp">// Instant UI update with automatic rollback on failure
+await store.UpdateOptimistic(
+    s =&gt; s.RemoveItem(itemId),                    // Optimistic: remove immediately
+    async s =&gt; await api.DeleteItemAsync(itemId), // Server: actual delete
+    (s, error) =&gt; s.RestoreItem(itemId)           // Error: rollback
+);</code></pre>
+              </div>
+
+              <h3>With Server Response</h3>
+              <p>Use the server response to update state with confirmed data:</p>
+              <div class="code-block">
+                <div class="code-block-title">Using server result</div>
+                <pre><code class="language-csharp">// Use server response to update state
+await store.UpdateOptimistic&lt;AppState, ServerItem&gt;(
+    s =&gt; s.AddPendingItem(item),                  // Show pending state
+    async s =&gt; await api.CreateItemAsync(item),   // Server creates with ID
+    (s, result) =&gt; s.ConfirmItem(result),         // Update with server data
+    (s, error) =&gt; s.RemovePendingItem(item)       // Remove on failure
+);</code></pre>
+              </div>
+
+              <h3>Component Example</h3>
               <div class="code-block">
                 <div class="code-block-title">TodoList.razor</div>
-                <pre><code class="language-csharp">@page "/todos"
-@inherits StoreComponent&lt;TodoState&gt;
-@inject ITodoService TodoService
+                <pre><code class="language-csharp">@inherits StoreComponent&lt;TodoState&gt;
+@inject ITodoApi Api
 
-&lt;!-- Component markup --&gt;
-
-@code {
-    async Task DeleteOptimistically(Guid id)
-    {
-        // 1. Save current state for potential rollback
-        var originalState = State;
-
-        // 2. Apply optimistic update immediately
-        await Update(s =&gt; s.RemoveTodo(id));
-
-        try
-        {
-            // 3. Perform async operation
-            await TodoService.DeleteAsync(id);
-        }
-        catch (Exception ex)
-        {
-            // 4. Rollback on error
-            await Update(_ =&gt; originalState);
-
-            // 5. Show error to user
-            await ShowError($"Failed to delete: {ex.Message}");
-        }
-    }
-}</code></pre>
-              </div>
-
-              <h3>With Loading States</h3>
-              <p>Combine optimistic updates with loading indicators for better UX:</p>
-
-              <div class="code-block">
-                <div class="code-block-title">LikeButton.razor</div>
-                <pre><code class="language-csharp">@inherits StoreComponent&lt;PostState&gt;
-@inject IPostService PostService
-
-&lt;button @onclick="ToggleLike" disabled="@isProcessing"&gt;
-    @(State.IsLiked ? "❤️" : "🤍") @State.LikeCount
-&lt;/button&gt;
-
-@code {
-    private bool isProcessing = false;
-
-    async Task ToggleLike()
-    {
-        if (isProcessing) return;
-
-        isProcessing = true;
-        var originalState = State;
-
-        // Optimistic update
-        await Update(s =&gt; s.ToggleLike());
-
-        try
-        {
-            if (State.IsLiked)
-                await PostService.LikeAsync(State.Id);
-            else
-                await PostService.UnlikeAsync(State.Id);
-        }
-        catch
-        {
-            // Rollback on failure
-            await Update(_ =&gt; originalState);
-        }
-        finally
-        {
-            isProcessing = false;
-        }
-    }
-}</code></pre>
-              </div>
-
-              <h3>Advanced: Retry Logic</h3>
-              <div class="code-block">
-                <div class="code-block-title">OptimisticHelper.cs</div>
-                <pre><code class="language-csharp">public static class OptimisticUpdateHelper
+async Task DeleteTodo(Guid id)
 {
-    public static async Task&lt;bool&gt; ExecuteOptimistically&lt;TState&gt;(
-        IStore&lt;TState&gt; store,
-        Func&lt;TState, TState&gt; optimisticUpdate,
-        Func&lt;Task&gt; asyncOperation,
-        int maxRetries = 3) where TState : notnull
-    {
-        var originalState = store.GetState();
-
-        // Apply optimistic update
-        await store.UpdateAsync(optimisticUpdate);
-
-        for (int attempt = 0; attempt &lt; maxRetries; attempt++)
-        {
-            try
-            {
-                await asyncOperation();
-                return true; // Success
-            }
-            catch when (attempt &lt; maxRetries - 1)
-            {
-                // Retry after delay
-                await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)));
-            }
-        }
-
-        // All retries failed - rollback
-        await store.UpdateAsync(_ =&gt; originalState);
-        return false;
-    }
-}
-
-// Usage
-var success = await OptimisticUpdateHelper.ExecuteOptimistically(
-    Store,
-    s =&gt; s.RemoveTodo(id),
-    () =&gt; TodoService.DeleteAsync(id)
-);</code></pre>
+    await Store.UpdateOptimistic(
+        s =&gt; s.RemoveTodo(id),
+        async _ =&gt; await Api.DeleteAsync(id),
+        (s, _) =&gt; s.RestoreTodo(id).SetError("Delete failed")
+    );
+}</code></pre>
               </div>
 
               <div class="alert alert-info">
@@ -449,6 +388,220 @@ var success = await OptimisticUpdateHelper.ExecuteOptimistically(
                   <li><strong>Reversible operations:</strong> Changes that can be easily rolled back</li>
                   <li><strong>Avoid for:</strong> Critical operations (payments, deletions), unreliable networks</li>
                 </ul>
+              </div>
+            </section>
+
+            <!-- Undo/Redo History -->
+            <section class="section" id="undo-redo">
+              <h2>Undo/Redo History</h2>
+              <p>
+                Full history stack for editor-like experiences with memory management and action grouping.
+              </p>
+
+              <h3>Setup</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddStoreWithHistory(
+    new EditorState(),
+    opts =&gt; opts
+        .WithMaxSize(100)                              // Max history entries
+        .WithMaxMemoryMB(50)                           // Memory limit
+        .ExcludeActions("CURSOR_MOVE", "SELECTION")    // Don't track these
+        .GroupActions(TimeSpan.FromMilliseconds(300)), // Group rapid edits
+    (store, sp) =&gt; store.WithDefaults(sp, "Editor")
+);
+
+builder.Services.AddStoreHistory&lt;EditorState&gt;();</code></pre>
+              </div>
+
+              <h3>Usage</h3>
+              <div class="code-block">
+                <div class="code-block-title">Editor.razor</div>
+                <pre><code class="language-csharp">@inherits StoreComponent&lt;EditorState&gt;
+@inject IStoreHistory&lt;EditorState&gt; History
+
+&lt;button @onclick="@(() =&gt; History.UndoAsync())" disabled="@(!History.CanUndo)"&gt;
+    Undo
+&lt;/button&gt;
+&lt;button @onclick="@(() =&gt; History.RedoAsync())" disabled="@(!History.CanRedo)"&gt;
+    Redo
+&lt;/button&gt;
+&lt;span&gt;@History.CurrentIndex / @History.Count&lt;/span&gt;
+
+@code {
+    // Jump to specific point in history
+    async Task GoTo(int index) =&gt; await History.GoToAsync(index);
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Query System -->
+            <section class="section" id="query-system">
+              <h2>Query System</h2>
+              <p>
+                TanStack Query-inspired data fetching with caching, background refresh, and loading states.
+              </p>
+
+              <h3>Setup</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddQueryClient();</code></pre>
+              </div>
+
+              <h3>Queries</h3>
+              <div class="code-block">
+                <div class="code-block-title">UserProfile.razor</div>
+                <pre><code class="language-csharp">@inject IQueryClient QueryClient
+
+@code {
+    private IQuery&lt;User&gt; userQuery = null!;
+
+    protected override void OnInitialized()
+    {
+        userQuery = QueryClient.CreateQuery&lt;User&gt;(
+            "user-123",                                    // Cache key
+            async ct =&gt; await api.GetUserAsync(123, ct),   // Fetch function
+            opts =&gt; opts
+                .WithStaleTime(TimeSpan.FromMinutes(5))    // Fresh for 5 min
+                .WithCacheTime(TimeSpan.FromHours(1))      // Cache for 1 hour
+                .WithRetry(3)                              // Retry 3 times
+        );
+    }
+}
+
+@if (userQuery.IsLoading) { &lt;Spinner /&gt; }
+@if (userQuery.IsError) { &lt;Error Message="@userQuery.Error" /&gt; }
+@if (userQuery.IsSuccess) { &lt;UserCard User="@userQuery.Data" /&gt; }</code></pre>
+              </div>
+
+              <h3>Mutations</h3>
+              <div class="code-block">
+                <div class="code-block-title">Mutation with cache invalidation</div>
+                <pre><code class="language-csharp">@code {
+    private IMutation&lt;UpdateUserRequest, User&gt; mutation = null!;
+
+    protected override void OnInitialized()
+    {
+        mutation = QueryClient.CreateMutation&lt;UpdateUserRequest, User&gt;(
+            async (req, ct) =&gt; await api.UpdateUserAsync(req, ct),
+            opts =&gt; opts.OnSuccess((_, _) =&gt;
+                QueryClient.InvalidateQueries("user-*"))  // Invalidate cache
+        );
+    }
+
+    async Task Save()
+    {
+        await mutation.MutateAsync(new UpdateUserRequest { Name = "John" });
+    }
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Immer-Style Updates -->
+            <section class="section" id="immer-style">
+              <h2>Immer-Style Updates</h2>
+              <p>
+                Clean syntax for complex nested updates using a draft-based API.
+              </p>
+
+              <h3>The Problem</h3>
+              <div class="code-block">
+                <div class="code-block-title">Verbose nested updates</div>
+                <pre><code class="language-csharp">// Verbose nested updates with records
+await store.UpdateAsync(s =&gt; s with {
+    User = s.User with {
+        Profile = s.User.Profile with {
+            Address = s.User.Profile.Address with { City = "NYC" }
+        }
+    },
+    Items = s.Items.Add(newItem)
+});</code></pre>
+              </div>
+
+              <h3>The Solution</h3>
+              <div class="code-block">
+                <div class="code-block-title">Clean, readable updates</div>
+                <pre><code class="language-csharp">// Clean, readable updates with ProduceAsync
+await store.ProduceAsync(draft =&gt; draft
+    .Set(s =&gt; s.User.Profile.Address.City, "NYC")
+    .Append(s =&gt; s.Items, newItem));</code></pre>
+              </div>
+
+              <h3>Available Operations</h3>
+              <div class="code-block">
+                <div class="code-block-title">All draft operations</div>
+                <pre><code class="language-csharp">await store.ProduceAsync(draft =&gt; draft
+    // Properties
+    .Set(s =&gt; s.Name, "John")                    // Set value
+    .Update(s =&gt; s.Count, c =&gt; c + 1)            // Transform
+    .SetNull&lt;string?&gt;(s =&gt; s.Optional)           // Set to null
+
+    // Numbers
+    .Increment(s =&gt; s.Count)                     // count++
+    .Decrement(s =&gt; s.Count)                     // count--
+    .Increment(s =&gt; s.Count, 5)                  // count += 5
+
+    // Booleans
+    .Toggle(s =&gt; s.IsActive)                     // !isActive
+
+    // Strings
+    .Concat(s =&gt; s.Name, " Jr.")                 // Append
+
+    // Lists (ImmutableList)
+    .Append(s =&gt; s.Items, item)                  // Add to end
+    .Prepend(s =&gt; s.Items, item)                 // Add to start
+    .Remove(s =&gt; s.Items, item)                  // Remove item
+    .SetAt(s =&gt; s.Items, 0, item)                // Replace at index
+    .RemoveAt(s =&gt; s.Items, 0)                   // Remove at index
+
+    // Dictionaries (ImmutableDictionary)
+    .DictSet(s =&gt; s.Map, "key", value)           // Add/update
+    .DictRemove(s =&gt; s.Map, "key")               // Remove
+);</code></pre>
+              </div>
+            </section>
+
+            <!-- Redux-Style Actions -->
+            <section class="section" id="redux-actions">
+              <h2>Redux-Style Actions</h2>
+              <p>
+                Type-safe action dispatching for teams familiar with Redux patterns.
+              </p>
+
+              <h3>Define Actions</h3>
+              <div class="code-block">
+                <div class="code-block-title">Actions as records</div>
+                <pre><code class="language-csharp">public record Increment : IAction&lt;CounterState&gt;;
+public record IncrementBy(int Amount) : IAction&lt;CounterState&gt;;
+public record Reset : IAction&lt;CounterState&gt;;</code></pre>
+              </div>
+
+              <h3>Dispatch Actions</h3>
+              <div class="code-block">
+                <div class="code-block-title">Simple dispatch</div>
+                <pre><code class="language-csharp">// Simple dispatch
+await store.DispatchAsync&lt;CounterState, Increment&gt;(
+    new Increment(),
+    (state, _) =&gt; state with { Count = state.Count + 1 }
+);
+
+// With payload
+await store.DispatchAsync(
+    new IncrementBy(5),
+    (state, action) =&gt; state with { Count = state.Count + action.Amount }
+);</code></pre>
+              </div>
+
+              <h3>Pattern Matching</h3>
+              <div class="code-block">
+                <div class="code-block-title">Using pattern matching</div>
+                <pre><code class="language-csharp">await store.DispatchAsync(action, (state, a) =&gt; a switch
+{
+    Increment =&gt; state with { Count = state.Count + 1 },
+    IncrementBy i =&gt; state with { Count = state.Count + i.Amount },
+    Reset =&gt; state with { Count = 0 },
+    _ =&gt; state
+});</code></pre>
               </div>
             </section>
 

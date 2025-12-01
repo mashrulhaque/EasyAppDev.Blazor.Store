@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -148,31 +171,57 @@
               <h2>Built-in Middleware</h2>
               <p>The library includes several production-ready middleware implementations:</p>
 
-              <div class="feature-list">
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">🛠️</span>
-                    <strong>DevToolsMiddleware</strong>
-                  </div>
-                  <p>Integrates with Redux DevTools browser extension for time-travel debugging, state inspection, and action replay.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">💾</span>
-                    <strong>PersistenceMiddleware</strong>
-                  </div>
-                  <p>Automatically saves state to LocalStorage or SessionStorage on updates and restores it on app load.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">📝</span>
-                    <strong>LoggingMiddleware</strong>
-                  </div>
-                  <p>Logs state changes to the console or your logging provider for debugging and monitoring.</p>
-                </div>
-              </div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Middleware</th>
+                    <th>Description</th>
+                    <th>Builder Method</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>DevToolsMiddleware</strong></td>
+                    <td>Redux DevTools integration for time-travel debugging</td>
+                    <td><code>.WithDevTools(sp, "Name")</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>PersistenceMiddleware</strong></td>
+                    <td>Auto-save/restore state to browser storage</td>
+                    <td><code>.WithPersistence(sp, "key")</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>LoggingMiddleware</strong></td>
+                    <td>State change logging to console or ILogger</td>
+                    <td><code>.WithLogging()</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>HistoryMiddleware</strong></td>
+                    <td>Undo/redo state tracking</td>
+                    <td><code>.WithHistory(opts)</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>TabSyncMiddleware</strong></td>
+                    <td>Cross-browser tab synchronization</td>
+                    <td><code>.WithTabSync(sp, opts)</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>ServerSyncMiddleware</strong></td>
+                    <td>SignalR server synchronization</td>
+                    <td><code>.WithServerSync(sp, opts)</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>PluginMiddleware</strong></td>
+                    <td>Plugin lifecycle management</td>
+                    <td><code>.WithPlugin&lt;T&gt;(sp)</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>DiagnosticsMiddleware</strong></td>
+                    <td>Performance tracking (DEBUG only)</td>
+                    <td><code>.WithDiagnostics(sp)</code></td>
+                  </tr>
+                </tbody>
+              </table>
 
               <div class="alert alert-success">
                 <div class="alert-title">Quick Setup</div>
@@ -183,6 +232,15 @@
                 <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
     new AppState(),
     (store, sp) => store.WithDefaults(sp, "MyApp"));  // Includes DevTools + Logging</code></pre>
+              </div>
+
+              <h3>Functional Middleware</h3>
+              <p>For simple cases, use <code>FunctionalMiddleware</code> without creating a class:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">store.WithMiddleware(FunctionalMiddleware.Create&lt;AppState&gt;(
+    onBefore: (state, action) => Console.WriteLine($"Before: {action}"),
+    onAfter: (prev, next, action) => Console.WriteLine($"After: {action}")
+));</code></pre>
               </div>
             </section>
 
@@ -430,11 +488,227 @@ builder.Services.AddStore(
               </div>
             </section>
 
+            <!-- Plugin System -->
+            <section class="section" id="plugins">
+              <h2>Plugin System</h2>
+              <p>
+                Plugins provide a higher-level abstraction than middleware, offering lifecycle hooks
+                and the ability to provide their own middleware. Use plugins to encapsulate related
+                functionality that can be shared across projects.
+              </p>
+
+              <h3>Creating a Plugin</h3>
+              <p>Extend <code>StorePluginBase&lt;TState&gt;</code> to create a plugin:</p>
+              <div class="code-block">
+                <div class="code-block-title">AnalyticsPlugin.cs</div>
+                <pre><code class="language-csharp">public class AnalyticsPlugin : StorePluginBase&lt;AppState&gt;
+{
+    private readonly IAnalyticsService _analytics;
+
+    public AnalyticsPlugin(IAnalyticsService analytics)
+    {
+        _analytics = analytics;
+    }
+
+    public override Task OnStoreCreatedAsync()
+    {
+        _analytics.Track("store_initialized");
+        return Task.CompletedTask;
+    }
+
+    public override Task OnAfterUpdateAsync(AppState prev, AppState next, string action)
+    {
+        _analytics.Track(action, new {
+            PreviousCount = prev.Count,
+            NewCount = next.Count
+        });
+        return Task.CompletedTask;
+    }
+
+    public override Task OnStoreDisposingAsync()
+    {
+        _analytics.Track("store_disposed");
+        return Task.CompletedTask;
+    }
+}</code></pre>
+              </div>
+
+              <h3>Plugin Lifecycle Hooks</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Hook</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>OnStoreCreatedAsync()</code></td>
+                    <td>Called when the store is first created</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnBeforeUpdateAsync(state, action)</code></td>
+                    <td>Called before state is updated</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnAfterUpdateAsync(prev, next, action)</code></td>
+                    <td>Called after state has been updated</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnStoreDisposingAsync()</code></td>
+                    <td>Called when the store is being disposed</td>
+                  </tr>
+                  <tr>
+                    <td><code>GetMiddleware()</code></td>
+                    <td>Return custom middleware to be added to the pipeline</td>
+                  </tr>
+                  <tr>
+                    <td><code>Configure(builder, services)</code></td>
+                    <td>Configure the store builder during registration</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>Registering Plugins</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Single Plugin</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "App")
+        .WithPlugin&lt;AppState, AnalyticsPlugin&gt;(sp)
+        .WithPlugin&lt;AppState, ValidationPlugin&gt;(sp));</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Auto-discover from Assembly</div>
+                <pre><code class="language-csharp">// Discovers and registers all StorePluginBase&lt;AppState&gt; implementations
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "App")
+        .WithPlugins(typeof(Program).Assembly, sp));</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Plugin Order</div>
+                <p>
+                  Plugins are invoked in registration order. If plugins have dependencies on each
+                  other, register them in the correct sequence.
+                </p>
+              </div>
+            </section>
+
+            <!-- Security -->
+            <section class="section" id="security">
+              <h2>Security</h2>
+              <p>
+                The library includes security features to protect sensitive data and validate
+                state integrity.
+              </p>
+
+              <h3>Sensitive Data Filtering</h3>
+              <p>
+                Prevent sensitive data from being exposed in DevTools, logs, or persistence
+                using the <code>[SensitiveData]</code> attribute:
+              </p>
+              <div class="code-block">
+                <div class="code-block-title">State with Sensitive Fields</div>
+                <pre><code class="language-csharp">public record UserState(
+    string Username,
+    string Email,
+    [property: SensitiveData] string Password,
+    [property: SensitiveData] string ApiToken,
+    [property: SensitiveData] string CreditCardNumber
+);</code></pre>
+              </div>
+
+              <p>Configure global sensitive field detection:</p>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.Configure&lt;SensitiveDataFilterOptions&gt;(opts =>
+{
+    opts.SensitivePropertyNames.Add("ApiKey");
+    opts.SensitivePropertyNames.Add("Secret");
+    opts.RedactionValue = "[FILTERED]";  // Default: "[REDACTED]"
+});</code></pre>
+              </div>
+
+              <h3>State Validation</h3>
+              <p>
+                Implement <code>IStateValidator&lt;TState&gt;</code> to validate state before it's
+                persisted, synchronized, or accepted from external sources:
+              </p>
+              <div class="code-block">
+                <div class="code-block-title">StateValidator.cs</div>
+                <pre><code class="language-csharp">public class AppStateValidator : IStateValidator&lt;AppState&gt;
+{
+    public bool Validate(AppState state, out string? error)
+    {
+        if (state.Count &lt; 0)
+        {
+            error = "Count cannot be negative";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(state.Username))
+        {
+            error = "Username is required";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+}</code></pre>
+              </div>
+
+              <p>Use validators with synchronization features:</p>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">// Register the validator
+builder.Services.AddSingleton&lt;IStateValidator&lt;AppState&gt;, AppStateValidator&gt;();
+
+// Use with server sync
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithServerSync(sp, opts => opts
+            .HubUrl("/hubs/state")
+            .WithValidator(sp.GetService&lt;IStateValidator&lt;AppState&gt;&gt;())
+            .RejectInvalidState()));  // Reject invalid incoming state</code></pre>
+              </div>
+
+              <h3>Message Signing</h3>
+              <p>
+                Enable HMAC-SHA256 message signing for cross-tab synchronization to prevent
+                malicious state injection:
+              </p>
+              <div class="code-block">
+                <pre><code class="language-csharp">.WithTabSync(sp, opts => opts
+    .Channel("my-app")
+    .EnableMessageSigning()      // Auto-generates signing key
+    .WithSigningKey(myKey))      // Or use custom key</code></pre>
+              </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Security Recommendations</div>
+                <ul>
+                  <li>Always mark password, token, and key fields with <code>[SensitiveData]</code></li>
+                  <li>Enable message signing when syncing sensitive state across tabs</li>
+                  <li>Use state validators for data from external sources (server sync, persistence)</li>
+                  <li>Never store unencrypted secrets in browser storage</li>
+                  <li>Review DevTools output to ensure sensitive data is filtered</li>
+                </ul>
+              </div>
+            </section>
+
             <!-- Navigation -->
             <section class="section">
+              <h2>Next Steps</h2>
               <div class="next-steps-grid">
                 <a href="./persistence.html" class="next-step-card">
-                  <div class="next-step-icon">📦</div>
+                  <div class="next-step-icon">💾</div>
                   <h3>Persistence</h3>
                   <p>Learn about auto-save and restore with LocalStorage</p>
                 </a>
@@ -445,10 +719,10 @@ builder.Services.AddStore(
                   <p>Time-travel debugging with Redux DevTools</p>
                 </a>
 
-                <a href="./best-practices.html" class="next-step-card">
-                  <div class="next-step-icon">📖</div>
-                  <h3>Best Practices</h3>
-                  <p>Patterns and anti-patterns for effective state management</p>
+                <a href="./persistence.html#tab-sync" class="next-step-card">
+                  <div class="next-step-icon">📑</div>
+                  <h3>Cross-Tab Sync</h3>
+                  <p>Synchronize state across browser tabs</p>
                 </a>
               </div>
             </section>

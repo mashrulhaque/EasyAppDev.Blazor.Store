@@ -15,7 +15,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>3.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -28,7 +28,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v3.0.0 - Phase 5: Killer Features
+v2.0.0 - Phase 5: Killer Features
 
 New Features:
 - TanStack Query-style data fetching: UseQuery(), UseMutation(), QueryClient with caching, retries, and stale-while-revalidate

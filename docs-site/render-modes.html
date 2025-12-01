@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -103,13 +126,118 @@
               Use the same code everywhere and let the library handle the differences.
             </p>
 
+            <!-- Feature Compatibility Matrix -->
+            <section class="section">
+              <h2>Feature Compatibility Matrix</h2>
+              <p>Complete feature availability across all Blazor render modes:</p>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Feature</th>
+                    <th>WebAssembly</th>
+                    <th>Server (Singleton)</th>
+                    <th>Server (Scoped)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Core Store</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>StoreComponent / SelectorStoreComponent</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Async Helpers</strong> (Debounce, Throttle, etc.)</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Optimistic Updates</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Undo/Redo History</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Query System</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Immer-Style Updates</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Redux-Style Actions</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Plugin System</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Server Sync (SignalR)</strong></td>
+                    <td>✅</td>
+                    <td>✅</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Redux DevTools</strong></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>LocalStorage Persistence</strong></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Cross-Tab Sync</strong></td>
+                    <td>✅</td>
+                    <td>❌</td>
+                    <td>✅</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Why Some Features Are Unavailable</div>
+                <p>
+                  Features marked ❌ for <strong>Server (Singleton)</strong> require <code>IJSRuntime</code>,
+                  which is not available during singleton service registration at startup. Use
+                  <strong>Server (Scoped)</strong> stores to get full feature support in Blazor Server apps.
+                </p>
+              </div>
+            </section>
+
             <!-- Quick Comparison -->
             <section class="section">
               <h2>Quick Comparison</h2>
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Feature</th>
+                    <th>Aspect</th>
                     <th>Server (Singleton)</th>
                     <th>Server (Scoped)</th>
                     <th>WebAssembly</th>
@@ -118,53 +246,32 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><strong>Core State Management</strong></td>
-                    <td>✅ Full</td>
-                    <td>✅ Full</td>
-                    <td>✅ Full</td>
-                    <td>✅ Full</td>
+                    <td><strong>State Isolation</strong></td>
+                    <td>Shared across all users</td>
+                    <td>Per-user instance</td>
+                    <td>Per-browser</td>
+                    <td>Transitions from shared to per-browser</td>
                   </tr>
                   <tr>
-                    <td><strong>Async Helpers</strong></td>
-                    <td>✅ All work</td>
-                    <td>✅ All work</td>
-                    <td>✅ All work</td>
-                    <td>✅ All work</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Components & Updates</strong></td>
-                    <td>✅ Perfect</td>
-                    <td>✅ Perfect</td>
-                    <td>✅ Perfect</td>
-                    <td>✅ Perfect</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Logging Middleware</strong></td>
-                    <td>✅ Works</td>
-                    <td>✅ Works</td>
-                    <td>✅ Works</td>
-                    <td>✅ Works</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Redux DevTools</strong></td>
-                    <td>⚠️ Gracefully skips</td>
-                    <td>✅ <strong>Works!</strong></td>
-                    <td>✅ Works</td>
-                    <td>✅ Activates after transition</td>
-                  </tr>
-                  <tr>
-                    <td><strong>LocalStorage Persistence</strong></td>
+                    <td><strong>JS Interop Features</strong></td>
                     <td>❌ Not available</td>
-                    <td>⚠️ Limited</td>
-                    <td>✅ Works</td>
-                    <td>✅ Works after transition</td>
+                    <td>✅ Full support</td>
+                    <td>✅ Full support</td>
+                    <td>✅ After transition</td>
                   </tr>
                   <tr>
-                    <td><strong>Code Changes Needed</strong></td>
-                    <td>✅ None</td>
-                    <td>✅ None</td>
-                    <td>✅ None</td>
-                    <td>✅ None</td>
+                    <td><strong>Best For</strong></td>
+                    <td>Shared app config, catalogs</td>
+                    <td>User sessions, carts</td>
+                    <td>Full client-side apps</td>
+                    <td>Progressive apps</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Registration</strong></td>
+                    <td><code>AddStore()</code></td>
+                    <td><code>AddScopedStore()</code></td>
+                    <td><code>AddStore()</code></td>
+                    <td><code>AddStore()</code></td>
                   </tr>
                 </tbody>
               </table>

@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v2.0.0</span></div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -95,7 +95,7 @@
         <div class="content-wrapper">
           <div>
             <h1>Migration Guide</h1>
-            <p class="lead">Upgrading from v1.x to v1.0.8</p>
+            <p class="lead">Upgrading from v1.x to v2.0.0</p>
 
             <!-- Overview -->
             <section class="section">
@@ -104,16 +104,16 @@
 
               <div class="alert alert-success">
                 <div class="alert-title">Good News!</div>
-                <p>v1.0.8 is largely backward compatible. Core functionality remains unchanged, and existing stores will continue to work as-is.</p>
+                <p>v2.0.0 is largely backward compatible. Core functionality remains unchanged, and existing stores will continue to work as-is.</p>
               </div>
             </section>
 
             <!-- What's New -->
             <section class="section">
-              <h2>What's New in v1.0.8</h2>
+              <h2>What's New in v2.0.0</h2>
 
               <h3>1. Async Helpers - 74% Code Reduction</h3>
-              <p>v1.0.8 introduces five production-ready async helpers that eliminate boilerplate code:</p>
+              <p>v2.0.0 introduces five production-ready async helpers that eliminate boilerplate code:</p>
 
               <div class="feature-list">
                 <div class="feature-item">
@@ -184,7 +184,7 @@
 
               <div class="alert alert-warning">
                 <div class="alert-title">Minor Breaking Changes</div>
-                <p>v1.0.8 has minimal breaking changes. Most applications will migrate without modifications.</p>
+                <p>v2.0.0 has minimal breaking changes. Most applications will migrate without modifications.</p>
               </div>
 
               <h3>Service Registration Changes</h3>
@@ -198,7 +198,7 @@
               </div>
 
               <div class="code-block">
-                <div class="code-block-title">After (v1.0.8) - Recommended</div>
+                <div class="code-block-title">After (v2.0.0) - Recommended</div>
                 <pre><code class="language-csharp">// Option 1: All-in-one registration (includes async helpers)
 builder.Services.AddStoreWithUtilities(
     new CounterState(0),
@@ -224,7 +224,7 @@ builder.Services.AddStore(
 
               <h3>Step 1: Update NuGet Package</h3>
               <div class="code-block">
-                <pre><code class="language-bash">dotnet add package EasyAppDev.Blazor.Store --version 1.0.0.0</code></pre>
+                <pre><code class="language-bash">dotnet add package EasyAppDev.Blazor.Store --version 2.0.0</code></pre>
               </div>
 
               <h3>Step 2: Update Service Registration</h3>
@@ -242,7 +242,7 @@ builder.Services.AddStore(
               </div>
 
               <div class="code-block">
-                <div class="code-block-title">After (v1.0.8)</div>
+                <div class="code-block-title">After (v2.0.0)</div>
                 <pre><code class="language-csharp">// Program.cs
 builder.Services.AddStoreWithUtilities(
     new CounterState(0),
@@ -264,7 +264,7 @@ builder.Services.AddStoreWithUtilities(
               </div>
 
               <div class="code-block">
-                <div class="code-block-title">After (v1.0.8)</div>
+                <div class="code-block-title">After (v2.0.0)</div>
                 <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
     new TodoState(),
     (store, sp) => store
@@ -376,7 +376,7 @@ builder.Services.AddStoreWithUtilities(
 &lt;button @onclick="@(() => Update(s => s.Decrement()))"&gt;Decrement&lt;/button&gt;</code></pre>
               </div>
 
-              <h3>After (v1.0.8)</h3>
+              <h3>After (v2.0.0)</h3>
               <div class="code-block">
                 <div class="code-block-title">Program.cs</div>
                 <pre><code class="language-csharp">// Simplified registration with async helpers
@@ -501,7 +501,7 @@ builder.Services.AddAsyncActionExecutor&lt;YourState&gt;();</code></pre>
                 <a href="./best-practices.html" class="next-step-card">
                   <div class="next-step-icon">📖</div>
                   <h3>Best Practices</h3>
-                  <p>Learn patterns for effective state management in v1.0.8.</p>
+                  <p>Learn patterns for effective state management in v2.0.0.</p>
                 </a>
 
                 <a href="./examples.html" class="next-step-card">

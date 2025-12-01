@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -360,18 +383,74 @@ builder.Services.AddStore(
               <h2 id="store-builder">StoreBuilder Configuration</h2>
               <p>Fluent methods for configuring your store.</p>
 
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Method</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>.WithDefaults(sp, "Name")</code></td>
+                    <td>DevTools + Logging + JSRuntime</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithDevTools(sp, "Name")</code></td>
+                    <td>Redux DevTools integration</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithLogging()</code></td>
+                    <td>State change logging</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithPersistence(sp, "key")</code></td>
+                    <td>LocalStorage auto-save/restore</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithHistory(opts)</code></td>
+                    <td>Undo/redo functionality</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithTabSync(sp, opts)</code></td>
+                    <td>Cross-browser tab sync</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithServerSync(sp, opts)</code></td>
+                    <td>SignalR server sync</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithPlugin&lt;T&gt;(sp)</code></td>
+                    <td>Register a plugin</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithPlugins(assembly, sp)</code></td>
+                    <td>Auto-discover plugins</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithMiddleware(middleware)</code></td>
+                    <td>Add custom middleware</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithDiagnostics(sp)</code></td>
+                    <td>Performance tracking (DEBUG)</td>
+                  </tr>
+                  <tr>
+                    <td><code>.WithComparer(comparer)</code></td>
+                    <td>Custom equality comparer</td>
+                  </tr>
+                  <tr>
+                    <td><code>.OnError(handler)</code></td>
+                    <td>Error handling callback</td>
+                  </tr>
+                </tbody>
+              </table>
+
               <div class="api-section">
                 <h4><code>WithDefaults</code></h4>
                 <p>Configures store with DevTools, logging middleware, and JSRuntime integration in one call.</p>
                 <div class="code-block">
                   <pre><code class="language-csharp">(store, sp) => store.WithDefaults(sp, "StoreName")</code></pre>
-                </div>
-                <p>Equivalent to:</p>
-                <div class="code-block">
-                  <pre><code class="language-csharp">store
-    .WithDevTools("StoreName")
-    .WithLogging()
-    .WithJSRuntime(sp.GetRequiredService&lt;IJSRuntime&gt;())</code></pre>
                 </div>
               </div>
 
@@ -383,23 +462,47 @@ builder.Services.AddStore(
     .WithDefaults(sp, "MyStore")
     .WithPersistence(sp, "storage-key")  // LocalStorage by default</code></pre>
                 </div>
-                <p>State is automatically saved on updates and restored on app load.</p>
               </div>
 
               <div class="api-section">
-                <h4><code>WithDiagnosticsIfAvailable</code></h4>
-                <p>Adds diagnostics middleware (DEBUG builds only, compiled out in production).</p>
+                <h4><code>WithHistory</code></h4>
+                <p>Enables undo/redo functionality with configurable history size.</p>
                 <div class="code-block">
-                  <pre><code class="language-csharp">// Program.cs
-builder.Services.AddStoreDiagnostics();
-
-builder.Services.AddStore(
-    new MyState(),
-    (store, sp) => store
-        .WithDefaults(sp, "MyStore")
-        .WithDiagnosticsIfAvailable(sp));</code></pre>
+                  <pre><code class="language-csharp">(store, sp) => store
+    .WithDefaults(sp, "Editor")
+    .WithHistory(opts => opts
+        .WithMaxSize(100)
+        .WithMaxMemoryMB(50)
+        .ExcludeActions("CURSOR_MOVE")
+        .GroupActions(TimeSpan.FromMilliseconds(300)))</code></pre>
                 </div>
-                <p>Tracks action history, performance metrics, and subscriptions. Zero overhead in production.</p>
+              </div>
+
+              <div class="api-section">
+                <h4><code>WithTabSync</code></h4>
+                <p>Enables real-time state synchronization across browser tabs.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">(store, sp) => store
+    .WithDefaults(sp, "Cart")
+    .WithTabSync(sp, opts => opts
+        .Channel("shopping-cart")
+        .EnableMessageSigning()
+        .WithDebounce(TimeSpan.FromMilliseconds(100)))</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>WithServerSync</code></h4>
+                <p>Enables SignalR-based server synchronization for real-time collaboration.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">(store, sp) => store
+    .WithDefaults(sp, "Document")
+    .WithServerSync(sp, opts => opts
+        .HubUrl("/hubs/documents")
+        .DocumentId(docId)
+        .EnablePresence()
+        .EnableCursorTracking())</code></pre>
+                </div>
               </div>
 
               <div class="api-section">
@@ -409,6 +512,267 @@ builder.Services.AddStore(
                   <pre><code class="language-csharp">(store, sp) => store
     .WithDefaults(sp, "MyStore")
     .WithMiddleware(new CustomMiddleware&lt;MyState&gt;())</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Optimistic Updates -->
+            <section class="section">
+              <h2 id="optimistic-updates">Optimistic Update Extensions</h2>
+              <p>Extension methods for immediate UI updates with automatic rollback on server errors.</p>
+
+              <div class="api-section">
+                <h4><code>UpdateOptimistic</code></h4>
+                <p>Updates state immediately and syncs with server asynchronously.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await store.UpdateOptimistic(
+    s => s.RemoveItem(itemId),                     // Optimistic update
+    async s => await api.DeleteItemAsync(itemId), // Server call
+    (s, error) => s.RestoreItem(itemId)           // Error handler (optional)
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>UpdateOptimistic&lt;TResult&gt;</code></h4>
+                <p>Optimistic update with server result transformation.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await store.UpdateOptimistic&lt;AppState, ApiResponse&gt;(
+    s => s.WithPendingItem(item),              // Optimistic
+    async s => await api.CreateItem(item),     // Server call
+    (s, result) => s.ConfirmItem(result.Id),   // Success transform
+    (s, error) => s.RemovePendingItem(item)    // Error handler
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>UpdateOptimisticWithConfirm</code></h4>
+                <p>Two-phase optimistic update with explicit confirmation.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await store.UpdateOptimisticWithConfirm(
+    s => s.SetPending(true),
+    async s => await api.ProcessAsync(),
+    (s, result) => s.Confirm(result)
+);</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- History API -->
+            <section class="section">
+              <h2 id="history-api">IStoreHistory&lt;T&gt;</h2>
+              <p>Interface for undo/redo functionality.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Definition</div>
+                <pre><code class="language-csharp">public interface IStoreHistory&lt;TState&gt;
+{
+    bool CanUndo { get; }
+    bool CanRedo { get; }
+    int CurrentIndex { get; }
+    int Count { get; }
+
+    Task UndoAsync();
+    Task RedoAsync();
+    Task GoToAsync(int index);
+    void Clear();
+}</code></pre>
+              </div>
+
+              <div class="api-section">
+                <h4>Registration</h4>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStoreWithHistory(
+    new EditorState(),
+    opts => opts.WithMaxSize(100).WithMaxMemoryMB(50),
+    (store, sp) => store.WithDefaults(sp, "Editor")
+);
+
+builder.Services.AddStoreHistory&lt;EditorState&gt;();</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4>Usage</h4>
+                <div class="code-block">
+                  <pre><code class="language-csharp">@inject IStoreHistory&lt;EditorState&gt; History
+
+&lt;button disabled="@(!History.CanUndo)" @onclick="History.UndoAsync"&gt;Undo&lt;/button&gt;
+&lt;button disabled="@(!History.CanRedo)" @onclick="History.RedoAsync"&gt;Redo&lt;/button&gt;
+&lt;span&gt;Position: @History.CurrentIndex / @History.Count&lt;/span&gt;</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Query Client API -->
+            <section class="section">
+              <h2 id="query-api">IQueryClient</h2>
+              <p>TanStack Query-inspired data fetching with caching and background refresh.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Registration</div>
+                <pre><code class="language-csharp">builder.Services.AddQueryClient();</code></pre>
+              </div>
+
+              <div class="api-section">
+                <h4><code>CreateQuery&lt;T&gt;</code></h4>
+                <p>Creates a query with automatic caching and background refresh.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">@inject IQueryClient QueryClient
+
+var userQuery = QueryClient.CreateQuery&lt;User&gt;(
+    "user-123",                                    // Query key
+    async ct => await api.GetUser(123, ct),        // Fetch function
+    opts => opts
+        .WithStaleTime(TimeSpan.FromMinutes(5))    // Fresh for 5 min
+        .WithCacheTime(TimeSpan.FromHours(1))      // Cache for 1 hour
+        .WithRetry(3)                              // Retry 3 times
+);
+
+// Access query state
+if (userQuery.IsLoading) { /* spinner */ }
+if (userQuery.IsError) { /* error UI */ }
+if (userQuery.IsSuccess) { /* use userQuery.Data */ }</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>CreateMutation&lt;TRequest, TResult&gt;</code></h4>
+                <p>Creates a mutation for data modification operations.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">var updateMutation = QueryClient.CreateMutation&lt;UpdateRequest, User&gt;(
+    async (req, ct) => await api.UpdateUser(req, ct),
+    opts => opts.OnSuccess((result, vars) =>
+        QueryClient.InvalidateQueries("user-*"))
+);
+
+await updateMutation.MutateAsync(new UpdateRequest { ... });</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>InvalidateQueries</code></h4>
+                <p>Invalidates cached queries matching a pattern.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">QueryClient.InvalidateQueries("user-*");  // Invalidate all user queries
+QueryClient.InvalidateQueries("user-123"); // Invalidate specific query</code></pre>
+                </div>
+              </div>
+            </section>
+
+            <!-- Immer-Style API -->
+            <section class="section">
+              <h2 id="immer-api">Immer-Style Updates</h2>
+              <p>Draft-based mutable-looking but immutable state updates.</p>
+
+              <div class="api-section">
+                <h4><code>ProduceAsync</code></h4>
+                <p>Update state using a draft object with chainable operations.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await store.ProduceAsync(draft => draft
+    .Set(s => s.User.Name, "John")
+    .Update(s => s.Count, c => c + 1)
+    .Append(s => s.Items, newItem)
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4>Draft Operations</h4>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Operation</th>
+                      <th>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><code>.Set(expr, value)</code></td>
+                      <td>Set any property value</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Update(expr, func)</code></td>
+                      <td>Transform property with function</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Increment(expr)</code></td>
+                      <td>Increment numeric property</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Decrement(expr)</code></td>
+                      <td>Decrement numeric property</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Toggle(expr)</code></td>
+                      <td>Toggle boolean property</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Append(expr, item)</code></td>
+                      <td>Add to ImmutableList</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Remove(expr, item)</code></td>
+                      <td>Remove from ImmutableList</td>
+                    </tr>
+                    <tr>
+                      <td><code>.SetAt(expr, index, item)</code></td>
+                      <td>Replace item at index</td>
+                    </tr>
+                    <tr>
+                      <td><code>.DictSet(expr, key, value)</code></td>
+                      <td>Add/update dictionary entry</td>
+                    </tr>
+                    <tr>
+                      <td><code>.DictRemove(expr, key)</code></td>
+                      <td>Remove dictionary entry</td>
+                    </tr>
+                    <tr>
+                      <td><code>.Concat(expr, str)</code></td>
+                      <td>Concatenate string</td>
+                    </tr>
+                    <tr>
+                      <td><code>.SetNull&lt;T&gt;(expr)</code></td>
+                      <td>Set nullable to null</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Redux-Style Actions -->
+            <section class="section">
+              <h2 id="redux-api">Redux-Style Actions</h2>
+              <p>Type-safe action dispatching with reducers.</p>
+
+              <div class="api-section">
+                <h4><code>IAction&lt;TState&gt;</code></h4>
+                <p>Marker interface for actions targeting a specific state type.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">public record Increment : IAction&lt;CounterState&gt;;
+public record IncrementBy(int Amount) : IAction&lt;CounterState&gt;;
+public record Reset : IAction&lt;CounterState&gt;;</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>DispatchAsync</code></h4>
+                <p>Dispatch an action with an inline reducer.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await store.DispatchAsync&lt;CounterState, Increment&gt;(
+    new Increment(),
+    (state, action) => state with { Count = state.Count + 1 }
+);
+
+// With pattern matching for multiple actions
+await store.DispatchAsync(new IncrementBy(5), (state, action) => action switch
+{
+    Increment => state with { Count = state.Count + 1 },
+    IncrementBy i => state with { Count = state.Count + i.Amount },
+    Reset => state with { Count = 0 },
+    _ => state
+});</code></pre>
                 </div>
               </div>
             </section>
@@ -432,74 +796,85 @@ builder.Services.AddStoreWithUtilities(
             <!-- Quick Reference Table -->
             <section class="section">
               <h2 id="quick-reference">Quick Reference</h2>
-              <table>
+              <table class="table">
                 <thead>
                   <tr>
                     <th>API</th>
                     <th>Purpose</th>
-                    <th>Code Reduction</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td><code>StoreComponent&lt;T&gt;</code></td>
                     <td>Base component with auto-subscription</td>
-                    <td>-</td>
                   </tr>
                   <tr>
                     <td><code>SelectorStoreComponent&lt;T&gt;</code></td>
-                    <td>Granular subscriptions (performance)</td>
-                    <td>25x fewer re-renders</td>
+                    <td>Granular subscriptions for performance</td>
                   </tr>
                   <tr>
-                    <td><code>Update()</code></td>
-                    <td>Sync state updates</td>
-                    <td>-</td>
-                  </tr>
-                  <tr>
-                    <td><code>UpdateAsync()</code></td>
-                    <td>Async state updates</td>
-                    <td>-</td>
+                    <td><code>Update()</code> / <code>UpdateAsync()</code></td>
+                    <td>Sync/async state updates</td>
                   </tr>
                   <tr>
                     <td><code>UpdateDebounced()</code></td>
-                    <td>Debounced updates (search, input)</td>
-                    <td>94%</td>
+                    <td>Debounced updates for search, input</td>
                   </tr>
                   <tr>
                     <td><code>UpdateThrottled()</code></td>
-                    <td>Throttled updates (scroll, mouse)</td>
-                    <td>95%</td>
+                    <td>Throttled updates for scroll, mouse</td>
                   </tr>
                   <tr>
                     <td><code>ExecuteAsync()</code></td>
-                    <td>Automatic error handling</td>
-                    <td>58%</td>
+                    <td>Automatic loading/success/error handling</td>
                   </tr>
                   <tr>
                     <td><code>LazyLoad()</code></td>
-                    <td>Caching + deduplication</td>
-                    <td>85%</td>
+                    <td>Caching with request deduplication</td>
                   </tr>
                   <tr>
                     <td><code>AsyncData&lt;T&gt;</code></td>
-                    <td>Async state management</td>
-                    <td>95%</td>
+                    <td>Async state representation</td>
                   </tr>
                   <tr>
-                    <td><code>AddStoreWithUtilities()</code></td>
-                    <td>All-in-one registration</td>
-                    <td>-</td>
+                    <td><code>UpdateOptimistic()</code></td>
+                    <td>Immediate UI with server sync/rollback</td>
                   </tr>
                   <tr>
-                    <td><code>WithDefaults()</code></td>
-                    <td>DevTools + Logging + JSRuntime</td>
-                    <td>-</td>
+                    <td><code>IStoreHistory&lt;T&gt;</code></td>
+                    <td>Undo/redo functionality</td>
                   </tr>
                   <tr>
-                    <td><code>WithPersistence()</code></td>
-                    <td>LocalStorage auto-save</td>
-                    <td>-</td>
+                    <td><code>IQueryClient</code></td>
+                    <td>Data fetching with caching</td>
+                  </tr>
+                  <tr>
+                    <td><code>ProduceAsync()</code></td>
+                    <td>Immer-style draft updates</td>
+                  </tr>
+                  <tr>
+                    <td><code>DispatchAsync()</code></td>
+                    <td>Redux-style action dispatching</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithTabSync()</code></td>
+                    <td>Cross-browser tab synchronization</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithServerSync()</code></td>
+                    <td>SignalR real-time collaboration</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithPlugin&lt;T&gt;()</code></td>
+                    <td>Plugin system integration</td>
+                  </tr>
+                  <tr>
+                    <td><code>[SensitiveData]</code></td>
+                    <td>Filter sensitive data from logs/DevTools</td>
+                  </tr>
+                  <tr>
+                    <td><code>IStateValidator&lt;T&gt;</code></td>
+                    <td>Validate state integrity</td>
                   </tr>
                 </tbody>
               </table>

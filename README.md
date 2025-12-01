@@ -13,6 +13,8 @@
   </a>
 </div>
 
+> **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v300) for migration guide.
+
 ---
 
 ## Why This Library?
@@ -94,6 +96,7 @@ That's it. State updates automatically propagate to all subscribed components.
 14. [Middleware](#middleware)
 15. [Blazor Render Modes](#blazor-render-modes)
 16. [API Reference](#api-reference)
+17. [Breaking Changes in v2.0.0](#breaking-changes-in-v300)
 
 ---
 
@@ -908,6 +911,70 @@ store
     .WithPlugin<TState, TPlugin>(sp)       // Plugin
     .WithDiagnostics(sp)                   // DEBUG only
 ```
+
+---
+
+## Breaking Changes in v2.0.0
+
+This major release introduces powerful new features but includes breaking changes from v1.x:
+
+### Middleware Interface
+
+The `IMiddleware<TState>` interface now receives both previous and new state in `OnAfterUpdateAsync`:
+
+```csharp
+// Before (v1.x)
+Task OnAfterUpdateAsync(TState newState, string? action);
+
+// After (v2.0)
+Task OnAfterUpdateAsync(TState previousState, TState newState, string? action);
+```
+
+**Migration:** Update your middleware implementations to accept the additional `previousState` parameter.
+
+### Optimistic Updates
+
+Optimistic updates now use dedicated extension methods instead of manual patterns:
+
+```csharp
+// Before (v1.x) - Manual rollback pattern
+var original = store.GetState();
+await store.UpdateAsync(s => s.RemoveItem(id));
+try { await api.DeleteAsync(id); }
+catch { await store.UpdateAsync(_ => original); throw; }
+
+// After (v2.0) - Built-in support
+await store.UpdateOptimistic(
+    s => s.RemoveItem(id),
+    async _ => await api.DeleteAsync(id),
+    (s, error) => s.RestoreItem(id)
+);
+```
+
+**Migration:** Replace manual try/catch rollback patterns with `UpdateOptimistic()`.
+
+### Plugin System
+
+Plugin hooks now receive both previous and new state:
+
+```csharp
+// Before (v1.x)
+public override Task OnAfterUpdateAsync(AppState newState, string action);
+
+// After (v2.0)
+public override Task OnAfterUpdateAsync(AppState previousState, AppState newState, string action);
+```
+
+**Migration:** Update plugin `OnAfterUpdateAsync` overrides to include `previousState` parameter.
+
+### New Features (Non-Breaking)
+
+- **Query System**: TanStack Query-inspired data fetching with `IQueryClient`
+- **Immer-Style Updates**: Clean syntax with `ProduceAsync()` and draft operations
+- **Undo/Redo History**: Full history stack with `IStoreHistory<T>`
+- **Cross-Tab Sync**: Real-time sync with `WithTabSync()`
+- **Server Sync**: SignalR collaboration with `WithServerSync()`
+- **Security**: `[SensitiveData]` attribute and `IStateValidator<T>`
 
 ---
 

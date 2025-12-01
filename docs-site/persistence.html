@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -444,6 +467,241 @@ async Task Logout()
               </div>
             </section>
 
+            <!-- Cross-Tab Synchronization -->
+            <section class="section" id="tab-sync">
+              <h2>Cross-Tab Synchronization</h2>
+              <p>
+                Synchronize state in real-time across multiple browser tabs. When a user updates
+                state in one tab, all other tabs automatically receive the update.
+              </p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Use Cases</div>
+                <ul>
+                  <li>Shopping cart updates visible across all open tabs</li>
+                  <li>User authentication state synchronized everywhere</li>
+                  <li>Theme preferences applied instantly to all tabs</li>
+                  <li>Real-time collaboration within the same browser</li>
+                </ul>
+              </div>
+
+              <h3>Basic Setup</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new CartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Cart")
+        .WithTabSync(sp, opts => opts
+            .Channel("shopping-cart")));  // Unique channel name</code></pre>
+              </div>
+
+              <h3>Advanced Configuration</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Full Options</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "MyApp")
+        .WithTabSync(sp, opts => opts
+            .Channel("my-app-state")
+            .EnableMessageSigning()                        // HMAC-SHA256 security
+            .WithDebounce(TimeSpan.FromMilliseconds(100))  // Prevent flooding
+            .ExcludeActions("HOVER", "FOCUS", "SCROLL"))); // Skip noisy actions</code></pre>
+              </div>
+
+              <h3>Configuration Options</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Option</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>Channel(name)</code></td>
+                    <td>Unique channel identifier for this store's messages</td>
+                  </tr>
+                  <tr>
+                    <td><code>EnableMessageSigning()</code></td>
+                    <td>Signs messages with HMAC-SHA256 to prevent tampering</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithSigningKey(key)</code></td>
+                    <td>Custom signing key (auto-generated if not specified)</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithDebounce(delay)</code></td>
+                    <td>Debounce rapid updates to prevent message flooding</td>
+                  </tr>
+                  <tr>
+                    <td><code>ExcludeActions(...)</code></td>
+                    <td>Actions that should not be synchronized across tabs</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Security Note</div>
+                <p>
+                  Enable message signing when synchronizing sensitive state to prevent malicious
+                  scripts from injecting fake state updates via BroadcastChannel API.
+                </p>
+              </div>
+            </section>
+
+            <!-- Server Synchronization -->
+            <section class="section" id="server-sync">
+              <h2>Server Synchronization (SignalR)</h2>
+              <p>
+                Enable real-time collaboration features with server-backed state synchronization
+                using SignalR. Perfect for collaborative editing, multiplayer features, and
+                keeping distributed users in sync.
+              </p>
+
+              <div class="alert alert-info">
+                <div class="alert-title">Features</div>
+                <ul>
+                  <li>Real-time state synchronization across all connected clients</li>
+                  <li>Presence tracking (see who's online)</li>
+                  <li>Cursor position sharing for collaborative editing</li>
+                  <li>Automatic reconnection with state recovery</li>
+                  <li>Conflict resolution strategies</li>
+                </ul>
+              </div>
+
+              <h3>Basic Setup</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new DocumentState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Document")
+        .WithServerSync(sp, opts => opts
+            .HubUrl("/hubs/documents")
+            .DocumentId(documentId)));</code></pre>
+              </div>
+
+              <h3>Full-Featured Configuration</h3>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs - Collaboration Features</div>
+                <pre><code class="language-csharp">builder.Services.AddStore(
+    new DocumentState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Document")
+        .WithServerSync(sp, opts => opts
+            .HubUrl("/hubs/documents")
+            .DocumentId(documentId)
+            .EnablePresence()                                    // Who's online
+            .EnableCursorTracking()                              // Real-time cursors
+            .ConflictResolution(ConflictResolution.LastWriteWins)
+            .WithValidator(sp.GetService&lt;IStateValidator&lt;DocumentState&gt;&gt;())
+            .OnUserJoined(user => Console.WriteLine($"{user} joined"))
+            .OnUserLeft(user => Console.WriteLine($"{user} left"))
+            .OnCursorUpdated((userId, pos) => RenderCursor(userId, pos))));</code></pre>
+              </div>
+
+              <h3>Conflict Resolution Strategies</h3>
+              <div class="comparison-grid">
+                <div class="comparison-card">
+                  <h4>ClientWins</h4>
+                  <p>Local changes always take precedence over server state.</p>
+                </div>
+                <div class="comparison-card">
+                  <h4>ServerWins</h4>
+                  <p>Server state always takes precedence over local changes.</p>
+                </div>
+                <div class="comparison-card">
+                  <h4>LastWriteWins</h4>
+                  <p>Most recent change wins based on timestamp (default).</p>
+                </div>
+                <div class="comparison-card">
+                  <h4>Custom</h4>
+                  <p>Implement your own conflict resolution logic.</p>
+                </div>
+              </div>
+
+              <h3>Presence and Cursors</h3>
+              <div class="code-block">
+                <div class="code-block-title">Component.razor - Using Presence</div>
+                <pre><code class="language-csharp">@inject IServerSync&lt;DocumentState&gt; ServerSync
+
+// Update your presence info
+await ServerSync.UpdatePresenceAsync(new PresenceData
+{
+    DisplayName = "John Doe",
+    Color = "#ff6b6b",
+    Status = "Editing"
+});
+
+// Update cursor position (e.g., on mouse move)
+await ServerSync.UpdateCursorAsync(new CursorPosition
+{
+    X = mouseX,
+    Y = mouseY,
+    Selection = selectedRange
+});</code></pre>
+              </div>
+
+              <h3>Configuration Options</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Option</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>HubUrl(url)</code></td>
+                    <td>SignalR hub endpoint URL</td>
+                  </tr>
+                  <tr>
+                    <td><code>DocumentId(id)</code></td>
+                    <td>Unique identifier for the synchronized document/room</td>
+                  </tr>
+                  <tr>
+                    <td><code>EnablePresence()</code></td>
+                    <td>Enable user presence tracking</td>
+                  </tr>
+                  <tr>
+                    <td><code>EnableCursorTracking()</code></td>
+                    <td>Enable real-time cursor position sharing</td>
+                  </tr>
+                  <tr>
+                    <td><code>ConflictResolution(mode)</code></td>
+                    <td>Strategy for handling concurrent edits</td>
+                  </tr>
+                  <tr>
+                    <td><code>WithValidator(validator)</code></td>
+                    <td>Validate incoming state from server</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnUserJoined(callback)</code></td>
+                    <td>Callback when a user joins the document</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnUserLeft(callback)</code></td>
+                    <td>Callback when a user leaves the document</td>
+                  </tr>
+                  <tr>
+                    <td><code>OnCursorUpdated(callback)</code></td>
+                    <td>Callback when another user's cursor moves</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Server Requirements</div>
+                <p>
+                  Server sync requires a SignalR hub on your server. Implement the hub to handle
+                  state broadcasting, presence management, and conflict resolution. See the
+                  <a href="./examples.html">Examples</a> section for a complete hub implementation.
+                </p>
+              </div>
+            </section>
+
             <!-- Next Steps -->
             <section class="section">
               <h2>Next Steps</h2>
@@ -460,10 +718,10 @@ async Task Logout()
                   <p>Extend store behavior with custom middleware.</p>
                 </a>
 
-                <a href="./best-practices.html" class="next-step-card">
-                  <div class="next-step-icon">📖</div>
-                  <h3>Best Practices</h3>
-                  <p>Learn patterns and anti-patterns for state management.</p>
+                <a href="./middleware.html#security" class="next-step-card">
+                  <div class="next-step-icon">🔒</div>
+                  <h3>Security</h3>
+                  <p>Learn about state validation and sensitive data handling.</p>
                 </a>
               </div>
             </section>

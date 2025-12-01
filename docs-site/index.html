@@ -21,7 +21,7 @@
           <span class="logo-text">EasyAppDev.Blazor.Store</span>
         </a>
         <div class="header-actions">
-          <span class="version-badge">v1.0.8</span>
+          <span class="version-badge">v2.0.0</span>
           <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
             GitHub
           </a>
@@ -56,7 +56,7 @@
 
           <!-- Async Helpers -->
           <div class="nav-section">
-            <div class="nav-section-title">Async Helpers <span class="nav-badge">v1.0.8</span></div>
+            <div class="nav-section-title">Async Helpers</div>
             <ul class="nav-list">
               <li><a href="./async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
               <li><a href="./async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
@@ -67,13 +67,36 @@
             </ul>
           </div>
 
-          <!-- Advanced -->
+          <!-- Advanced Features -->
           <div class="nav-section">
-            <div class="nav-section-title">Advanced</div>
+            <div class="nav-section-title">Advanced Features</div>
             <ul class="nav-list">
-              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
-              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="./state-management.html#optimistic-updates" class="nav-link"><span class="nav-icon">🚀</span><span>Optimistic Updates</span></a></li>
+              <li><a href="./state-management.html#undo-redo" class="nav-link"><span class="nav-icon">↩️</span><span>Undo/Redo History</span></a></li>
+              <li><a href="./state-management.html#query-system" class="nav-link"><span class="nav-icon">🔍</span><span>Query System</span></a></li>
+              <li><a href="./state-management.html#immer-style" class="nav-link"><span class="nav-icon">✏️</span><span>Immer-Style Updates</span></a></li>
+              <li><a href="./state-management.html#redux-actions" class="nav-link"><span class="nav-icon">📦</span><span>Redux-Style Actions</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Sync & Collaboration -->
+          <div class="nav-section">
+            <div class="nav-section-title">Sync &amp; Collaboration</div>
+            <ul class="nav-list">
+              <li><a href="./persistence.html#tab-sync" class="nav-link"><span class="nav-icon">📑</span><span>Cross-Tab Sync</span></a></li>
+              <li><a href="./persistence.html#server-sync" class="nav-link"><span class="nav-icon">🔗</span><span>Server Sync (SignalR)</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Extensibility -->
+          <div class="nav-section">
+            <div class="nav-section-title">Extensibility</div>
+            <ul class="nav-list">
               <li><a href="./middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+              <li><a href="./middleware.html#plugins" class="nav-link"><span class="nav-icon">🔌</span><span>Plugin System</span></a></li>
+              <li><a href="./devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="./persistence.html" class="nav-link"><span class="nav-icon">💾</span><span>Persistence</span></a></li>
+              <li><a href="./middleware.html#security" class="nav-link"><span class="nav-icon">🔒</span><span>Security</span></a></li>
             </ul>
           </div>
 
@@ -98,7 +121,7 @@
             <section class="hero">
               <div class="hero-badge">
                 <span class="badge-icon">⚡</span>
-                <span>v1.0.8 Released - Async Helpers Now Available!</span>
+                <span>Full-Featured State Management - Queries, Sync, Plugins &amp; More!</span>
               </div>
 
               <h1 class="hero-title">
@@ -114,8 +137,8 @@
                 <a href="./getting-started.html" class="btn btn-primary">
                   ⚡ Get Started
                 </a>
-                <a href="./async-helpers/index.html" class="btn btn-secondary">
-                  💻 View Async Helpers
+                <a href="./state-management.html" class="btn btn-secondary">
+                  📚 Explore Features
                 </a>
               </div>
 
@@ -254,57 +277,89 @@ builder.Services.AddStoreWithUtilities(
 
             <!-- What's New -->
             <section class="section">
-              <h2>What's New in v1.0.8</h2>
+              <h2>Complete Feature Set</h2>
 
               <div class="alert alert-info">
-                <div class="alert-title">Async Helpers - Major Update</div>
-                <p>v1.0.8 introduces powerful async helpers that eliminate 74% of boilerplate code on average!</p>
+                <div class="alert-title">Full-Featured State Management</div>
+                <p>Everything you need for building modern Blazor applications - from simple counters to real-time collaborative apps.</p>
               </div>
 
               <div class="feature-list">
                 <div class="feature-item">
                   <div class="feature-item-title">
-                    <span class="feature-icon-small">⏱️</span>
-                    <strong>UpdateDebounced</strong> - 94% code reduction
-                  </div>
-                  <p>Reduces debounce code from 17 lines to 1 line. Perfect for search inputs.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">🔄</span>
-                    <strong>AsyncData&lt;T&gt;</strong> - 95% code reduction
-                  </div>
-                  <p>Simplifies async state from 20+ lines to 1 property. Manage loading, data, and errors effortlessly.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">⚡</span>
-                    <strong>ExecuteAsync</strong> - 58% code reduction
-                  </div>
-                  <p>Automatic error handling reduces try-catch from 12 lines to 5 lines.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
-                    <span class="feature-icon-small">🌊</span>
-                    <strong>UpdateThrottled</strong> - 95% code reduction
-                  </div>
-                  <p>One-line throttling for high-frequency events like scroll and mouse move.</p>
-                </div>
-
-                <div class="feature-item">
-                  <div class="feature-item-title">
                     <span class="feature-icon-small">🚀</span>
-                    <strong>LazyLoad</strong> - 85% code reduction
+                    <strong>Optimistic Updates</strong>
                   </div>
-                  <p>Automatic caching with expiration and request deduplication.</p>
+                  <p>Update UI immediately, rollback on error. One-liner with <code>UpdateOptimistic()</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">↩️</span>
+                    <strong>Undo/Redo History</strong>
+                  </div>
+                  <p>Full history stack with memory management. Perfect for editor-like experiences.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔍</span>
+                    <strong>Query System</strong>
+                  </div>
+                  <p>TanStack Query-inspired data fetching with caching, background refresh, and retries.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📑</span>
+                    <strong>Cross-Tab Sync</strong>
+                  </div>
+                  <p>Sync state across browser tabs in real-time with HMAC message signing.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔗</span>
+                    <strong>Server Sync (SignalR)</strong>
+                  </div>
+                  <p>Real-time collaboration with presence tracking and live cursors.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">✏️</span>
+                    <strong>Immer-Style Updates</strong>
+                  </div>
+                  <p>Clean syntax for complex nested updates: <code>draft.Set(s =&gt; s.User.Name, "John")</code>.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">📦</span>
+                    <strong>Redux-Style Actions</strong>
+                  </div>
+                  <p>Type-safe action dispatching with pattern matching for teams familiar with Redux.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔌</span>
+                    <strong>Plugin System</strong>
+                  </div>
+                  <p>Extensible hooks for analytics, validation, and cross-cutting concerns.</p>
+                </div>
+
+                <div class="feature-item">
+                  <div class="feature-item-title">
+                    <span class="feature-icon-small">🔒</span>
+                    <strong>Security</strong>
+                  </div>
+                  <p>Sensitive data filtering, state validation, and message signing built-in.</p>
                 </div>
               </div>
 
-              <a href="./async-helpers/index.html" class="btn btn-primary">
-                Explore Async Helpers →
+              <a href="./state-management.html" class="btn btn-primary">
+                Explore All Features →
               </a>
             </section>
 
