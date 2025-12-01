@@ -1,0 +1,289 @@
+@page "/actions-demo"
+@using EasyAppDev.Blazor.Store.Actions
+@inherits StoreComponent<ActionsDemoState>
+
+<PageTitle>Redux-Style Actions</PageTitle>
+
+<div class="container mt-4">
+    <h1>Redux-Style Actions</h1>
+    <p class="lead">
+        Type-safe action dispatching with pattern matching reducers.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Counter with Actions</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="display-1">@State.Count</h1>
+                    <p class="text-muted">
+                        Last Action: @State.LastAction
+                        @if (State.LastActionTime.HasValue)
+                        {
+                            <span> at @State.LastActionTime.Value.ToString("HH:mm:ss")</span>
+                        }
+                    </p>
+
+                    <div class="btn-group mb-3">
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="DispatchDecrement">-1</button>
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="() => DispatchDecrementBy(5)">-5</button>
+                        <button class="btn btn-lg btn-warning" @onclick="DispatchReset">Reset</button>
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="() => DispatchIncrementBy(5)">+5</button>
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="DispatchIncrement">+1</button>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="input-group" style="max-width: 300px; margin: 0 auto;">
+                            <input type="number" class="form-control" @bind="customValue" placeholder="Custom value" />
+                            <button class="btn btn-primary" @onclick="DispatchSetCount">Set Count</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Action Dispatcher Demo</h5>
+                </div>
+                <div class="card-body">
+                    <p>Using a pre-configured action dispatcher with registered reducers:</p>
+
+                    <div class="btn-group">
+                        <button class="btn btn-outline-primary" @onclick="UseDispatcherIncrement">
+                            Dispatch Increment
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="UseDispatcherDecrement">
+                            Dispatch Decrement
+                        </button>
+                        <button class="btn btn-outline-info" @onclick="() => UseDispatcherIncrementBy(10)">
+                            Dispatch IncrementBy(10)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Pattern Matching Demo</h5>
+                </div>
+                <div class="card-body">
+                    <p>Using pattern matching with switch expressions:</p>
+
+                    <div class="btn-group">
+                        <button class="btn btn-success" @onclick="() => DispatchWithPatternMatching(new Increment())">
+                            Increment
+                        </button>
+                        <button class="btn btn-danger" @onclick="() => DispatchWithPatternMatching(new Decrement())">
+                            Decrement
+                        </button>
+                        <button class="btn btn-warning" @onclick="() => DispatchWithPatternMatching(new Reset())">
+                            Reset
+                        </button>
+                        <button class="btn btn-info" @onclick="() => DispatchWithPatternMatching(new IncrementBy(25))">
+                            +25
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>1. Define Actions as Records:</h6>
+                    <pre class="bg-light p-2"><code>public record Increment : IAction;
+public record IncrementBy(int Amount) : IAction;
+public record Reset : IAction;</code></pre>
+
+                    <h6 class="mt-3">2. Inline Dispatch:</h6>
+                    <pre class="bg-light p-2"><code>await store.DispatchAsync(
+  new IncrementBy(5),
+  (state, action) => state with {
+    Count = state.Count + action.Amount
+  }
+);</code></pre>
+
+                    <h6 class="mt-3">3. Pattern Matching:</h6>
+                    <pre class="bg-light p-2"><code>await store.DispatchAsync(action,
+  (state, a) => a switch
+  {
+    Increment => state with {
+      Count = state.Count + 1
+    },
+    IncrementBy i => state with {
+      Count = state.Count + i.Amount
+    },
+    Reset => state with { Count = 0 },
+    _ => state
+  });</code></pre>
+
+                    <h6 class="mt-3">4. Pre-configured Dispatcher:</h6>
+                    <pre class="bg-light p-2"><code>var dispatcher = store.CreateDispatcher(d => d
+  .Register&lt;Increment&gt;((s, a) =>
+    s with { Count = s.Count + 1 })
+  .Register&lt;Decrement&gt;((s, a) =>
+    s with { Count = s.Count - 1 })
+);
+
+await dispatcher.DispatchAsync(new Increment());</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int customValue;
+    private ActionDispatcher<ActionsDemoState>? dispatcher;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Create pre-configured dispatcher
+        dispatcher = Store.CreateDispatcher(d => d
+            .Register<Increment>((s, _) => s with
+            {
+                Count = s.Count + 1,
+                LastAction = "Increment (Dispatcher)",
+                LastActionTime = DateTime.Now
+            })
+            .Register<Decrement>((s, _) => s with
+            {
+                Count = s.Count - 1,
+                LastAction = "Decrement (Dispatcher)",
+                LastActionTime = DateTime.Now
+            })
+            .Register<IncrementBy>((s, a) => s with
+            {
+                Count = s.Count + a.Amount,
+                LastAction = $"IncrementBy({a.Amount}) (Dispatcher)",
+                LastActionTime = DateTime.Now
+            })
+        );
+    }
+
+    private async Task DispatchIncrement()
+    {
+        await Store.DispatchAsync(new Increment(), (state, _) => state with
+        {
+            Count = state.Count + 1,
+            LastAction = "Increment",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task DispatchDecrement()
+    {
+        await Store.DispatchAsync(new Decrement(), (state, _) => state with
+        {
+            Count = state.Count - 1,
+            LastAction = "Decrement",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task DispatchIncrementBy(int amount)
+    {
+        await Store.DispatchAsync(new IncrementBy(amount), (state, action) => state with
+        {
+            Count = state.Count + action.Amount,
+            LastAction = $"IncrementBy({action.Amount})",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task DispatchDecrementBy(int amount)
+    {
+        await Store.DispatchAsync(new DecrementBy(amount), (state, action) => state with
+        {
+            Count = state.Count - action.Amount,
+            LastAction = $"DecrementBy({action.Amount})",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task DispatchReset()
+    {
+        await Store.DispatchAsync(new Reset(), (state, _) => state with
+        {
+            Count = 0,
+            LastAction = "Reset",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task DispatchSetCount()
+    {
+        await Store.DispatchAsync(new SetCount(customValue), (state, action) => state with
+        {
+            Count = action.Value,
+            LastAction = $"SetCount({action.Value})",
+            LastActionTime = DateTime.Now
+        });
+    }
+
+    private async Task UseDispatcherIncrement()
+    {
+        await dispatcher!.DispatchAsync(new Increment());
+    }
+
+    private async Task UseDispatcherDecrement()
+    {
+        await dispatcher!.DispatchAsync(new Decrement());
+    }
+
+    private async Task UseDispatcherIncrementBy(int amount)
+    {
+        await dispatcher!.DispatchAsync(new IncrementBy(amount));
+    }
+
+    private async Task DispatchWithPatternMatching(IAction action)
+    {
+        await Store.DispatchAsync<ActionsDemoState, IAction>(action, (state, a) => a switch
+        {
+            Increment => state with
+            {
+                Count = state.Count + 1,
+                LastAction = "Increment (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            Decrement => state with
+            {
+                Count = state.Count - 1,
+                LastAction = "Decrement (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            IncrementBy i => state with
+            {
+                Count = state.Count + i.Amount,
+                LastAction = $"IncrementBy({i.Amount}) (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            DecrementBy d => state with
+            {
+                Count = state.Count - d.Amount,
+                LastAction = $"DecrementBy({d.Amount}) (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            Reset => state with
+            {
+                Count = 0,
+                LastAction = "Reset (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            SetCount s => state with
+            {
+                Count = s.Value,
+                LastAction = $"SetCount({s.Value}) (Pattern)",
+                LastActionTime = DateTime.Now
+            },
+            _ => state
+        });
+    }
+}

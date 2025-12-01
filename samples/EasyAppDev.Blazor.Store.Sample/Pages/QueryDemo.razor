@@ -1,0 +1,243 @@
+@page "/query-demo"
+@using EasyAppDev.Blazor.Store.Query
+@inherits QueryComponent
+
+<PageTitle>Query System</PageTitle>
+
+<div class="container mt-4">
+    <h1>Query System</h1>
+    <p class="lead">
+        TanStack Query-inspired data fetching with caching, background refresh, and loading states.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Users Query</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 d-flex gap-2">
+                        <button class="btn btn-outline-primary btn-sm" @onclick="() => usersQuery.RefetchAsync()">
+                            Refetch
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => usersQuery.Invalidate()">
+                            Invalidate Cache
+                        </button>
+                    </div>
+
+                    @if (usersQuery.IsLoading)
+                    {
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            <span>Loading users...</span>
+                        </div>
+                    }
+                    else if (usersQuery.IsError)
+                    {
+                        <div class="alert alert-danger">
+                            Error: @usersQuery.Error?.Message
+                        </div>
+                    }
+                    else if (usersQuery.IsSuccess && usersQuery.Data != null)
+                    {
+                        <div class="list-group">
+                            @foreach (var user in usersQuery.Data)
+                            {
+                                <button class="list-group-item list-group-item-action @(selectedUserId == user.Id ? "active" : "")"
+                                        @onclick="() => SelectUser(user.Id)">
+                                    <div class="d-flex align-items-center">
+                                        <img src="@user.Avatar" alt="@user.Name" class="rounded-circle me-3" width="40" height="40" />
+                                        <div>
+                                            <strong>@user.Name</strong>
+                                            <br />
+                                            <small class="@(selectedUserId == user.Id ? "" : "text-muted")">@user.Email</small>
+                                        </div>
+                                    </div>
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    <div class="mt-2 text-muted small">
+                        Status: @usersQuery.Status |
+                        Fetching: @usersQuery.IsFetching |
+                        Stale: @usersQuery.IsStale |
+                        Updated: @(usersQuery.DataUpdatedAt?.ToString("HH:mm:ss") ?? "Never")
+                    </div>
+                </div>
+            </div>
+
+            @if (selectedUserId > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Posts by Selected User</h5>
+                        @if (postsQuery?.IsFetching == true)
+                        {
+                            <div class="spinner-border spinner-border-sm"></div>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (postsQuery?.IsLoading == true)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border"></div>
+                            </div>
+                        }
+                        else if (postsQuery?.IsError == true)
+                        {
+                            <div class="alert alert-danger">@postsQuery.Error?.Message</div>
+                        }
+                        else if (postsQuery?.Data != null)
+                        {
+                            @if (postsQuery.Data.Any())
+                            {
+                                @foreach (var post in postsQuery.Data)
+                                {
+                                    <div class="card mb-2">
+                                        <div class="card-body">
+                                            <h6 class="card-title">@post.Title</h6>
+                                            <p class="card-text small text-muted">@post.Body</p>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="text-muted">No posts found for this user.</p>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Create New Post (Mutation)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" placeholder="Post title..."
+                                   @bind="newPostTitle" />
+                        </div>
+                        <div class="mb-3">
+                            <textarea class="form-control" rows="3" placeholder="Post body..."
+                                      @bind="newPostBody"></textarea>
+                        </div>
+                        <button class="btn btn-primary"
+                                @onclick="CreatePost"
+                                disabled="@(createPostMutation.IsLoading || string.IsNullOrWhiteSpace(newPostTitle))">
+                            @if (createPostMutation.IsLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                <span>Creating...</span>
+                            }
+                            else
+                            {
+                                <span>Create Post</span>
+                            }
+                        </button>
+
+                        @if (createPostMutation.IsSuccess)
+                        {
+                            <div class="alert alert-success mt-3">
+                                Post created successfully! ID: @createPostMutation.Data?.Id
+                            </div>
+                        }
+                        @if (createPostMutation.IsError)
+                        {
+                            <div class="alert alert-danger mt-3">
+                                Error: @createPostMutation.Error?.Message
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>Query Features:</h6>
+                    <ul>
+                        <li><strong>Caching</strong>: Data cached until stale</li>
+                        <li><strong>Background Refresh</strong>: Updates silently</li>
+                        <li><strong>Loading States</strong>: IsLoading, IsFetching</li>
+                        <li><strong>Error Handling</strong>: Built-in retry</li>
+                        <li><strong>Cache Invalidation</strong>: Manual or automatic</li>
+                    </ul>
+
+                    <h6 class="mt-3">Setup:</h6>
+                    <pre class="bg-light p-2"><code>builder.Services
+  .AddQueryClient();</code></pre>
+
+                    <h6 class="mt-3">Query Usage:</h6>
+                    <pre class="bg-light p-2"><code>var query = UseQuery(
+  "users",
+  ct => api.GetUsersAsync(ct)
+);
+
+@@if (query.IsLoading)
+@@if (query.IsError)
+@@if (query.IsSuccess)</code></pre>
+
+                    <h6 class="mt-3">Mutation Usage:</h6>
+                    <pre class="bg-light p-2"><code>var mutation = UseMutation(
+  (req, ct) => api.CreateAsync(req, ct)
+);
+
+await mutation.MutateAsync(data);
+
+// Invalidate cache after mutation
+QueryClient.InvalidateQueries("posts-*");</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Query<List<QueryUser>>? usersQuery;
+    private Query<List<QueryPost>>? postsQuery;
+    private Mutation<QueryPost, CreatePostRequest>? createPostMutation;
+
+    private int selectedUserId;
+    private string newPostTitle = "";
+    private string newPostBody = "";
+
+    protected override void OnInitialized()
+    {
+        usersQuery = UseQuery("users", async ct => await FakeApi.GetUsersAsync(ct));
+
+        createPostMutation = UseMutation<QueryPost, CreatePostRequest>(
+            async req => await FakeApi.CreatePostAsync(req));
+    }
+
+    private void SelectUser(int userId)
+    {
+        selectedUserId = userId;
+
+        // Create a new query for posts (will use cache if available)
+        postsQuery = UseQuery($"posts-{userId}", async ct => await FakeApi.GetPostsByUserAsync(userId, ct));
+    }
+
+    private async Task CreatePost()
+    {
+        if (string.IsNullOrWhiteSpace(newPostTitle)) return;
+
+        var request = new CreatePostRequest(selectedUserId, newPostTitle, newPostBody);
+        await createPostMutation!.MutateAsync(request);
+
+        if (createPostMutation.IsSuccess)
+        {
+            newPostTitle = "";
+            newPostBody = "";
+            // Invalidate posts cache to refetch
+            QueryClient.InvalidateQueries($"posts-{selectedUserId}");
+            await postsQuery!.RefetchAsync();
+        }
+    }
+}

@@ -4,9 +4,9 @@
 
 <div class="container mt-4">
     <div class="text-center mb-5">
-        <h1 class="display-4">🚀 EasyAppDev.Blazor.Store</h1>
-        <p class="lead">A Zustand-inspired state management library for Blazor</p>
-        <p class="text-muted">Simple • Type-Safe • Immutable • Blazor-Friendly</p>
+        <h1 class="display-4">EasyAppDev.Blazor.Store</h1>
+        <p class="lead">Type-safe state management for Blazor using C# records</p>
+        <p class="text-muted">Inspired by Zustand | Built for C# developers</p>
     </div>
 
     <div class="row mb-4">
@@ -15,8 +15,7 @@
                 <h4>Welcome to the Interactive Demo!</h4>
                 <p class="mb-0">
                     This sample application demonstrates all features of EasyAppDev.Blazor.Store.
-                    Each page shows a different aspect of the library with live examples,
-                    detailed explanations, and code samples.
+                    Each page shows a different aspect of the library with live examples and code samples.
                 </p>
             </div>
         </div>
@@ -26,14 +25,14 @@
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">⚡ Why Choose This Library?</h5>
-                    <ul class="card-text">
-                        <li><strong>Simple API:</strong> Minimal boilerplate, intuitive usage</li>
-                        <li><strong>Type-Safe:</strong> Full C# type safety with IntelliSense</li>
-                        <li><strong>Immutable:</strong> Records with <code>with</code> expressions</li>
-                        <li><strong>Blazor-Native:</strong> Automatic subscription management</li>
-                        <li><strong>DevTools:</strong> Redux DevTools integration</li>
-                        <li><strong>Persistence:</strong> LocalStorage/SessionStorage built-in</li>
+                    <h5 class="card-title">Why This Library?</h5>
+                    <ul class="card-text small">
+                        <li><strong>Zero boilerplate</strong> - No actions, reducers, or dispatchers</li>
+                        <li><strong>Type-safe</strong> - Full C# type safety with IntelliSense</li>
+                        <li><strong>Immutable</strong> - Records with <code>with</code> expressions</li>
+                        <li><strong>Automatic updates</strong> - Components re-render on state changes</li>
+                        <li><strong>Redux DevTools</strong> - Time-travel debugging</li>
+                        <li><strong>Persistence</strong> - LocalStorage built-in</li>
                     </ul>
                 </div>
             </div>
@@ -42,8 +41,8 @@
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">📦 Core Concepts</h5>
-                    <ul class="card-text">
+                    <h5 class="card-title">Core Concepts</h5>
+                    <ul class="card-text small">
                         <li><strong>State:</strong> Immutable C# records</li>
                         <li><strong>Store:</strong> Holds and manages state</li>
                         <li><strong>Components:</strong> Subscribe via base classes</li>
@@ -58,8 +57,8 @@
         <div class="col-md-4">
             <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">🎯 Quick Start</h5>
-                    <pre class="card-text"><code>// 1. Define state
+                    <h5 class="card-title">Quick Start</h5>
+                    <pre class="card-text small"><code>// 1. Define state
 public record CounterState(int Count)
 {
     public CounterState Increment()
@@ -78,114 +77,194 @@ builder.Services.AddStore(
         </div>
     </div>
 
-    <h2 class="mb-4">📚 Interactive Examples</h2>
+    <h2 class="mb-4">Core Features</h2>
 
-    <div class="row g-4">
+    <div class="row g-4 mb-5">
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">🔢 Counter (Basic + DevTools)</h5>
-                    <p class="card-text">
-                        The classic counter example demonstrating basic state management
-                        and Redux DevTools integration.
+                    <h5 class="card-title">Counter (Basic + DevTools)</h5>
+                    <p class="card-text small">
+                        The classic counter example demonstrating basic state management and Redux DevTools integration.
                     </p>
-                    <ul class="small">
-                        <li>Pure state transformation methods</li>
-                        <li>Component subscription with StoreComponent</li>
-                        <li>Redux DevTools time-travel debugging</li>
-                        <li>Action tracking and state history</li>
-                    </ul>
-                    <a href="/counter" class="btn btn-primary">View Demo →</a>
+                    <a href="/counter" class="btn btn-outline-primary btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">📝 Todo List (Immutable Collections)</h5>
-                    <p class="card-text">
-                        Comprehensive example showing how to work with immutable collections.
+                    <h5 class="card-title">Todo List (Immutable Collections)</h5>
+                    <p class="card-text small">
+                        Working with ImmutableList operations: Add, Remove, Filter, and complex state transformations.
                     </p>
-                    <ul class="small">
-                        <li>ImmutableList operations (Add, Remove, SetItem)</li>
-                        <li>Filtering and computed properties</li>
-                        <li>Complex state transformations</li>
-                        <li>Best practices for collections</li>
-                    </ul>
-                    <a href="/todos" class="btn btn-primary">View Demo →</a>
+                    <a href="/todos" class="btn btn-outline-primary btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">👤 User Profile (Async Actions)</h5>
-                    <p class="card-text">
-                        Learn how to handle async operations and loading states.
+                    <h5 class="card-title">Shopping Cart (Persistence)</h5>
+                    <p class="card-text small">
+                        Automatic state persistence with LocalStorage. Cart survives page refreshes and browser restarts.
                     </p>
-                    <ul class="small">
-                        <li>Async state updates with UpdateAsync</li>
-                        <li>Loading state management</li>
-                        <li>Error handling patterns</li>
-                        <li>Simulated API calls</li>
-                    </ul>
-                    <a href="/profile" class="btn btn-primary">View Demo →</a>
+                    <a href="/cart" class="btn btn-outline-primary btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-body">
-                    <h5 class="card-title">🛒 Shopping Cart (Persistence)</h5>
-                    <p class="card-text">
-                        Automatic state persistence with browser localStorage.
+                    <h5 class="card-title">Theme Settings (Selectors)</h5>
+                    <p class="card-text small">
+                        Performance optimization with SelectorStoreComponent. Only re-render when selected state changes.
                     </p>
-                    <ul class="small">
-                        <li>LocalStorage persistence middleware</li>
-                        <li>Automatic save/restore</li>
-                        <li>Complex nested data structures</li>
-                        <li>Survives page refreshes</li>
-                    </ul>
-                    <a href="/cart" class="btn btn-primary">View Demo →</a>
+                    <a href="/theme" class="btn btn-outline-primary btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mb-4">Async Helpers</h2>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">AsyncData&lt;T&gt;</h6>
+                    <p class="card-text small">Loading states made simple</p>
+                    <a href="/async-data-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">ExecuteAsync</h6>
+                    <p class="card-text small">Automatic error handling</p>
+                    <a href="/execute-async-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">Debounce/Throttle</h6>
+                    <p class="card-text small">Rate-limited updates</p>
+                    <a href="/debounce-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title">LazyLoad</h6>
+                    <p class="card-text small">Cached data loading</p>
+                    <a href="/lazy-load-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mb-4">Advanced Features</h2>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Optimistic Updates</h5>
+                    <p class="card-text small">
+                        Update UI immediately, rollback automatically on server error. Perfect for responsive UIs.
+                    </p>
+                    <a href="/optimistic-demo" class="btn btn-primary btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Undo/Redo History</h5>
+                    <p class="card-text small">
+                        Full history stack for editor-like experiences. Memory-limited with action grouping.
+                    </p>
+                    <a href="/history-demo" class="btn btn-primary btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Query System</h5>
+                    <p class="card-text small">
+                        TanStack Query-inspired data fetching with caching, background refresh, and mutations.
+                    </p>
+                    <a href="/query-demo" class="btn btn-primary btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <h5 class="card-title">Cross-Tab Sync</h5>
+                    <p class="card-text small">
+                        Real-time state synchronization across browser tabs using BroadcastChannel API.
+                    </p>
+                    <a href="/tab-sync-demo" class="btn btn-info btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <h5 class="card-title">Immer-Style Updates</h5>
+                    <p class="card-text small">
+                        Clean syntax for complex nested updates using draft-based mutations.
+                    </p>
+                    <a href="/immer-demo" class="btn btn-info btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <h5 class="card-title">Redux-Style Actions</h5>
+                    <p class="card-text small">
+                        Type-safe action dispatching with pattern matching reducers.
+                    </p>
+                    <a href="/actions-demo" class="btn btn-info btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100 border-success">
                 <div class="card-body">
-                    <h5 class="card-title">🎨 Theme Settings (Selectors)</h5>
-                    <p class="card-text">
-                        Performance optimization with SelectorStoreComponent.
+                    <h5 class="card-title">Plugin System</h5>
+                    <p class="card-text small">
+                        Extensible hooks for cross-cutting concerns: logging, analytics, validation, and more.
                     </p>
-                    <ul class="small">
-                        <li>Granular subscriptions with selectors</li>
-                        <li>Optimized re-rendering</li>
-                        <li>Multiple components, different slices</li>
-                        <li>Render count comparison</li>
-                    </ul>
-                    <a href="/theme" class="btn btn-primary">View Demo →</a>
+                    <a href="/plugin-demo" class="btn btn-success btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100 border-danger">
                 <div class="card-body">
-                    <h5 class="card-title">🔍 Diagnostics (Debug Tools)</h5>
-                    <p class="card-text">
-                        Built-in diagnostics panel for debugging state changes.
+                    <h5 class="card-title">Security Features</h5>
+                    <p class="card-text small">
+                        Sensitive data filtering, state validation, and message signing for secure state management.
                     </p>
-                    <ul class="small">
-                        <li>Real-time state change tracking</li>
-                        <li>Component render monitoring</li>
-                        <li>Subscription tracking</li>
-                        <li>Performance insights</li>
-                    </ul>
-                    <a href="/diagnostics" class="btn btn-primary">View Demo →</a>
+                    <a href="/security-demo" class="btn btn-danger btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
@@ -195,51 +274,21 @@ builder.Services.AddStore(
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h5>📖 Learning Path</h5>
+                    <h5>Learning Path</h5>
                 </div>
                 <div class="card-body">
-                    <h6>Recommended Order for Learning:</h6>
+                    <h6>Recommended Order:</h6>
                     <ol>
-                        <li>
-                            <strong>Counter</strong> - Start here to understand the basics:
-                            state, updates, and DevTools
-                        </li>
-                        <li>
-                            <strong>Todo List</strong> - Learn about immutable collections
-                            and complex state operations
-                        </li>
-                        <li>
-                            <strong>User Profile</strong> - Master async operations
-                            and loading states
-                        </li>
-                        <li>
-                            <strong>Shopping Cart</strong> - Explore persistence
-                            and see how state survives refreshes
-                        </li>
-                        <li>
-                            <strong>Theme Settings</strong> - Optimize performance
-                            with selectors
-                        </li>
-                        <li>
-                            <strong>Diagnostics</strong> - Debug and monitor your stores
-                        </li>
+                        <li><strong>Counter</strong> - Basics: state, updates, DevTools</li>
+                        <li><strong>Todo List</strong> - Immutable collections</li>
+                        <li><strong>Async Helpers</strong> - AsyncData, ExecuteAsync, Debounce, LazyLoad</li>
+                        <li><strong>Shopping Cart</strong> - Persistence with LocalStorage</li>
+                        <li><strong>Theme Settings</strong> - Selectors for performance</li>
+                        <li><strong>Optimistic Updates</strong> - Instant UI with rollback</li>
+                        <li><strong>History</strong> - Undo/redo functionality</li>
+                        <li><strong>Query System</strong> - Data fetching with caching</li>
+                        <li><strong>Advanced</strong> - Tab Sync, Immer, Actions, Plugins, Security</li>
                     </ol>
-
-                    <h6 class="mt-4">Key Documentation:</h6>
-                    <ul>
-                        <li>
-                            <strong>CLAUDE.md</strong> - Project overview and guidelines
-                        </li>
-                        <li>
-                            <strong>docs/ARCHITECTURE.md</strong> - Complete architecture overview
-                        </li>
-                        <li>
-                            <strong>docs/CODING_STANDARDS.md</strong> - Coding standards and anti-patterns
-                        </li>
-                        <li>
-                            <strong>docs/TESTING_STRATEGY.md</strong> - Testing philosophy
-                        </li>
-                    </ul>
                 </div>
             </div>
         </div>
@@ -252,10 +301,9 @@ builder.Services.AddStore(
                     <h5>Ready to build something awesome?</h5>
                     <p class="mb-3">
                         Start with the Counter example and work your way through each demo.
-                        Every page includes live code examples and detailed explanations!
                     </p>
                     <a href="/counter" class="btn btn-lg btn-primary">
-                        Start Learning →
+                        Start Learning
                     </a>
                 </div>
             </div>

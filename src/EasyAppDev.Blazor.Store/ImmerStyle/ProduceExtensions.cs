@@ -675,21 +675,22 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
 
     private static TObj SetProperty<TObj, TValue>(TObj obj, PropertyInfo prop, TValue value)
     {
-        var type = typeof(TObj);
+        // Use runtime type instead of compile-time type to handle nested record types correctly
+        var type = obj!.GetType();
 
         // Check if it's a record type with a with expression (has <Clone>$ method)
         var cloneMethod = type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.Public);
         if (cloneMethod != null)
         {
             // It's a record - use clone and set
-            var clone = (TObj)cloneMethod.Invoke(obj, null)!;
+            var clone = cloneMethod.Invoke(obj, null)!;
 
             // Find the init accessor
             var setter = prop.GetSetMethod();
             if (setter != null)
             {
                 setter.Invoke(clone, new object?[] { value });
-                return clone;
+                return (TObj)clone;
             }
 
             // Try to find the backing field for init-only property
@@ -698,7 +699,7 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
             if (backingField != null)
             {
                 backingField.SetValue(clone, value);
-                return clone;
+                return (TObj)clone;
             }
         }
 
@@ -720,7 +721,8 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
     {
         if (obj == null) throw new ArgumentNullException(nameof(obj));
 
-        var type = typeof(TObj);
+        // Use runtime type instead of compile-time type to handle nested record types correctly
+        var type = obj.GetType();
 
         // Try record clone method
         var cloneMethod = type.GetMethod("<Clone>$", BindingFlags.Instance | BindingFlags.Public);

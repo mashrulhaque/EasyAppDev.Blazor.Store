@@ -1,0 +1,194 @@
+@page "/plugin-demo"
+@using EasyAppDev.Blazor.Store.Sample.Plugins
+@inherits StoreComponent<PluginDemoState>
+@inject AnalyticsDemoPlugin AnalyticsPlugin
+
+<PageTitle>Plugin System</PageTitle>
+
+<div class="container mt-4">
+    <h1>Plugin System</h1>
+    <p class="lead">
+        Extensible hooks for cross-cutting concerns like logging, analytics, and validation.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Counter with Plugins</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="display-1 @(IsValid() ? "" : "text-danger")">@State.Counter</h1>
+
+                    @if (!State.IsValid)
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Validation Warning:</strong> @State.ValidationError
+                        </div>
+                    }
+
+                    <div class="btn-group">
+                        <button class="btn btn-lg btn-outline-danger" @onclick="() => Decrement(10)">-10</button>
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="() => Decrement(1)">-1</button>
+                        <button class="btn btn-lg btn-warning" @onclick="Reset">Reset</button>
+                        <button class="btn btn-lg btn-outline-secondary" @onclick="() => Increment(1)">+1</button>
+                        <button class="btn btn-lg btn-outline-success" @onclick="() => Increment(10)">+10</button>
+                    </div>
+
+                    <p class="mt-3 text-muted small">
+                        Valid range: -100 to 100 (enforced by ValidationPlugin)
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Action Log (from LoggingPlugin)</h5>
+                </div>
+                <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                    @if (State.ActionLog.Any())
+                    {
+                        <ul class="list-unstyled mb-0 small font-monospace">
+                            @foreach (var entry in State.ActionLog.Reverse())
+                            {
+                                <li class="border-bottom py-1">@entry</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No actions logged yet.</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Analytics Events (from AnalyticsPlugin)</h5>
+                </div>
+                <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                    @if (AnalyticsPlugin.Events.Any())
+                    {
+                        <ul class="list-unstyled mb-0 small font-monospace">
+                            @foreach (var ev in AnalyticsPlugin.Events.Reverse())
+                            {
+                                <li class="border-bottom py-1">@ev</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No analytics events yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Active Plugins</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            LoggingPlugin
+                            <span class="badge bg-success">v1.0.0</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ValidationPlugin
+                            <span class="badge bg-success">v1.0.0</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            AnalyticsPlugin
+                            <span class="badge bg-success">v1.0.0</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>1. Create a Plugin:</h6>
+                    <pre class="bg-light p-2"><code>public class MyPlugin
+  : StorePluginBase&lt;AppState&gt;
+{
+  public override string Name => "MyPlugin";
+
+  public override Task OnAfterUpdateAsync(
+    AppState prev,
+    AppState next,
+    string action)
+  {
+    // Track, log, validate, etc.
+    return Task.CompletedTask;
+  }
+}</code></pre>
+
+                    <h6 class="mt-3">2. Register Plugin:</h6>
+                    <pre class="bg-light p-2"><code>builder.Services.AddStore(
+  new AppState(),
+  (store, sp) => store
+    .WithPlugin&lt;AppState, MyPlugin&gt;(sp)
+);</code></pre>
+
+                    <h6 class="mt-3">Plugin Lifecycle Hooks:</h6>
+                    <ul>
+                        <li><code>OnStoreCreatedAsync</code></li>
+                        <li><code>OnBeforeUpdateAsync</code></li>
+                        <li><code>OnAfterUpdateAsync</code></li>
+                        <li><code>OnStoreDisposingAsync</code></li>
+                        <li><code>GetMiddleware()</code></li>
+                        <li><code>Configure(builder, services)</code></li>
+                    </ul>
+
+                    <h6 class="mt-3">Auto-Discovery:</h6>
+                    <pre class="bg-light p-2"><code>// Register all plugins from assembly
+store.WithPlugins(
+  typeof(Program).Assembly, sp
+);</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool IsValid() => State.Counter >= -100 && State.Counter <= 100;
+
+    private async Task Increment(int amount)
+    {
+        var logEntry = $"[{DateTime.Now:HH:mm:ss}] INCREMENT({amount})";
+
+        await Update(s => s
+            .Increment()
+            .LogAction(logEntry)
+            .SetValidation(s.Counter + amount <= 100, s.Counter + amount > 100 ? "Counter would exceed 100" : null),
+            $"INCREMENT_{amount}");
+    }
+
+    private async Task Decrement(int amount)
+    {
+        var logEntry = $"[{DateTime.Now:HH:mm:ss}] DECREMENT({amount})";
+
+        await Update(s => s
+            .Decrement()
+            .LogAction(logEntry)
+            .SetValidation(s.Counter - amount >= -100, s.Counter - amount < -100 ? "Counter would go below -100" : null),
+            $"DECREMENT_{amount}");
+    }
+
+    private async Task Reset()
+    {
+        var logEntry = $"[{DateTime.Now:HH:mm:ss}] RESET";
+
+        await Update(s => s
+            .SetCounter(0)
+            .LogAction(logEntry)
+            .SetValidation(true),
+            "RESET");
+    }
+}

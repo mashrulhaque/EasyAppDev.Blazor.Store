@@ -1,0 +1,269 @@
+@page "/security-demo"
+@using System.Text.Json
+@using EasyAppDev.Blazor.Store.Security
+@inherits StoreComponent<SecurityDemoState>
+
+<PageTitle>Security Features</PageTitle>
+
+<div class="container mt-4">
+    <h1>Security Features</h1>
+    <p class="lead">
+        Sensitive data filtering, validation, and message signing for secure state management.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">User Credentials</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" value="@State.Username"
+                                   @onchange="OnUsernameChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Password <span class="badge bg-danger">Sensitive</span></label>
+                            <input type="password" class="form-control" value="@State.Password"
+                                   @onchange="OnPasswordChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" value="@State.Email"
+                                   @onchange="OnEmailChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">API Token <span class="badge bg-danger">Sensitive</span></label>
+                            <input type="password" class="form-control" value="@State.ApiToken"
+                                   @onchange="OnTokenChange" />
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <button class="btn @(State.IsLoggedIn ? "btn-danger" : "btn-success")"
+                                @onclick="ToggleLogin">
+                            @(State.IsLoggedIn ? "Logout" : "Login")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Credit Card Info</h5>
+                </div>
+                <div class="card-body">
+                    @if (State.Card == null)
+                    {
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Card Number</label>
+                                <input type="text" class="form-control" @bind="cardNumber"
+                                       placeholder="4111 1111 1111 1111" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Expiry</label>
+                                <input type="text" class="form-control" @bind="cardExpiry"
+                                       placeholder="12/25" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">CVV <span class="badge bg-danger">Sensitive</span></label>
+                                <input type="password" class="form-control" @bind="cardCvv"
+                                       placeholder="123" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Holder Name</label>
+                                <input type="text" class="form-control" @bind="cardHolder"
+                                       placeholder="John Doe" />
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <button class="btn btn-primary" @onclick="AddCard">Add Card</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-success">
+                            <strong>Card Added:</strong> **** **** **** @State.Card.CardNumber[^4..]
+                            <br />
+                            <small>Holder: @State.Card.HolderName | Expires: @State.Card.ExpiryDate</small>
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="RemoveCard">Remove Card</button>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">State Preview</h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="showFiltered" id="filterToggle" />
+                        <label class="form-check-label" for="filterToggle">
+                            @(showFiltered ? "Filtered (DevTools safe)" : "Raw (shows secrets!)")
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 small" style="max-height: 300px; overflow-y: auto;">@GetStateJson()</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Sensitive Data Attribute</h5>
+                </div>
+                <div class="card-body small">
+                    <p>Mark properties that should be filtered:</p>
+                    <pre class="bg-light p-2"><code>public record UserState(
+  string Username,
+  [property: SensitiveData]
+  string Password,
+  [property: SensitiveData(
+    Reason = "API authentication"
+  )]
+  string ApiToken
+);</code></pre>
+
+                    <h6 class="mt-3">DevTools Output:</h6>
+                    <pre class="bg-light p-2"><code>{
+  "username": "john",
+  "password": "[FILTERED]",
+  "apiToken": "[FILTERED]"
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Filter Options</h5>
+                </div>
+                <div class="card-body small">
+                    <pre class="bg-light p-2"><code>services.Configure&lt;
+  SensitiveDataFilterOptions&gt;(opts =>
+{
+  opts.FilteredPropertyNames
+    .Add("ApiKey");
+  opts.ReplacementValue =
+    "[REDACTED]";
+});</code></pre>
+
+                    <h6 class="mt-3">Auto-Filtered Names:</h6>
+                    <ul class="small">
+                        <li>Password</li>
+                        <li>Secret</li>
+                        <li>Token</li>
+                        <li>ApiKey</li>
+                        <li>AccessToken</li>
+                        <li>RefreshToken</li>
+                        <li>PrivateKey</li>
+                        <li>Credential(s)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">State Validation</h5>
+                </div>
+                <div class="card-body small">
+                    <pre class="bg-light p-2"><code>public class StateValidator
+  : IStateValidator&lt;AppState&gt;
+{
+  public bool Validate(
+    AppState state,
+    out string? error)
+  {
+    if (state.Count &lt; 0)
+    {
+      error = "Count negative";
+      return false;
+    }
+    error = null;
+    return true;
+  }
+}
+
+// Use with server sync
+.WithServerSync(sp, opts =&gt; opts
+  .WithValidator(validator)
+  .RejectInvalidState())</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool showFiltered = true;
+    private string cardNumber = "";
+    private string cardExpiry = "";
+    private string cardCvv = "";
+    private string cardHolder = "";
+
+    private string GetStateJson()
+    {
+        var options = new JsonSerializerOptions { WriteIndented = true };
+
+        if (showFiltered)
+        {
+            // Use filtered serialization
+            return SensitiveDataFilterExtensions.SerializeFiltered(State,
+                new SensitiveDataFilterOptions { Enabled = true });
+        }
+        else
+        {
+            // Show raw state (warning: exposes secrets!)
+            return JsonSerializer.Serialize(State, options);
+        }
+    }
+
+    private async Task OnUsernameChange(ChangeEventArgs e)
+    {
+        await Update(s => s with { Username = e.Value?.ToString() ?? "" }, "SET_USERNAME");
+    }
+
+    private async Task OnPasswordChange(ChangeEventArgs e)
+    {
+        await Update(s => s with { Password = e.Value?.ToString() ?? "" }, "SET_PASSWORD");
+    }
+
+    private async Task OnEmailChange(ChangeEventArgs e)
+    {
+        await Update(s => s with { Email = e.Value?.ToString() ?? "" }, "SET_EMAIL");
+    }
+
+    private async Task OnTokenChange(ChangeEventArgs e)
+    {
+        await Update(s => s.SetApiToken(e.Value?.ToString() ?? ""), "SET_API_TOKEN");
+    }
+
+    private async Task ToggleLogin()
+    {
+        if (State.IsLoggedIn)
+            await Update(s => s.Logout(), "LOGOUT");
+        else
+            await Update(s => s.Login(), "LOGIN");
+    }
+
+    private async Task AddCard()
+    {
+        if (string.IsNullOrWhiteSpace(cardNumber)) return;
+
+        var card = new CreditCardInfo(cardNumber, cardCvv, cardExpiry, cardHolder);
+        await Update(s => s.SetCard(card), "ADD_CARD");
+
+        cardNumber = "";
+        cardExpiry = "";
+        cardCvv = "";
+        cardHolder = "";
+    }
+
+    private async Task RemoveCard()
+    {
+        await Update(s => s with { Card = null }, "REMOVE_CARD");
+    }
+}

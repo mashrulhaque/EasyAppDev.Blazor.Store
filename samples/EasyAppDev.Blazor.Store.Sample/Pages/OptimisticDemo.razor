@@ -1,0 +1,246 @@
+@page "/optimistic-demo"
+@using EasyAppDev.Blazor.Store.Core
+@inherits StoreComponent<OptimisticDemoState>
+
+<PageTitle>Optimistic Updates</PageTitle>
+
+<div class="container mt-4">
+    <h1>Optimistic Updates</h1>
+    <p class="lead">
+        Update UI immediately, rollback automatically on server error.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Todo List with Optimistic Updates</h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(State.LastError))
+                    {
+                        <div class="alert alert-danger alert-dismissible">
+                            <strong>Error:</strong> @State.LastError
+                            <button type="button" class="btn-close" @onclick="ClearError"></button>
+                        </div>
+                    }
+
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Add new item..."
+                               @bind="newItemText" @bind:event="oninput"
+                               @onkeyup="HandleKeyUp" />
+                        <button class="btn btn-primary" @onclick="AddItem" disabled="@State.IsProcessing">
+                            @if (State.IsProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Add
+                        </button>
+                    </div>
+
+                    <ul class="list-group">
+                        @foreach (var item in State.Items)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center @(item.IsPending ? "list-group-item-warning" : "")">
+                                <div class="d-flex align-items-center">
+                                    <input type="checkbox" class="form-check-input me-2"
+                                           checked="@item.IsCompleted"
+                                           @onchange="() => ToggleItem(item)" />
+                                    <span class="@(item.IsCompleted ? "text-decoration-line-through text-muted" : "")">
+                                        @item.Text
+                                    </span>
+                                    @if (item.IsPending)
+                                    {
+                                        <span class="badge bg-warning ms-2">Pending...</span>
+                                    }
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        @onclick="() => DeleteItem(item)"
+                                        disabled="@item.IsPending">
+                                    Delete
+                                </button>
+                            </li>
+                        }
+                    </ul>
+
+                    @if (!State.Items.Any())
+                    {
+                        <p class="text-muted text-center mt-3">No items yet. Add one above!</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Test Scenarios</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-auto">
+                            <button class="btn btn-success" @onclick="AddItemSuccess">
+                                Add (Success)
+                            </button>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-danger" @onclick="AddItemFail">
+                                Add (Fail + Rollback)
+                            </button>
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-info" @onclick="AddItemWithServerId">
+                                Add (With Server ID)
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted mt-2 small">
+                        Try "Add (Fail + Rollback)" to see the item appear instantly then disappear when the server rejects it.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body">
+                    <ol class="small">
+                        <li class="mb-2">
+                            <strong>Optimistic Update</strong>: UI updates immediately
+                        </li>
+                        <li class="mb-2">
+                            <strong>Server Call</strong>: Request sent in background
+                        </li>
+                        <li class="mb-2">
+                            <strong>On Success</strong>: Confirm with server data (e.g., real ID)
+                        </li>
+                        <li class="mb-2">
+                            <strong>On Failure</strong>: Automatic rollback to previous state
+                        </li>
+                    </ol>
+
+                    <hr />
+
+                    <h6>Code Example:</h6>
+                    <pre class="bg-light p-2 small"><code>await store.UpdateOptimistic(
+  s => s.AddItem(item),      // Optimistic
+  async () => await api.Add(item), // Server
+  (s, error) => s.SetError(error)  // On error
+);</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string newItemText = "";
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(newItemText))
+        {
+            await AddItem();
+        }
+    }
+
+    private async Task AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(newItemText)) return;
+
+        var text = newItemText;
+        newItemText = "";
+
+        var tempItem = new OptimisticTodoItem(Guid.NewGuid(), text, false, true);
+
+        await Store.UpdateOptimistic(
+            s => s.AddItem(tempItem),
+            async () =>
+            {
+                await Task.Delay(1000); // Simulate API call
+                return tempItem.Id;
+            },
+            onSuccess: (s, serverId) => s.MarkItemConfirmed(serverId),
+            onError: (s, ex) => s.RemoveItem(tempItem.Id).SetError("Failed to add item"),
+            actionName: "ADD_TODO_OPTIMISTIC"
+        );
+    }
+
+    private async Task AddItemSuccess()
+    {
+        var tempItem = new OptimisticTodoItem(Guid.NewGuid(), "Success Item " + DateTime.Now.ToString("HH:mm:ss"), false, true);
+
+        await Store.UpdateOptimistic(
+            s => s.AddItem(tempItem),
+            async () =>
+            {
+                await Task.Delay(1500);
+                return Guid.NewGuid(); // Server returns new ID
+            },
+            onSuccess: (s, serverId) => s.UpdateItemWithServerId(tempItem.Id, serverId),
+            actionName: "ADD_SUCCESS"
+        );
+    }
+
+    private async Task AddItemFail()
+    {
+        var tempItem = new OptimisticTodoItem(Guid.NewGuid(), "Will Fail " + DateTime.Now.ToString("HH:mm:ss"), false, true);
+
+        await Store.UpdateOptimistic(
+            s => s.AddItem(tempItem),
+            async () =>
+            {
+                await Task.Delay(1500);
+                throw new Exception("Server rejected the request!");
+            },
+            onError: (s, ex) => s.RemoveItem(tempItem.Id).SetError(ex.Message),
+            actionName: "ADD_FAIL"
+        );
+    }
+
+    private async Task AddItemWithServerId()
+    {
+        var tempId = Guid.NewGuid();
+        var tempItem = new OptimisticTodoItem(tempId, "Server ID Demo " + DateTime.Now.ToString("HH:mm:ss"), false, true);
+
+        var serverId = await Store.UpdateOptimisticWithConfirm(
+            s => s.AddItem(tempItem),
+            async () =>
+            {
+                await Task.Delay(1200);
+                return Guid.NewGuid(); // Server generates real ID
+            },
+            confirm: (s, id) => s.UpdateItemWithServerId(tempId, id),
+            actionName: "ADD_WITH_CONFIRM"
+        );
+    }
+
+    private async Task ToggleItem(OptimisticTodoItem item)
+    {
+        await Store.UpdateOptimistic(
+            s => s.ToggleItem(item.Id),
+            async () => await Task.Delay(500), // Simulate server
+            actionName: "TOGGLE_TODO"
+        );
+    }
+
+    private async Task DeleteItem(OptimisticTodoItem item)
+    {
+        await Store.UpdateOptimistic(
+            s => s.RemoveItem(item.Id),
+            async () =>
+            {
+                await Task.Delay(800);
+                // Simulate occasional failure
+                if (Random.Shared.NextDouble() < 0.2)
+                    throw new Exception("Delete failed!");
+            },
+            rollback: s => s.RestoreItem(item),
+            onError: (s, ex) => s.SetError(ex.Message),
+            actionName: "DELETE_TODO"
+        );
+    }
+
+    private Task ClearError() => Update(s => s with { LastError = null }, "CLEAR_ERROR");
+}

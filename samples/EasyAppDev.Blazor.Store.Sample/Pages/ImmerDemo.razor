@@ -1,0 +1,301 @@
+@page "/immer-demo"
+@using EasyAppDev.Blazor.Store.ImmerStyle
+@inherits StoreComponent<ImmerDemoState>
+
+<PageTitle>Immer-Style Updates</PageTitle>
+
+<div class="container mt-4">
+    <h1>Immer-Style Updates</h1>
+    <p class="lead">
+        Clean syntax for complex nested updates using draft-based mutations.
+    </p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">User Profile (Nested Updates)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" value="@State.Profile.Name"
+                                   @onchange="OnNameChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Points</label>
+                            <div class="input-group">
+                                <button class="btn btn-outline-secondary" @onclick="DecrementPoints">-</button>
+                                <input type="text" class="form-control text-center" value="@State.Profile.Points" readonly />
+                                <button class="btn btn-outline-secondary" @onclick="IncrementPoints">+</button>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Street</label>
+                            <input type="text" class="form-control" value="@State.Profile.Address.Street"
+                                   @onchange="OnStreetChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" value="@State.Profile.Address.City"
+                                   @onchange="OnCityChange" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Zip Code</label>
+                            <input type="text" class="form-control" value="@State.Profile.Address.ZipCode"
+                                   @onchange="OnZipChange" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Shopping Items (List Operations)</h5>
+                    <button class="btn btn-primary btn-sm" @onclick="AddItem">Add Item</button>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in State.ShopItems)
+                            {
+                                <tr>
+                                    <td>@item.Name</td>
+                                    <td>$@item.Price.ToString("F2")</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-secondary" @onclick="() => DecrementQuantity(item.Id)">-</button>
+                                            <span class="btn btn-light disabled">@item.Quantity</span>
+                                            <button class="btn btn-outline-secondary" @onclick="() => IncrementQuantity(item.Id)">+</button>
+                                        </div>
+                                    </td>
+                                    <td>$@((item.Price * item.Quantity).ToString("F2"))</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item.Id)">Remove</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3" class="text-end">Grand Total:</th>
+                                <th colspan="2">$@State.ShopItems.Sum(i => i.Price * i.Quantity).ToString("F2")</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Settings (Dictionary Operations)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Theme</label>
+                            <select class="form-select" value="@State.Settings.GetValueOrDefault("theme", "light")"
+                                    @onchange="OnThemeChange">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                                <option value="auto">Auto</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Language</label>
+                            <select class="form-select" value="@State.Settings.GetValueOrDefault("language", "en")"
+                                    @onchange="OnLanguageChange">
+                                <option value="en">English</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Custom Setting</label>
+                            <button class="btn btn-outline-primary d-block w-100" @onclick="AddCustomSetting">
+                                Add Setting
+                            </button>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-3">Current Settings:</h6>
+                    <pre class="bg-light p-2 small">@System.Text.Json.JsonSerializer.Serialize(State.Settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Action Count</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h2>@State.ActionCount</h2>
+                    <p class="text-muted">Total updates performed</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Immer-Style Syntax</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>The Problem (Verbose):</h6>
+                    <pre class="bg-light p-2"><code>// Nested updates are painful
+state with {
+  User = state.User with {
+    Profile = state.User.Profile with {
+      Address = ... with {
+        City = "NYC"
+      }
+    }
+  }
+}</code></pre>
+
+                    <h6 class="mt-3">The Solution (Clean):</h6>
+                    <pre class="bg-light p-2"><code>// Use ProduceAsync
+await store.ProduceAsync(d => d
+  .Set(s => s.User.Profile.Address.City, "NYC")
+  .Increment(s => s.Count)
+  .Append(s => s.Items, newItem)
+);</code></pre>
+
+                    <h6 class="mt-3">Available Operations:</h6>
+                    <ul>
+                        <li><code>Set</code> - Set any property</li>
+                        <li><code>Update</code> - Transform property</li>
+                        <li><code>Increment/Decrement</code> - Numbers</li>
+                        <li><code>Toggle</code> - Booleans</li>
+                        <li><code>Append/Remove/SetAt</code> - Lists</li>
+                        <li><code>DictSet/DictRemove</code> - Dictionaries</li>
+                        <li><code>Concat</code> - Strings</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int nextItemId = 4;
+
+    private async Task OnNameChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .Set(s => s.Profile.Name, e.Value?.ToString() ?? "")
+            .Increment(s => s.ActionCount),
+            "SET_NAME");
+    }
+
+    private async Task IncrementPoints()
+    {
+        await Store.ProduceAsync(d => d
+            .Increment(s => s.Profile.Points, 10)
+            .Increment(s => s.ActionCount),
+            "INCREMENT_POINTS");
+    }
+
+    private async Task DecrementPoints()
+    {
+        await Store.ProduceAsync(d => d
+            .Decrement(s => s.Profile.Points, 10)
+            .Increment(s => s.ActionCount),
+            "DECREMENT_POINTS");
+    }
+
+    private async Task OnStreetChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .Set(s => s.Profile.Address.Street, e.Value?.ToString() ?? "")
+            .Increment(s => s.ActionCount),
+            "SET_STREET");
+    }
+
+    private async Task OnCityChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .Set(s => s.Profile.Address.City, e.Value?.ToString() ?? "")
+            .Increment(s => s.ActionCount),
+            "SET_CITY");
+    }
+
+    private async Task OnZipChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .Set(s => s.Profile.Address.ZipCode, e.Value?.ToString() ?? "")
+            .Increment(s => s.ActionCount),
+            "SET_ZIP");
+    }
+
+    private async Task AddItem()
+    {
+        var newItem = new ImmerShopItem(nextItemId++, $"New Item {nextItemId}", Random.Shared.Next(10, 100), 1);
+
+        await Store.ProduceAsync(d => d
+            .Append(s => s.ShopItems, newItem)
+            .Increment(s => s.ActionCount),
+            "ADD_ITEM");
+    }
+
+    private async Task RemoveItem(int id)
+    {
+        await Store.ProduceAsync(d => d
+            .RemoveAll(s => s.ShopItems, i => i.Id == id)
+            .Increment(s => s.ActionCount),
+            "REMOVE_ITEM");
+    }
+
+    private async Task IncrementQuantity(int id)
+    {
+        await Store.ProduceAsync(d => d
+            .UpdateWhere(s => s.ShopItems, i => i.Id == id, i => i with { Quantity = i.Quantity + 1 })
+            .Increment(s => s.ActionCount),
+            "INCREMENT_QTY");
+    }
+
+    private async Task DecrementQuantity(int id)
+    {
+        var item = State.ShopItems.FirstOrDefault(i => i.Id == id);
+        if (item?.Quantity <= 1) return;
+
+        await Store.ProduceAsync(d => d
+            .UpdateWhere(s => s.ShopItems, i => i.Id == id, i => i with { Quantity = i.Quantity - 1 })
+            .Increment(s => s.ActionCount),
+            "DECREMENT_QTY");
+    }
+
+    private async Task OnThemeChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .DictSet(s => s.Settings, "theme", e.Value?.ToString() ?? "light")
+            .Increment(s => s.ActionCount),
+            "SET_THEME");
+    }
+
+    private async Task OnLanguageChange(ChangeEventArgs e)
+    {
+        await Store.ProduceAsync(d => d
+            .DictSet(s => s.Settings, "language", e.Value?.ToString() ?? "en")
+            .Increment(s => s.ActionCount),
+            "SET_LANGUAGE");
+    }
+
+    private async Task AddCustomSetting()
+    {
+        var key = $"custom_{DateTime.Now.Ticks % 1000}";
+        await Store.ProduceAsync(d => d
+            .DictSet(s => s.Settings, key, "custom_value")
+            .Increment(s => s.ActionCount),
+            "ADD_CUSTOM_SETTING");
+    }
+}
