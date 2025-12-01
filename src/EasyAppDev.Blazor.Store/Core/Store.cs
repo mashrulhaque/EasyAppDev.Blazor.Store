@@ -1,4 +1,5 @@
 using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.Selectors;
 using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Core;
@@ -17,6 +18,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     private readonly ISubscriptionManager<TState> _subscriptionManager;
     private readonly MiddlewarePipeline<TState>? _middlewarePipeline;
     private readonly ILogger<Store<TState>>? _logger;
+    private readonly StoreErrorHandler<TState>? _errorHandler;
     private bool _disposed;
     private readonly AsyncLocal<int> _updateDepth = new();
 
@@ -30,6 +32,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     /// <param name="middlewarePipelineLogger">Optional logger for middleware pipeline.</param>
     /// <param name="logger">Optional logger for store operations.</param>
     /// <param name="middlewareOptions">Optional configuration options for middleware pipeline.</param>
+    /// <param name="errorHandler">Optional centralized error handler for store errors.</param>
     public Store(
         TState initialState,
         ISubscriptionManager<TState> subscriptionManager,
@@ -37,13 +40,15 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
         IEnumerable<IMiddleware<TState>>? middlewares = null,
         ILogger<MiddlewarePipeline<TState>>? middlewarePipelineLogger = null,
         ILogger<Store<TState>>? logger = null,
-        MiddlewarePipelineOptions? middlewareOptions = null)
+        MiddlewarePipelineOptions? middlewareOptions = null,
+        StoreErrorHandler<TState>? errorHandler = null)
     {
         _state = initialState ?? throw new ArgumentNullException(nameof(initialState));
         _subscriptionManager = subscriptionManager ?? throw new ArgumentNullException(nameof(subscriptionManager));
         _lock = new SemaphoreSlim(1, 1);
         _comparer = comparer ?? EqualityComparer<TState>.Default;
         _logger = logger;
+        _errorHandler = errorHandler;
 
         if (middlewares?.Any() == true)
         {
@@ -229,6 +234,22 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
         return _subscriptionManager.Subscribe(selector, callback, () => _state, comparer);
     }
 
+    /// <inheritdoc />
+    public IDisposable Subscribe<TSelected>(
+        ISelector<TState, TSelected> selector,
+        Action<TSelected> callback)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(callback);
+        ThrowIfDisposed();
+
+        return _subscriptionManager.Subscribe(
+            state => selector.Select(state),
+            callback,
+            () => _state,
+            EqualityComparer<TSelected>.Default);
+    }
+
     private void NotifySubscribers()
     {
         _subscriptionManager.NotifyAll();
@@ -238,6 +259,25 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(Store<TState>));
+    }
+
+    /// <summary>
+    /// Reports an error to the registered error handler.
+    /// </summary>
+    internal void HandleError(Exception exception, ErrorLocation location, string? action = null)
+    {
+        var error = new StoreError<TState>(exception, _state, action, location);
+
+        _logger?.LogError(exception, "Store error in {Location}: {Message}", location, exception.Message);
+
+        try
+        {
+            _errorHandler?.Invoke(error);
+        }
+        catch (Exception handlerEx)
+        {
+            _logger?.LogError(handlerEx, "Error in store error handler");
+        }
     }
 
     /// <inheritdoc />

@@ -18,6 +18,7 @@ public class StoreBuilder<TState> where TState : notnull
     private ILogger<Store<TState>>? _storeLogger;
     private ILogger<SubscriptionManager<TState>>? _subscriptionManagerLogger;
     private MiddlewarePipelineOptions? _middlewareOptions;
+    private StoreErrorHandler<TState>? _errorHandler;
 
     private StoreBuilder(TState initialState)
     {
@@ -142,6 +143,49 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
+    /// Registers a centralized error handler for store operations.
+    /// Errors from middleware, subscribers, and persistence are routed to this handler.
+    /// </summary>
+    /// <param name="errorHandler">The error handler delegate.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <example>
+    /// <code>
+    /// builder.OnError(error =>
+    /// {
+    ///     logger.LogError(error.Exception,
+    ///         "Store error in {Location}: {Message}",
+    ///         error.Location,
+    ///         error.Exception.Message);
+    ///
+    ///     // Report to error tracking service
+    ///     errorTracker.CaptureException(error.Exception, new Dictionary&lt;string, object&gt;
+    ///     {
+    ///         ["store"] = typeof(TState).Name,
+    ///         ["action"] = error.Action ?? "unknown",
+    ///         ["location"] = error.Location.ToString()
+    ///     });
+    /// });
+    /// </code>
+    /// </example>
+    public StoreBuilder<TState> OnError(StoreErrorHandler<TState> errorHandler)
+    {
+        _errorHandler = errorHandler ?? throw new ArgumentNullException(nameof(errorHandler));
+        return this;
+    }
+
+    /// <summary>
+    /// Registers an error handler using an action that receives the error.
+    /// </summary>
+    /// <param name="handler">The error handler action.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> OnError(Action<StoreError<TState>> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _errorHandler = handler.Invoke;
+        return this;
+    }
+
+    /// <summary>
     /// Enables Redux DevTools integration with lazy IJSRuntime resolution.
     /// Works in all render modes: Server, WebAssembly, and Auto (Server → WASM).
     /// </summary>
@@ -182,6 +226,35 @@ public class StoreBuilder<TState> where TState : notnull
             debounceMs);
 
         return hydratedBuilder.WithMiddleware(middleware);
+    }
+
+    /// <summary>
+    /// Adds state persistence with full configuration options.
+    /// </summary>
+    /// <param name="provider">The persistence provider.</param>
+    /// <param name="options">The persistence configuration options.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <example>
+    /// <code>
+    /// .WithPersistence(provider, new PersistenceOptions&lt;CartState&gt;
+    /// {
+    ///     Key = "cart-state",
+    ///     DebounceMs = 500,
+    ///     OnHydrationSuccess = state => logger.LogInformation("Loaded {Count} items", state.Items.Count),
+    ///     ShouldPersist = (prev, curr, action) => action != "TEMP_UPDATE",
+    ///     TransformOnLoad = state => state with { CheckoutInProgress = false }
+    /// })
+    /// </code>
+    /// </example>
+    public StoreBuilder<TState> WithPersistence(
+        IPersistenceProvider provider,
+        PersistenceOptions<TState> options)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var middleware = new PersistenceMiddleware<TState>(provider, options);
+        return WithMiddleware(middleware);
     }
 
     /// <summary>
@@ -229,7 +302,8 @@ public class StoreBuilder<TState> where TState : notnull
                         _middlewarePipelineLogger = this._middlewarePipelineLogger,
                         _storeLogger = this._storeLogger,
                         _subscriptionManagerLogger = this._subscriptionManagerLogger,
-                        _middlewareOptions = this._middlewareOptions
+                        _middlewareOptions = this._middlewareOptions,
+                        _errorHandler = this._errorHandler
                     };
                     builder._middlewares.AddRange(this._middlewares);
                     return builder;
@@ -261,6 +335,7 @@ public class StoreBuilder<TState> where TState : notnull
             middlewares: _middlewares,
             middlewarePipelineLogger: _middlewarePipelineLogger,
             logger: _storeLogger,
-            middlewareOptions: _middlewareOptions);
+            middlewareOptions: _middlewareOptions,
+            errorHandler: _errorHandler);
     }
 }

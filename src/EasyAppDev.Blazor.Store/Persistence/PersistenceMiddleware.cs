@@ -17,6 +17,7 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
     private readonly bool _debounce;
     private readonly int _debounceMs;
     private readonly ILogger<PersistenceMiddleware<TState>>? _logger;
+    private readonly PersistenceOptions<TState>? _options;
     private CancellationTokenSource? _debounceCts;
 
     /// <summary>
@@ -45,6 +46,30 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         _logger = logger;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PersistenceMiddleware{TState}"/> class
+    /// with full configuration options.
+    /// </summary>
+    /// <param name="provider">The persistence provider.</param>
+    /// <param name="options">The persistence configuration options.</param>
+    /// <param name="logger">Optional logger for error reporting.</param>
+    public PersistenceMiddleware(
+        IPersistenceProvider provider,
+        PersistenceOptions<TState> options,
+        ILogger<PersistenceMiddleware<TState>>? logger = null)
+    {
+        _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _key = options.Key;
+        _jsonOptions = options.JsonOptions ?? new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        _debounceMs = options.DebounceMs;
+        _debounce = options.DebounceMs > 0;
+        _logger = logger;
+    }
+
     /// <inheritdoc />
     public Task OnBeforeUpdateAsync(TState currentState, string? action)
     {
@@ -57,13 +82,24 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         TState currentState,
         string? action)
     {
+        // Check if we should persist this change
+        if (_options?.ShouldPersist != null && !_options.ShouldPersist(previousState, currentState, action))
+        {
+            return;
+        }
+
+        // Apply transformation before saving
+        var stateToSave = _options?.TransformOnSave != null
+            ? _options.TransformOnSave(currentState)
+            : currentState;
+
         if (_debounce)
         {
-            await DebouncedSaveAsync(currentState).ConfigureAwait(false);
+            await DebouncedSaveAsync(stateToSave).ConfigureAwait(false);
         }
         else
         {
-            await SaveStateAsync(currentState).ConfigureAwait(false);
+            await SaveStateAsync(stateToSave).ConfigureAwait(false);
         }
     }
 
@@ -106,14 +142,36 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         {
             var json = await _provider.LoadAsync(_key).ConfigureAwait(false);
             if (json == null)
+            {
+                _options?.OnHydrationSkipped?.Invoke();
                 return default;
+            }
 
-            return JsonSerializer.Deserialize<TState>(json, _jsonOptions);
+            var loadedState = JsonSerializer.Deserialize<TState>(json, _jsonOptions);
+            if (loadedState == null)
+            {
+                _options?.OnHydrationSkipped?.Invoke();
+                return default;
+            }
+
+            // Apply transformation after loading
+            var transformedState = _options?.TransformOnLoad != null
+                ? _options.TransformOnLoad(loadedState)
+                : loadedState;
+
+            _options?.OnHydrationSuccess?.Invoke(transformedState);
+            return transformedState;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error loading persisted state from key: {Key}", _key);
+            _options?.OnHydrationFailure?.Invoke(ex);
             return default;
         }
     }
+
+    /// <summary>
+    /// Gets whether hydration should occur on initialization.
+    /// </summary>
+    public bool HydrateOnInit => _options?.HydrateOnInit ?? true;
 }

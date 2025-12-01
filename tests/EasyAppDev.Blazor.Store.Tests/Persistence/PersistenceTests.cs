@@ -161,6 +161,6 @@ public class PersistenceTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new PersistenceMiddleware<TestState>(providerMock.Object, null!));
+            new PersistenceMiddleware<TestState>(providerMock.Object, key: null!));
     }
 }

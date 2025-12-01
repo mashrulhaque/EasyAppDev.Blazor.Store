@@ -15,7 +15,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>1.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -28,29 +28,27 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v1.2.0 - Phase 2: Cleanup and Simplification
-
-Breaking Changes:
-- Removed deprecated synchronous Update() method from IStateWriter and Store
-- Removed deprecated WithJSRuntime() and old WithDevTools() overloads from StoreBuilder
-- StoreComponent&lt;T&gt; slimmed down - utility methods moved to StoreComponentWithUtilities&lt;T&gt;
+v2.0.0 - Phase 3: Core Enhancements
 
 New Features:
-- StoreComponentWithUtilities&lt;T&gt; for components needing debounce, throttle, lazy loading, and async execution
-- UpdateWithAsync extension method for simplified async data loading patterns
-- DevTools now uses IServiceProvider for lazy IJSRuntime resolution (Blazor Server compatibility)
+- ISelector subscription: Subscribe to stores using memoized selectors (store.Subscribe(MySelectors.Total, callback))
+- Functional middleware: Add inline middleware with .Use() and conditional .UseWhen() syntax
+- MiddlewareContext: Rich context object passed to middleware with phase info, services, and state
+- PersistenceOptions: Full configuration for persistence with callbacks (OnHydrationSuccess, OnHydrationFailure, etc.)
+- Structured error handling: StoreError&lt;T&gt; record with ErrorLocation enum for centralized error management
+- OnError handler: Register error handlers in StoreBuilder for unified error tracking
 
-Upgrade Guide:
-- Replace Update() calls with await Update() or await Store.UpdateAsync()
-- Components using UpdateDebounced, UpdateThrottled, ExecuteAsync, or LazyLoad should inherit from StoreComponentWithUtilities&lt;T&gt;
-- Replace .WithJSRuntime().WithDevTools() with .WithDevTools(sp, "StoreName")
+Breaking Changes:
+- Middleware now receives MiddlewareContext instead of raw parameters (for functional middleware)
+- IStateObservable has new Subscribe overload for ISelector
 
-v1.1.0 - Phase 1: Bug Fixes and Polish
+Migration Guide:
+- Add .OnError() to StoreBuilder for centralized error handling
+- Use new PersistenceOptions for advanced persistence control
+- Consider using .Use() for simple inline middleware
 
-- AsyncData&lt;T&gt; converted from class to record for value equality
-- MemoizedSelector thread-safety improvements
-- Proper logging for persistence hydration errors
-- Enhanced XML documentation
+v1.2.0 - Phase 2: Cleanup and Simplification
+(See previous release notes)
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

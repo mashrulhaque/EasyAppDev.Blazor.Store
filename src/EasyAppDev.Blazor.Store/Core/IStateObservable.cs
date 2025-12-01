@@ -140,4 +140,42 @@ public interface IStateObservable<TState> where TState : notnull
         Func<TState, TSelected> selector,
         Action<TSelected> callback,
         IEqualityComparer<TSelected> comparer);
+
+    /// <summary>
+    /// Subscribes to state changes using a memoized selector.
+    /// The callback is only invoked when the selector result changes.
+    /// </summary>
+    /// <typeparam name="TSelected">The type of the selected value from the state.</typeparam>
+    /// <param name="selector">A memoized selector that computes the derived value.</param>
+    /// <param name="callback">Callback invoked when the selected value changes.</param>
+    /// <returns>Disposable subscription. Call Dispose to unsubscribe.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="selector"/> or <paramref name="callback"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// This overload uses a pre-defined <see cref="Selectors.ISelector{TState, TResult}"/> for efficient
+    /// memoized state derivation. Useful for complex computed values that should only recompute
+    /// when their dependencies change.
+    /// </para>
+    /// <para>
+    /// The selector is responsible for memoization; this method simply uses its Select method.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Define selectors once (e.g., in a static class)
+    /// public static class CartSelectors
+    /// {
+    ///     public static readonly ISelector&lt;CartState, decimal&gt; Total =
+    ///         Selectors.Create&lt;CartState, decimal&gt;(s => s.Items.Sum(i => i.Price * i.Quantity));
+    /// }
+    ///
+    /// // Subscribe using the selector
+    /// var subscription = store.Subscribe(CartSelectors.Total, total => {
+    ///     Console.WriteLine($"Cart total: {total:C}");
+    /// });
+    /// </code>
+    /// </example>
+    IDisposable Subscribe<TSelected>(
+        Selectors.ISelector<TState, TSelected> selector,
+        Action<TSelected> callback);
 }
