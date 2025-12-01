@@ -129,12 +129,24 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
         }
 #endif
 
-        _subscription = Store.Subscribe(_ =>
+        _subscription = Store.Subscribe(state =>
         {
 #if DEBUG
             DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
 #endif
-            InvokeAsync(StateHasChanged);
+            // Use try-catch to handle component disposal during async invoke
+            try
+            {
+                InvokeAsync(StateHasChanged);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component was disposed during notification - this is expected
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogWarning(ex, "Error invoking StateHasChanged in {ComponentType}", GetType().Name);
+            }
         });
     }
 

@@ -67,17 +67,23 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
         ThrowIfDisposed();
 
         var state = stateGetter();
-        var previousValue = selector(state);
+        // Use a wrapper object to safely track previous value across notifications
+        var valueHolder = new SelectorValueHolder<TSelected>(selector(state));
 
         var subscription = new Subscription(
             () =>
             {
                 var currentState = stateGetter();
                 var currentValue = selector(currentState);
-                if (!comparer.Equals(previousValue, currentValue))
+
+                // Thread-safe check and update of previous value
+                lock (valueHolder)
                 {
-                    previousValue = currentValue;
-                    callback(currentValue);
+                    if (!comparer.Equals(valueHolder.Value, currentValue))
+                    {
+                        valueHolder.Value = currentValue;
+                        callback(currentValue);
+                    }
                 }
             },
             RemoveSubscription);
@@ -88,6 +94,15 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
         }
 
         return subscription;
+    }
+
+    /// <summary>
+    /// Thread-safe wrapper for selector value tracking.
+    /// </summary>
+    private sealed class SelectorValueHolder<T>
+    {
+        public T Value;
+        public SelectorValueHolder(T value) => Value = value;
     }
 
     /// <inheritdoc />

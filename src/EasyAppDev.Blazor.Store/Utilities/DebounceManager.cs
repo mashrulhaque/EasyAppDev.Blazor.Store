@@ -64,16 +64,18 @@ public sealed class DebounceManager : IDebounceManager
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(delayMilliseconds);
 
         CancellationTokenSource cts;
+        CancellationTokenSource? oldCts = null;
+
         await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
 
-            // Cancel existing debounce for this key
+            // Cancel existing debounce for this key (dispose outside lock)
             if (_pendingActions.TryGetValue(key, out var existingCts))
             {
                 existingCts.Cancel();
-                existingCts.Dispose();
+                oldCts = existingCts;
             }
 
             // Create new cancellation token for this debounce
@@ -84,6 +86,9 @@ public sealed class DebounceManager : IDebounceManager
         {
             _lock.Release();
         }
+
+        // Dispose old CTS outside lock to avoid blocking
+        oldCts?.Dispose();
 
         // Schedule execution after delay (outside the lock)
         _ = ExecuteAfterDelayAsync(key, action, delayMilliseconds, cts);
@@ -111,20 +116,27 @@ public sealed class DebounceManager : IDebounceManager
         }
         finally
         {
-            // Clean up completed action - only remove if this is still the current CTS
+            // Clean up completed action - only remove and dispose if this is still the current CTS
+            bool shouldDispose = false;
             await _lock.WaitAsync().ConfigureAwait(false);
             try
             {
                 if (_pendingActions.TryGetValue(key, out var currentCts) &&
                     ReferenceEquals(currentCts, cts))
                 {
-                    currentCts.Dispose();
                     _pendingActions.Remove(key);
+                    shouldDispose = true;
                 }
             }
             finally
             {
                 _lock.Release();
+            }
+
+            // Dispose outside lock - only if we owned it
+            if (shouldDispose)
+            {
+                cts.Dispose();
             }
         }
     }

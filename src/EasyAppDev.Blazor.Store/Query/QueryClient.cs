@@ -97,7 +97,19 @@ public sealed class QueryClient : IQueryClient, IDisposable
         ArgumentNullException.ThrowIfNull(key);
 
         _invalidatedKeys[key] = true;
-        TriggerRefetchAsync(key).ConfigureAwait(false);
+
+        // Fire and forget with proper error handling
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await TriggerRefetchAsync(key).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error triggering refetch for invalidated query {Key}", key);
+            }
+        });
 
         _logger?.LogDebug("Query invalidated for key {Key}", key);
     }

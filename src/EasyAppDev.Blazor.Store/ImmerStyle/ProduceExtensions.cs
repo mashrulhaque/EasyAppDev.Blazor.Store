@@ -50,6 +50,8 @@ public static class ProduceExtensions
 
     /// <summary>
     /// Updates state using multiple Immer-style operations.
+    /// Note: The async recipe receives a draft based on current state at execution time.
+    /// For complex async operations, consider using the synchronous overload within UpdateAsync.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="store">The store to update.</param>
@@ -64,10 +66,13 @@ public static class ProduceExtensions
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(recipe);
 
-        var state = store.GetState();
-        var draft = new Draft<TState>(state);
-        await recipe(draft);
-        await store.UpdateAsync(_ => draft.Produce(), action ?? "PRODUCE_ASYNC");
+        // Use UpdateAsync with async updater to ensure atomicity
+        await store.UpdateAsync(async currentState =>
+        {
+            var draft = new Draft<TState>(currentState);
+            await recipe(draft);
+            return draft.Produce();
+        }, action ?? "PRODUCE_ASYNC");
     }
 
     /// <summary>

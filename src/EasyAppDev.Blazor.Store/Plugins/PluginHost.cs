@@ -14,6 +14,7 @@ namespace EasyAppDev.Blazor.Store.Plugins;
 public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
 {
     private readonly List<IStorePlugin<TState>> _plugins = new();
+    private readonly object _pluginsLock = new();
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<PluginHost<TState>>? _logger;
     private bool _initialized;
@@ -30,7 +31,16 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
     /// <summary>
     /// Gets all registered plugins.
     /// </summary>
-    public IReadOnlyList<IStorePlugin<TState>> Plugins => _plugins.AsReadOnly();
+    public IReadOnlyList<IStorePlugin<TState>> Plugins
+    {
+        get
+        {
+            lock (_pluginsLock)
+            {
+                return _plugins.ToList().AsReadOnly();
+            }
+        }
+    }
 
     /// <summary>
     /// Registers a plugin instance.
@@ -39,17 +49,21 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
     {
         ArgumentNullException.ThrowIfNull(plugin);
 
-        if (_initialized)
+        lock (_pluginsLock)
         {
-            throw new InvalidOperationException("Cannot register plugins after initialization");
+            if (_initialized)
+            {
+                throw new InvalidOperationException("Cannot register plugins after initialization");
+            }
+
+            if (_plugins.Any(p => p.Name == plugin.Name))
+            {
+                throw new InvalidOperationException($"Plugin '{plugin.Name}' is already registered");
+            }
+
+            _plugins.Add(plugin);
         }
 
-        if (_plugins.Any(p => p.Name == plugin.Name))
-        {
-            throw new InvalidOperationException($"Plugin '{plugin.Name}' is already registered");
-        }
-
-        _plugins.Add(plugin);
         _logger?.LogDebug("Plugin registered: {PluginName} v{Version}", plugin.Name, plugin.Version);
         return this;
     }
@@ -147,7 +161,10 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
     /// </summary>
     public IStorePlugin<TState>? GetPlugin(string name)
     {
-        return _plugins.FirstOrDefault(p => p.Name == name);
+        lock (_pluginsLock)
+        {
+            return _plugins.FirstOrDefault(p => p.Name == name);
+        }
     }
 
     /// <summary>
@@ -155,11 +172,15 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
     /// </summary>
     public TPlugin? GetPlugin<TPlugin>() where TPlugin : IStorePlugin<TState>
     {
-        return _plugins.OfType<TPlugin>().FirstOrDefault();
+        lock (_pluginsLock)
+        {
+            return _plugins.OfType<TPlugin>().FirstOrDefault();
+        }
     }
 
     private void ValidateDependencies()
     {
+        // Called during configuration, lock is already held or not needed
         var pluginNames = new HashSet<string>(_plugins.Select(p => p.Name));
 
         foreach (var plugin in _plugins)
@@ -178,7 +199,14 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        foreach (var plugin in _plugins)
+        List<IStorePlugin<TState>> pluginsToDispose;
+        lock (_pluginsLock)
+        {
+            pluginsToDispose = _plugins.ToList();
+            _plugins.Clear();
+        }
+
+        foreach (var plugin in pluginsToDispose)
         {
             try
             {
@@ -189,7 +217,5 @@ public sealed class PluginHost<TState> : IAsyncDisposable where TState : notnull
                 _logger?.LogWarning(ex, "Error disposing plugin: {PluginName}", plugin.Name);
             }
         }
-
-        _plugins.Clear();
     }
 }

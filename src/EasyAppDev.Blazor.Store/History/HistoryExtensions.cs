@@ -111,6 +111,7 @@ public static class HistoryExtensions
 
     /// <summary>
     /// Adds a store with history tracking and registers both as services.
+    /// Also registers IStateReader, IStateWriter, and IStateObservable as aliases.
     /// </summary>
     /// <typeparam name="TState">The type of state managed by the store.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -159,12 +160,18 @@ public static class HistoryExtensions
             return store;
         });
 
+        // Register interface aliases (required by AsyncActionExecutor and for interface segregation)
+        services.AddSingleton<IStateReader<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+        services.AddSingleton<IStateWriter<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+        services.AddSingleton<IStateObservable<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+
         return services;
     }
 
     /// <summary>
     /// Adds a scoped store with history tracking.
     /// Use for Blazor Server where each circuit needs its own store.
+    /// Also registers IStateReader, IStateWriter, and IStateObservable as aliases.
     /// </summary>
     /// <typeparam name="TState">The type of state managed by the store.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -205,6 +212,11 @@ public static class HistoryExtensions
 
             return store;
         });
+
+        // Register interface aliases (required by AsyncActionExecutor and for interface segregation)
+        services.AddScoped<IStateReader<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+        services.AddScoped<IStateWriter<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+        services.AddScoped<IStateObservable<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
 
         return services;
     }
