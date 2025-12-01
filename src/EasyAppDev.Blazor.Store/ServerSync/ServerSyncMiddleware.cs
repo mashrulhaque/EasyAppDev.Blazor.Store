@@ -3,6 +3,7 @@
 
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.Security;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -491,6 +492,25 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         if (remoteState == null)
             return;
 
+        // Validate incoming state if validator is configured
+        if (_options.StateValidator != null)
+        {
+            var validationResult = _options.StateValidator.Validate(remoteState);
+            if (!validationResult.IsValid)
+            {
+                _logger?.LogWarning(
+                    "Server state validation failed: {Errors}",
+                    string.Join(", ", validationResult.Errors));
+
+                _options.OnValidationFailed?.Invoke(validationResult with { Source = "ServerSync" });
+
+                if (_options.RejectInvalidState)
+                {
+                    return;
+                }
+            }
+        }
+
         // Apply conflict resolution
         var resolvedState = ResolveConflict(localState, remoteState, update.Version);
         if (resolvedState == null)
@@ -569,15 +589,34 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
         try
         {
+            var newState = JsonSerializer.Deserialize<TState>(stateJson, _jsonOptions);
+            if (newState == null)
+                return;
+
+            // Validate incoming state if validator is configured
+            if (_options.StateValidator != null)
+            {
+                var validationResult = _options.StateValidator.Validate(newState);
+                if (!validationResult.IsValid)
+                {
+                    _logger?.LogWarning(
+                        "Full state validation failed: {Errors}",
+                        string.Join(", ", validationResult.Errors));
+
+                    _options.OnValidationFailed?.Invoke(validationResult with { Source = "ServerSync_FullState" });
+
+                    if (_options.RejectInvalidState)
+                    {
+                        return;
+                    }
+                }
+            }
+
             _isReceivingUpdate = true;
             _currentVersion = version;
 
-            var newState = JsonSerializer.Deserialize<TState>(stateJson, _jsonOptions);
-            if (newState != null)
-            {
-                await _store.UpdateAsync(_ => newState, "@@SYNC_FULL").ConfigureAwait(false);
-                _logger?.LogDebug("Applied full state sync, version: {Version}", version);
-            }
+            await _store.UpdateAsync(_ => newState, "@@SYNC_FULL").ConfigureAwait(false);
+            _logger?.LogDebug("Applied full state sync, version: {Version}", version);
         }
         catch (Exception ex)
         {

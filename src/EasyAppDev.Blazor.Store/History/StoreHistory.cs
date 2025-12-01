@@ -1,3 +1,4 @@
+using System.Text.Json;
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Middleware;
 
@@ -14,10 +15,12 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
     private readonly List<HistoryEntry<TState>> _history = new();
     private readonly HistoryOptions _options;
     private readonly object _lock = new();
+    private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
     private IStore<TState>? _store;
     private int _currentIndex = -1;
     private bool _isUndoRedo;
     private DateTime _lastEntryTime = DateTime.MinValue;
+    private long _estimatedMemoryUsage = 0;
 
     /// <summary>
     /// Creates a new store history tracker.
@@ -256,11 +259,18 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
         {
             var now = DateTime.UtcNow;
 
+            // Estimate size of new state
+            var newEntrySize = EstimateStateSize(currentState);
+
             // Check if we should group with the previous entry
             if (_options.GroupWindow > TimeSpan.Zero &&
                 _currentIndex >= 0 &&
                 (now - _lastEntryTime) < _options.GroupWindow)
             {
+                // Update memory estimate (subtract old, add new)
+                var oldEntrySize = EstimateStateSize(_history[_currentIndex].State);
+                _estimatedMemoryUsage = _estimatedMemoryUsage - oldEntrySize + newEntrySize;
+
                 // Replace the current entry instead of adding a new one
                 _history[_currentIndex] = new HistoryEntry<TState>(currentState, action, now);
                 _lastEntryTime = now;
@@ -271,6 +281,11 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
             // Truncate forward history if we're not at the end
             if (_currentIndex < _history.Count - 1)
             {
+                // Update memory estimate for removed entries
+                for (var i = _currentIndex + 1; i < _history.Count; i++)
+                {
+                    _estimatedMemoryUsage -= EstimateStateSize(_history[i].State);
+                }
                 _history.RemoveRange(_currentIndex + 1, _history.Count - _currentIndex - 1);
             }
 
@@ -278,16 +293,63 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
             _history.Add(new HistoryEntry<TState>(currentState, action, now));
             _currentIndex = _history.Count - 1;
             _lastEntryTime = now;
+            _estimatedMemoryUsage += newEntrySize;
 
-            // Enforce max size
+            // Enforce max count
             while (_history.Count > _options.MaxSize)
             {
+                _estimatedMemoryUsage -= EstimateStateSize(_history[0].State);
                 _history.RemoveAt(0);
                 _currentIndex--;
+            }
+
+            // Enforce max memory (if configured)
+            if (_options.MaxMemoryBytes > 0)
+            {
+                while (_history.Count > 1 && _estimatedMemoryUsage > _options.MaxMemoryBytes)
+                {
+                    _estimatedMemoryUsage -= EstimateStateSize(_history[0].State);
+                    _history.RemoveAt(0);
+                    _currentIndex--;
+                }
             }
         }
 
         OnHistoryChanged?.Invoke();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Gets the estimated memory usage of the history in bytes.
+    /// </summary>
+    public long EstimatedMemoryUsage
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _estimatedMemoryUsage;
+            }
+        }
+    }
+
+    private long EstimateStateSize(TState state)
+    {
+        if (_options.StateSizeEstimator != null)
+        {
+            return _options.StateSizeEstimator(state);
+        }
+
+        // Default: use JSON serialization size as estimate
+        try
+        {
+            var json = JsonSerializer.Serialize(state, _jsonOptions);
+            return json.Length * 2; // UTF-16 chars = 2 bytes each
+        }
+        catch
+        {
+            // Fallback: rough estimate based on type
+            return 1024; // 1KB default
+        }
     }
 }

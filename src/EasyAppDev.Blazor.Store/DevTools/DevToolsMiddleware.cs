@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.Security;
 
 namespace EasyAppDev.Blazor.Store.DevTools;
 
@@ -19,6 +20,8 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly string _storeName;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly JsonSerializerOptions? _filteredJsonOptions;
+    private readonly DevToolsOptions<TState>? _options;
     private readonly ILogger<DevToolsMiddleware<TState>>? _logger;
     private IJSObjectReference? _devToolsModule;
     private bool _initialized;
@@ -36,15 +39,39 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         IServiceProvider serviceProvider,
         string storeName = "Store",
         ILogger<DevToolsMiddleware<TState>>? logger = null)
+        : this(serviceProvider, storeName, null, logger)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance with options for sensitive data filtering.
+    /// </summary>
+    /// <param name="serviceProvider">Service provider to resolve IJSRuntime on-demand.</param>
+    /// <param name="storeName">The name of the store for DevTools display.</param>
+    /// <param name="options">DevTools configuration options.</param>
+    /// <param name="logger">Optional logger for error reporting.</param>
+    public DevToolsMiddleware(
+        IServiceProvider serviceProvider,
+        string storeName,
+        DevToolsOptions<TState>? options,
+        ILogger<DevToolsMiddleware<TState>>? logger = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _storeName = storeName;
+        _options = options;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
+            WriteIndented = options?.SerializeIndented ?? false
         };
+
+        // Create filtered JSON options if sensitive data filtering is enabled
+        if (options?.SensitiveDataFilter?.Enabled == true)
+        {
+            _filteredJsonOptions = SensitiveDataFilterExtensions.CreateFilteredJsonOptions(
+                options.SensitiveDataFilter);
+        }
     }
 
     private async Task EnsureInitializedAsync()
@@ -107,10 +134,30 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         if (!_initialized || _devToolsModule == null)
             return;
 
+        // Check if action should be filtered
+        if (_options?.ActionFilter != null && action != null && !_options.ActionFilter(action))
+            return;
+
+        // Check if action is in ignored list
+        if (_options?.IgnoredActions != null && action != null && _options.IgnoredActions.Contains(action))
+            return;
+
+        // Check if paused
+        if (_options?.Paused == true)
+            return;
+
         try
         {
             var actionName = action ?? "UPDATE_STATE";
-            var stateJson = JsonSerializer.Serialize(currentState, _jsonOptions);
+
+            // Apply state sanitizer if configured
+            var stateToSerialize = _options?.StateSanitizer != null
+                ? _options.StateSanitizer(currentState)
+                : currentState;
+
+            // Use filtered JSON options if sensitive data filtering is enabled
+            var jsonOptions = _filteredJsonOptions ?? _jsonOptions;
+            var stateJson = JsonSerializer.Serialize(stateToSerialize, jsonOptions);
 
             await _devToolsModule.InvokeVoidAsync(
                 "sendToDevTools",

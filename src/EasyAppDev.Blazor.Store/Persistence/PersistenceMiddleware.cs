@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.Security;
 using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Persistence;
@@ -152,6 +153,28 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
             {
                 _options?.OnHydrationSkipped?.Invoke();
                 return default;
+            }
+
+            // Validate loaded state if validator is configured
+            if (_options?.StateValidator != null)
+            {
+                var validationResult = _options.StateValidator.Validate(loadedState);
+                if (!validationResult.IsValid)
+                {
+                    _logger?.LogWarning(
+                        "State validation failed for key {Key}: {Errors}",
+                        _key,
+                        string.Join(", ", validationResult.Errors));
+
+                    _options.OnValidationFailed?.Invoke(validationResult with { Source = "Persistence" });
+
+                    if (_options.RejectInvalidState)
+                    {
+                        _options.OnHydrationFailure?.Invoke(
+                            new InvalidOperationException($"State validation failed: {string.Join(", ", validationResult.Errors)}"));
+                        return default;
+                    }
+                }
             }
 
             // Apply transformation after loading

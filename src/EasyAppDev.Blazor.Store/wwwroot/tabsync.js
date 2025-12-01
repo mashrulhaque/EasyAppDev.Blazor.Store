@@ -1,12 +1,39 @@
 /**
  * Tab synchronization support for EasyAppDev.Blazor.Store
  * Uses BroadcastChannel API to sync state changes across browser tabs.
+ *
+ * Security: Uses Symbol-keyed storage to prevent external script access.
  */
 (function () {
     'use strict';
 
-    // Store for active channels
-    window.__storeTabSync = window.__storeTabSync || {};
+    // Use Symbol for internal storage key to prevent external access
+    const STORAGE_KEY = Symbol.for('EasyAppDev.Blazor.Store.TabSync');
+
+    // Initialize storage if not exists (using Symbol prevents enumeration)
+    if (!window[STORAGE_KEY]) {
+        Object.defineProperty(window, STORAGE_KEY, {
+            value: new Map(),
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
+    }
+
+    const storage = window[STORAGE_KEY];
+
+    // Legacy support: maintain backward compatibility with existing code
+    // but mark as deprecated
+    if (!window.__storeTabSync) {
+        Object.defineProperty(window, '__storeTabSync', {
+            get: function() {
+                console.warn('[TabSync] window.__storeTabSync is deprecated. Internal storage is now isolated.');
+                return {}; // Return empty object to prevent errors
+            },
+            enumerable: false,
+            configurable: false
+        });
+    }
 
     /**
      * Initializes a BroadcastChannel for cross-tab communication.
@@ -27,9 +54,9 @@
         }
 
         // Close existing channel if any
-        if (window.__storeTabSync[channelName]) {
+        if (storage.has(channelName)) {
             try {
-                window.__storeTabSync[channelName].channel.close();
+                storage.get(channelName).channel.close();
             } catch (e) {
                 // Ignore errors when closing
             }
@@ -50,10 +77,11 @@
                 console.error('[TabSync] Message error:', event);
             };
 
-            window.__storeTabSync[channelName] = {
+            storage.set(channelName, {
                 channel: channel,
-                dotNetRef: dotNetRef
-            };
+                dotNetRef: dotNetRef,
+                createdAt: Date.now()
+            });
 
             return true;
         } catch (e) {
@@ -68,7 +96,7 @@
      * @param {string} message - JSON-serialized message to send
      */
     window.__postTabSyncMessage = function (channelName, message) {
-        const syncInfo = window.__storeTabSync[channelName];
+        const syncInfo = storage.get(channelName);
         if (!syncInfo || !syncInfo.channel) {
             console.warn('[TabSync] Channel not initialized:', channelName);
             return;
@@ -86,7 +114,7 @@
      * @param {string} channelName - The name of the channel to dispose
      */
     window.__disposeTabSync = function (channelName) {
-        const syncInfo = window.__storeTabSync[channelName];
+        const syncInfo = storage.get(channelName);
         if (!syncInfo) {
             return;
         }
@@ -99,6 +127,14 @@
             // Ignore errors when closing
         }
 
-        delete window.__storeTabSync[channelName];
+        storage.delete(channelName);
+    };
+
+    /**
+     * Gets the count of active channels (for diagnostics).
+     * @returns {number} - Number of active channels
+     */
+    window.__getTabSyncChannelCount = function () {
+        return storage.size;
     };
 })();

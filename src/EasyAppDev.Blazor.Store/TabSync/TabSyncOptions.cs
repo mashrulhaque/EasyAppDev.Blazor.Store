@@ -1,3 +1,5 @@
+using EasyAppDev.Blazor.Store.Security;
+
 namespace EasyAppDev.Blazor.Store.TabSync;
 
 /// <summary>
@@ -53,6 +55,42 @@ public sealed class TabSyncOptions
     /// Default is 0.
     /// </summary>
     public int DebounceMs { get; set; } = 0;
+
+    /// <summary>
+    /// Gets or sets whether to enable message signing for cross-tab messages.
+    /// When enabled, messages are signed with HMAC to prevent tampering.
+    /// Default is false for backward compatibility.
+    /// </summary>
+    public bool EnableMessageSigning { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to require valid signatures on incoming messages.
+    /// Only applies when EnableMessageSigning is true.
+    /// Default is true.
+    /// </summary>
+    public bool RequireValidSignature { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum age of a message in seconds before it's rejected.
+    /// Helps prevent replay attacks. Default is 30 seconds.
+    /// </summary>
+    public int MaxMessageAgeSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets whether to validate message timestamps.
+    /// Default is true.
+    /// </summary>
+    public bool ValidateTimestamp { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when a message with invalid signature is received.
+    /// </summary>
+    public Action<string>? OnInvalidSignature { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when state validation fails.
+    /// </summary>
+    public Action<StateValidationResult>? OnValidationFailed { get; set; }
 
     /// <summary>
     /// Sets the channel name.

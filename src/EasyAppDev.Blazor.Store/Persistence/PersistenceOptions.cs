@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyAppDev.Blazor.Store.Security;
 
 namespace EasyAppDev.Blazor.Store.Persistence;
 
@@ -68,6 +69,26 @@ public class PersistenceOptions<TState> where TState : notnull
     /// Useful for excluding sensitive data from persistence.
     /// </summary>
     public Func<TState, TState>? TransformOnSave { get; init; }
+
+    /// <summary>
+    /// Gets or sets the state validator for validating loaded state.
+    /// Validates state after deserialization from storage.
+    /// Default: NoOpStateValidator (accepts all states).
+    /// </summary>
+    public IStateValidator<TState>? StateValidator { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether to reject invalid states from storage.
+    /// If true, invalid states are not applied and OnHydrationFailure is called.
+    /// If false, invalid states are logged but still applied.
+    /// Default: true.
+    /// </summary>
+    public bool RejectInvalidState { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when state validation fails.
+    /// </summary>
+    public Action<StateValidationResult>? OnValidationFailed { get; init; }
 }
 
 /// <summary>

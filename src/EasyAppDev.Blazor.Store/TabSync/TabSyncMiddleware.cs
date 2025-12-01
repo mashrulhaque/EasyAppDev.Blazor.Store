@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Middleware;
+using EasyAppDev.Blazor.Store.Security;
 using Microsoft.JSInterop;
 
 namespace EasyAppDev.Blazor.Store.TabSync;
@@ -23,6 +24,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     private readonly TabSyncOptions _options;
     private readonly string _tabId = Guid.NewGuid().ToString("N")[..8];
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly MessageSigner? _messageSigner;
 
     private IJSRuntime? _jsRuntime;
     private IJSObjectReference? _jsModule;
@@ -49,6 +51,12 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
+
+        // Initialize message signer if signing is enabled
+        if (_options.EnableMessageSigning)
+        {
+            _messageSigner = new MessageSigner();
+        }
     }
 
     /// <summary>
@@ -136,6 +144,44 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
             var message = JsonSerializer.Deserialize<SyncMessage>(messageJson, _jsonOptions);
             if (message == null || message.TabId == _tabId) return;
 
+            // Verify message signature if signing is enabled
+            if (_options.EnableMessageSigning && _messageSigner != null)
+            {
+                if (string.IsNullOrEmpty(message.Signature))
+                {
+                    if (_options.RequireValidSignature)
+                    {
+                        _options.OnInvalidSignature?.Invoke("Missing signature");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Reconstruct the signed content (message without signature)
+                    var signedContent = $"{message.TabId}:{message.Action}:{message.State}:{message.Timestamp:O}";
+                    if (!_messageSigner.Verify(signedContent, message.Signature))
+                    {
+                        _options.OnInvalidSignature?.Invoke("Invalid signature");
+                        if (_options.RequireValidSignature)
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Validate message timestamp to prevent replay attacks
+            if (_options.ValidateTimestamp && _options.MaxMessageAgeSeconds > 0)
+            {
+                var messageAge = DateTime.UtcNow - message.Timestamp;
+                if (messageAge.TotalSeconds > _options.MaxMessageAgeSeconds)
+                {
+                    _options.OnSyncError?.Invoke(new InvalidOperationException(
+                        $"Message too old: {messageAge.TotalSeconds:F1}s (max: {_options.MaxMessageAgeSeconds}s)"));
+                    return;
+                }
+            }
+
             _options.OnSyncReceived?.Invoke(message.Action);
 
             if (_options.SyncFullState && message.State != null)
@@ -197,15 +243,25 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
                 if (cts.Token.IsCancellationRequested) return;
             }
 
+            var stateJson = _options.SyncFullState
+                ? JsonSerializer.Serialize(currentState, _jsonOptions)
+                : null;
+            var timestamp = DateTime.UtcNow;
+
             var message = new SyncMessage
             {
                 TabId = _tabId,
                 Action = action,
-                State = _options.SyncFullState
-                    ? JsonSerializer.Serialize(currentState, _jsonOptions)
-                    : null,
-                Timestamp = DateTime.UtcNow
+                State = stateJson,
+                Timestamp = timestamp
             };
+
+            // Sign the message if signing is enabled
+            if (_options.EnableMessageSigning && _messageSigner != null)
+            {
+                var signedContent = $"{_tabId}:{action}:{stateJson}:{timestamp:O}";
+                message.Signature = _messageSigner.Sign(signedContent);
+            }
 
             var messageJson = JsonSerializer.Serialize(message, _jsonOptions);
 
@@ -250,6 +306,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         }
 
         _dotNetRef?.Dispose();
+        _messageSigner?.Dispose();
     }
 
     private sealed class SyncMessage
@@ -258,5 +315,6 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         public string? Action { get; set; }
         public string? State { get; set; }
         public DateTime Timestamp { get; set; }
+        public string? Signature { get; set; }
     }
 }

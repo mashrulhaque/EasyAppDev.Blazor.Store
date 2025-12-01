@@ -1,6 +1,8 @@
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
+using EasyAppDev.Blazor.Store.Security;
+
 namespace EasyAppDev.Blazor.Store.DevTools;
 
 /// <summary>
@@ -98,10 +100,33 @@ public class DevToolsOptions<TState> where TState : notnull
     public Action<TState>? OnStateImport { get; set; }
 
     /// <summary>
+    /// Gets or sets options for filtering sensitive data from DevTools output.
+    /// When enabled, properties marked with [SensitiveData] or matching common
+    /// sensitive property names (Password, Token, Secret, etc.) are redacted.
+    /// </summary>
+    /// <remarks>
+    /// This provides automatic protection against accidentally exposing sensitive
+    /// data in the browser's Redux DevTools extension. Consider enabling this
+    /// for any store that may contain user credentials, tokens, or PII.
+    /// </remarks>
+    public SensitiveDataFilterOptions? SensitiveDataFilter { get; set; }
+
+    /// <summary>
     /// Creates default options with the given store name.
     /// </summary>
     public static DevToolsOptions<TState> Default(string? name = null) => new()
     {
         Name = name ?? typeof(TState).Name
+    };
+
+    /// <summary>
+    /// Creates options with sensitive data filtering enabled.
+    /// </summary>
+    /// <param name="name">Optional store name.</param>
+    /// <returns>Options with sensitive data filtering enabled.</returns>
+    public static DevToolsOptions<TState> WithSensitiveDataFiltering(string? name = null) => new()
+    {
+        Name = name ?? typeof(TState).Name,
+        SensitiveDataFilter = new SensitiveDataFilterOptions { Enabled = true }
     };
 }

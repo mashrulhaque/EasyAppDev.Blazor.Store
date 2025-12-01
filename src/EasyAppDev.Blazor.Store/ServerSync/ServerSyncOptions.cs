@@ -1,6 +1,8 @@
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
+using EasyAppDev.Blazor.Store.Security;
+
 namespace EasyAppDev.Blazor.Store.ServerSync;
 
 /// <summary>
@@ -180,6 +182,27 @@ public class ServerSyncOptions<TState> where TState : notnull
     /// Gets or sets a function to convert state changes to operations.
     /// </summary>
     public Func<TState, TState, string?, IEnumerable<StateOperation>>? StateToOperations { get; set; }
+
+    // --- Security options ---
+
+    /// <summary>
+    /// Gets or sets the state validator for validating incoming state from the server.
+    /// Default is null (no validation).
+    /// </summary>
+    public IStateValidator<TState>? StateValidator { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to reject invalid states from the server.
+    /// If true, invalid states are not applied.
+    /// If false, invalid states are logged but still applied.
+    /// Default is true.
+    /// </summary>
+    public bool RejectInvalidState { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when state validation fails.
+    /// </summary>
+    public Action<StateValidationResult>? OnValidationFailed { get; set; }
 }
 
 /// <summary>

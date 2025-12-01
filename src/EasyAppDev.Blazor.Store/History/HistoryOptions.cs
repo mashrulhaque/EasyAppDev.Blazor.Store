@@ -13,6 +13,24 @@ public sealed class HistoryOptions
     public int MaxSize { get; set; } = 50;
 
     /// <summary>
+    /// Maximum total estimated memory size for history entries in bytes.
+    /// Older entries are removed when this limit is exceeded.
+    /// Set to 0 to disable memory-based limiting (default).
+    /// </summary>
+    /// <remarks>
+    /// Memory size is estimated using state serialization size.
+    /// For accurate limits with large states, consider setting this value.
+    /// Recommended values: 1MB (1_048_576), 5MB (5_242_880), 10MB (10_485_760).
+    /// </remarks>
+    public long MaxMemoryBytes { get; set; } = 0;
+
+    /// <summary>
+    /// Function to estimate the memory size of a state object.
+    /// If not provided, uses JSON serialization size as an estimate.
+    /// </summary>
+    public Func<object, long>? StateSizeEstimator { get; set; }
+
+    /// <summary>
     /// Actions that should not be tracked in history.
     /// Useful for excluding high-frequency updates like cursor movements.
     /// </summary>
@@ -53,6 +71,40 @@ public sealed class HistoryOptions
         if (maxSize <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxSize), "Max size must be positive.");
         MaxSize = maxSize;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum memory size for history entries.
+    /// </summary>
+    /// <param name="maxBytes">Maximum memory size in bytes.</param>
+    /// <returns>This options instance for chaining.</returns>
+    public HistoryOptions WithMaxMemory(long maxBytes)
+    {
+        if (maxBytes < 0)
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), "Max memory must be non-negative.");
+        MaxMemoryBytes = maxBytes;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the maximum memory size for history entries using a friendly unit.
+    /// </summary>
+    /// <param name="megabytes">Maximum memory size in megabytes.</param>
+    /// <returns>This options instance for chaining.</returns>
+    public HistoryOptions WithMaxMemoryMB(int megabytes)
+    {
+        return WithMaxMemory(megabytes * 1024L * 1024L);
+    }
+
+    /// <summary>
+    /// Sets a custom state size estimator function.
+    /// </summary>
+    /// <param name="estimator">Function that returns estimated byte size of a state.</param>
+    /// <returns>This options instance for chaining.</returns>
+    public HistoryOptions WithSizeEstimator(Func<object, long> estimator)
+    {
+        StateSizeEstimator = estimator ?? throw new ArgumentNullException(nameof(estimator));
         return this;
     }
 
