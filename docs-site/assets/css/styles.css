@@ -759,7 +759,7 @@ li {
   }
 
   .sidebar-overlay {
-    display: block;
+    display: none;
     position: fixed;
     inset: 0;
     top: 73px;
