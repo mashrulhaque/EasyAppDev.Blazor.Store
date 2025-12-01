@@ -30,7 +30,7 @@ public class LoggingMiddlewareTests
     }
 
     [Fact]
-    public void WithLogging_AddsLoggingMiddleware()
+    public async Task WithLogging_AddsLoggingMiddleware()
     {
         // Arrange
         var logs = new List<string>();
@@ -41,7 +41,7 @@ public class LoggingMiddlewareTests
             .WithLogging(log => logs.Add(log))
             .Build();
 
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         logs.Should().NotBeEmpty();

@@ -206,7 +206,7 @@ public record LazyLoadTestState(
 public record ProductData(int Id, string Name, decimal Price);
 
 // Test component
-public class TestLazyLoadComponent : StoreComponent<LazyLoadTestState>
+public class TestLazyLoadComponent : StoreComponentWithUtilities<LazyLoadTestState>
 {
     public new LazyLoadTestState State => base.State;
 

@@ -105,7 +105,7 @@ public class MiddlewareTests
     }
 
     [Fact]
-    public void SynchronousUpdate_CallsMiddleware()
+    public async Task AsyncUpdate_CallsMiddleware()
     {
         // Arrange
         var middleware = new TestMiddleware<TestState>();
@@ -115,7 +115,7 @@ public class MiddlewareTests
             .Build();
 
         // Act
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         middleware.BeforeUpdateCalls.Should().Be(1);

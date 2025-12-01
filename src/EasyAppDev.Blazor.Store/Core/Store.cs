@@ -59,13 +59,6 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     }
 
     /// <inheritdoc />
-    [Obsolete("Synchronous Update can cause deadlock with cross-store updates. Use UpdateAsync instead to ensure proper async flow and avoid reentrancy issues.")]
-    public void Update(Func<TState, TState> updater, string? action = null)
-    {
-        UpdateAsync(updater, action).GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc />
     public async Task UpdateAsync(Func<TState, TState> updater, string? action = null)
     {
         ArgumentNullException.ThrowIfNull(updater);

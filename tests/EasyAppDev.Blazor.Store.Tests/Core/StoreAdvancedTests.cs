@@ -28,7 +28,7 @@ public class StoreAdvancedTests : IDisposable
         // Act
         for (int i = 0; i < updateCount; i++)
         {
-            tasks.Add(Task.Run(() => _store.Update(state => state with { Counter = state.Counter + 1 })));
+            tasks.Add(Task.Run(async () => await _store.UpdateAsync(state => state with { Counter = state.Counter + 1 })));
         }
 
         await Task.WhenAll(tasks);
@@ -61,7 +61,7 @@ public class StoreAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void Update_WhenSubscriberThrows_OtherSubscribersStillNotified()
+    public async Task Update_WhenSubscriberThrows_OtherSubscribersStillNotified()
     {
         // Arrange
         var firstCallbackExecuted = false;
@@ -74,7 +74,7 @@ public class StoreAdvancedTests : IDisposable
         _store.Subscribe(_ => { thirdCallbackExecuted = true; });
 
         // Act
-        _store.Update(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         firstCallbackExecuted.Should().BeTrue("first subscriber should be notified");
@@ -83,7 +83,7 @@ public class StoreAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void Subscribe_MultipleSubscribeUnsubscribe_ManagesMemoryCorrectly()
+    public async Task Subscribe_MultipleSubscribeUnsubscribe_ManagesMemoryCorrectly()
     {
         // Arrange & Act
         for (int i = 0; i < 1000; i++)
@@ -95,28 +95,28 @@ public class StoreAdvancedTests : IDisposable
         // Trigger update to ensure no dangling subscriptions
         var callbackCount = 0;
         using var testSubscription = _store.Subscribe(_ => callbackCount++);
-        _store.Update(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         callbackCount.Should().Be(1, "only active subscription should be notified");
     }
 
     [Fact]
-    public void Update_WithSameState_DoesNotNotifySubscribers()
+    public async Task Update_WithSameState_DoesNotNotifySubscribers()
     {
         // Arrange
         var callbackCount = 0;
         _store.Subscribe(_ => callbackCount++);
 
         // Act - update with same state
-        _store.Update(state => state);
+        await _store.UpdateAsync(state => state);
 
         // Assert
         callbackCount.Should().Be(0, "subscribers should not be notified when state doesn't change");
     }
 
     [Fact]
-    public void Subscribe_WithCustomComparer_UsesComparerForEquality()
+    public async Task Subscribe_WithCustomComparer_UsesComparerForEquality()
     {
         // Arrange
         var comparer = new TestStateComparer();
@@ -126,7 +126,7 @@ public class StoreAdvancedTests : IDisposable
         store.Subscribe(_ => callbackCount++);
 
         // Act - update counter (comparer considers states equal if counter and message are same)
-        store.Update(state => state with { Counter = 0, Message = "Initial" });
+        await store.UpdateAsync(state => state with { Counter = 0, Message = "Initial" });
 
         // Assert
         callbackCount.Should().Be(0, "comparer should prevent notification for equal states");
@@ -164,7 +164,7 @@ public class StoreAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void Subscribe_FromWithinCallback_DoesNotDeadlock()
+    public async Task Subscribe_FromWithinCallback_DoesNotDeadlock()
     {
         // Arrange
         IDisposable? innerSubscription = null;
@@ -177,8 +177,8 @@ public class StoreAdvancedTests : IDisposable
         });
 
         // Act
-        _store.Update(state => state with { Counter = 1 });
-        _store.Update(state => state with { Counter = 2 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 2 });
 
         // Assert
         innerCallbackCount.Should().Be(1, "inner subscription should be notified on second update");
@@ -188,7 +188,7 @@ public class StoreAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void Dispose_WhileSubscriberExecuting_HandlesGracefully()
+    public async Task Dispose_WhileSubscriberExecuting_HandlesGracefully()
     {
         // Arrange
         var callbackStarted = new TaskCompletionSource<bool>();
@@ -201,8 +201,8 @@ public class StoreAdvancedTests : IDisposable
         });
 
         // Act
-        var updateTask = Task.Run(() => _store.Update(state => state with { Counter = 1 }));
-        callbackStarted.Task.Wait(TimeSpan.FromSeconds(5));
+        var updateTask = Task.Run(async () => await _store.UpdateAsync(state => state with { Counter = 1 }));
+        await callbackStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Dispose while callback is executing
         _store.Dispose();
@@ -214,7 +214,7 @@ public class StoreAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void Subscribe_WithSelector_HandlesNullSelectedValues()
+    public async Task Subscribe_WithSelector_HandlesNullSelectedValues()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, null!));
@@ -225,7 +225,7 @@ public class StoreAdvancedTests : IDisposable
             state => state.Message,
             message => callbackCount++);
 
-        store.Update(state => state with { Message = "Changed" });
+        await store.UpdateAsync(state => state with { Message = "Changed" });
         callbackCount.Should().Be(1);
     }
 

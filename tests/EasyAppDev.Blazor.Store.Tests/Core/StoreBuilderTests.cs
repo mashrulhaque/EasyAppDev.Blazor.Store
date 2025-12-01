@@ -30,7 +30,7 @@ public class StoreBuilderTests
     }
 
     [Fact]
-    public void WithComparer_SetsCustomComparer()
+    public async Task WithComparer_SetsCustomComparer()
     {
         // Arrange
         var comparer = new TestStateComparer();
@@ -43,7 +43,7 @@ public class StoreBuilderTests
             .Build();
 
         // Assert - comparer is used internally, verify no exception
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
         store.GetState().Counter.Should().Be(1);
     }
 

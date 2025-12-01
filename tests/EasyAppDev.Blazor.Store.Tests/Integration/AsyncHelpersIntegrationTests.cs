@@ -207,7 +207,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     #region Test Components and States
 
     // SearchAndLoadComponent - Tests Debounce + ExecuteAsync
-    private class SearchAndLoadComponent : StoreComponent<SearchAndLoadState>
+    private class SearchAndLoadComponent : StoreComponentWithUtilities<SearchAndLoadState>
     {
         public new SearchAndLoadState State => base.State;
 
@@ -235,7 +235,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     }
 
     // ScrollAndLoadComponent - Tests Throttle + LazyLoad
-    private class ScrollAndLoadComponent : StoreComponent<ScrollAndLoadState>
+    private class ScrollAndLoadComponent : StoreComponentWithUtilities<ScrollAndLoadState>
     {
         public new ScrollAndLoadState State => base.State;
 
@@ -267,7 +267,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     private record LoadedItem(string Id, string Data);
 
     // ComplexAppComponent - Tests all features together
-    private class ComplexAppComponent : StoreComponent<ComplexAppState>
+    private class ComplexAppComponent : StoreComponentWithUtilities<ComplexAppState>
     {
         public new ComplexAppState State => base.State;
 
@@ -322,7 +322,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     private record ProductDetails(string Id, string Name, decimal Price, string Description);
 
     // AsyncTransitionComponent - Tests AsyncData state transitions
-    private class AsyncTransitionComponent : StoreComponent<AsyncTransitionState>
+    private class AsyncTransitionComponent : StoreComponentWithUtilities<AsyncTransitionState>
     {
         public new AsyncTransitionState State => base.State;
 
@@ -344,7 +344,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     }
 
     // AsyncErrorComponent - Tests error handling
-    private class AsyncErrorComponent : StoreComponent<AsyncErrorState>
+    private class AsyncErrorComponent : StoreComponentWithUtilities<AsyncErrorState>
     {
         public new AsyncErrorState State => base.State;
 
@@ -370,7 +370,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     }
 
     // ConcurrentComponent - Tests concurrent operations
-    private class ConcurrentComponent : StoreComponent<ConcurrentState>
+    private class ConcurrentComponent : StoreComponentWithUtilities<ConcurrentState>
     {
         public new ConcurrentState State => base.State;
 
@@ -402,7 +402,7 @@ public class AsyncHelpersIntegrationTests : TestContext
     }
 
     // CacheTestComponent - Tests LazyLoad caching
-    private class CacheTestComponent : StoreComponent<CacheTestState>
+    private class CacheTestComponent : StoreComponentWithUtilities<CacheTestState>
     {
         public new CacheTestState State => base.State;
 

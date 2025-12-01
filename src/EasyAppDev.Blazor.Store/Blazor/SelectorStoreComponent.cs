@@ -106,36 +106,6 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     protected abstract object SelectState(TState state);
 
     /// <summary>
-    /// Updates the state using the provided updater function.
-    /// </summary>
-    /// <param name="updater">Function that transforms current state to new state.</param>
-    /// <param name="action">Optional action name for debugging.</param>
-    protected void UpdateState(Func<TState, TState> updater, string? action = null)
-    {
-        Store.Update(updater, action);
-    }
-
-    /// <summary>
-    /// Updates the state asynchronously.
-    /// </summary>
-    /// <param name="updater">Function that transforms current state to new state.</param>
-    /// <param name="action">Optional action name for debugging.</param>
-    protected Task UpdateStateAsync(Func<TState, TState> updater, string? action = null)
-    {
-        return Store.UpdateAsync(updater, action);
-    }
-
-    /// <summary>
-    /// Updates the state asynchronously using an async updater.
-    /// </summary>
-    /// <param name="asyncUpdater">Async function that transforms state.</param>
-    /// <param name="action">Optional action name for debugging.</param>
-    protected Task UpdateStateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null)
-    {
-        return Store.UpdateAsync(asyncUpdater, action);
-    }
-
-    /// <summary>
     /// Updates the state using a transformation function (Zustand-style).
     /// </summary>
     /// <param name="updater">Function that transforms current state to new state.</param>

@@ -11,10 +11,7 @@ namespace EasyAppDev.Blazor.Store.Core;
 /// </remarks>
 /// <example>
 /// <code>
-/// // Synchronous update
-/// stateWriter.Update(state => state with { Count = state.Count + 1 }, "INCREMENT");
-///
-/// // Asynchronous update
+/// // Asynchronous update (recommended)
 /// await stateWriter.UpdateAsync(
 ///     state => state with { IsLoading = true },
 ///     "START_LOADING"
@@ -32,43 +29,6 @@ namespace EasyAppDev.Blazor.Store.Core;
 /// </example>
 public interface IStateWriter<TState> where TState : notnull
 {
-    /// <summary>
-    /// Updates the state synchronously using the provided updater function.
-    /// </summary>
-    /// <param name="updater">
-    /// A pure function that takes the current state and returns the new state.
-    /// Must not return null. Should use immutable update patterns (e.g., 'with' expressions).
-    /// </param>
-    /// <param name="action">
-    /// Optional action name for debugging, logging, and Redux DevTools integration.
-    /// If not provided, a default action name will be generated.
-    /// </param>
-    /// <exception cref="ArgumentNullException">
-    /// Thrown when <paramref name="updater"/> is null.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the store has been disposed.
-    /// </exception>
-    /// <remarks>
-    /// Blocks until update completes. Avoid long-running operations.
-    /// For async operations, use <see cref="UpdateAsync(Func{TState, Task{TState}}, string)"/>.
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// // Simple increment
-    /// stateWriter.Update(s => s with { Count = s.Count + 1 }, "INCREMENT");
-    ///
-    /// // Conditional update
-    /// stateWriter.Update(s => s.Count &lt; 10
-    ///     ? s with { Count = s.Count + 1 }
-    ///     : s, "INCREMENT_IF_VALID");
-    ///
-    /// // Using state methods
-    /// stateWriter.Update(s => s.Increment(), "INCREMENT");
-    /// </code>
-    /// </example>
-    void Update(Func<TState, TState> updater, string? action = null);
-
     /// <summary>
     /// Updates the state asynchronously using the provided updater function.
     /// </summary>

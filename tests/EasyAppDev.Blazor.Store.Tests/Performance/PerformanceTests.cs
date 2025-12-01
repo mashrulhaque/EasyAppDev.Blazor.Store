@@ -41,7 +41,7 @@ public class PerformanceTests
     }
 
     [Fact]
-    public void Subscription_Performance_1000Subscribers()
+    public async Task Subscription_Performance_1000Subscribers()
     {
         // Arrange
         var store = StoreBuilder<TestState>
@@ -65,7 +65,7 @@ public class PerformanceTests
 
         // Update state
         sw.Restart();
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
         sw.Stop();
         var notifyTime = sw.ElapsedMilliseconds;
 
@@ -170,7 +170,7 @@ public class PerformanceTests
     }
 
     [Fact]
-    public void LargeState_Update_Performance()
+    public async Task LargeState_Update_Performance()
     {
         // Arrange - Large state with collection
         var largeState = new LargeTestState(
@@ -185,7 +185,7 @@ public class PerformanceTests
         // Act - Update with large state
         var sw = Stopwatch.StartNew();
 
-        store.Update(state => state with
+        await store.UpdateAsync(state => state with
         {
             Items = state.Items.Append("New_Item").ToList()
         });
@@ -323,7 +323,7 @@ public class PerformanceTests
     }
 
     [Fact]
-    public void MemoryEfficiency_SubscriptionCleanup()
+    public async Task MemoryEfficiency_SubscriptionCleanup()
     {
         // Arrange
         var store = StoreBuilder<TestState>
@@ -338,7 +338,7 @@ public class PerformanceTests
         }
 
         // Update store
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert - No callbacks should fire (all disposed)
         // This test verifies that disposed subscriptions are properly cleaned up

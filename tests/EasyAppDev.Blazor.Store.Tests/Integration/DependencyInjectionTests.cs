@@ -209,7 +209,7 @@ public class DependencyInjectionTests : TestContext
     /// Tests the recommended configuration: AddStoreUtilities + IStateWriter + AddAsyncActionExecutor + AddStore.
     /// </summary>
     [Fact]
-    public void FullSetup_WithSampleAppConfiguration_Succeeds()
+    public async Task FullSetup_WithSampleAppConfiguration_Succeeds()
     {
         // Arrange - Replicate exact sample app setup
         var services = new ServiceCollection();
@@ -245,7 +245,7 @@ public class DependencyInjectionTests : TestContext
 
         // Verify store is functional
         store!.GetState().Counter.Should().Be(0);
-        store.Update(s => s with { Counter = 5 });
+        await store.UpdateAsync(s => s with { Counter = 5 });
         store.GetState().Counter.Should().Be(5);
     }
 
@@ -329,7 +329,7 @@ public class DependencyInjectionTests : TestContext
     /// Validates that scoped stores work correctly with scoped utilities.
     /// </summary>
     [Fact]
-    public void ScopedStore_WithScopedUtilities_WorksCorrectly()
+    public async Task ScopedStore_WithScopedUtilities_WorksCorrectly()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -347,8 +347,8 @@ public class DependencyInjectionTests : TestContext
         var store1 = scope1.ServiceProvider.GetRequiredService<IStore<TestDiState>>();
         var store2 = scope2.ServiceProvider.GetRequiredService<IStore<TestDiState>>();
 
-        store1.Update(s => s with { Counter = 10 });
-        store2.Update(s => s with { Counter = 20 });
+        await store1.UpdateAsync(s => s with { Counter = 10 });
+        await store2.UpdateAsync(s => s with { Counter = 20 });
 
         // Assert - Each scope has its own store instance
         store1.GetState().Counter.Should().Be(10);
@@ -410,15 +410,16 @@ public class DependencyInjectionTests : TestContext
 
     /// <summary>
     /// Test component that exposes all injected dependencies for validation.
+    /// Uses StoreComponentWithUtilities for access to utility methods.
     /// </summary>
-    public class TestStoreComponent : StoreComponent<TestDiState>
+    public class TestStoreComponent : StoreComponentWithUtilities<TestDiState>
     {
         // Expose protected properties for testing
         public new IStore<TestDiState> Store => base.Store;
         public new IDebounceManager DebounceManager => base.DebounceManager;
         public new IThrottleManager ThrottleManager => base.ThrottleManager;
         public new ILazyCache LazyCache => base.LazyCache;
-        public new IAsyncActionExecutor<TestDiState> AsyncExecutor => base.AsyncExecutor;
+        public new IAsyncActionExecutor<TestDiState>? AsyncExecutor => base.AsyncExecutor;
 
         protected override void BuildRenderTree(RenderTreeBuilder builder)
         {
@@ -436,7 +437,7 @@ public class DependencyInjectionTests : TestContext
 
         private void Increment()
         {
-            UpdateState(s => s with { Counter = s.Counter + 1 });
+            Update(s => s with { Counter = s.Counter + 1 });
         }
 
         public async Task TestDebounce()

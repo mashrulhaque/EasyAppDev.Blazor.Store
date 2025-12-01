@@ -210,7 +210,7 @@ public class ExecuteAsyncTests : TestContext
     }
 
     // Test component
-    private class TestExecuteAsyncComponent : StoreComponent<TestState>
+    private class TestExecuteAsyncComponent : StoreComponentWithUtilities<TestState>
     {
         // Expose State publicly for tests
         public new TestState State => base.State;

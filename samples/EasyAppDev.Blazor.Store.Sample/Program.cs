@@ -6,7 +6,9 @@ using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Blazor;
 using EasyAppDev.Blazor.Store.Persistence;
 using Microsoft.JSInterop;
+#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
+#endif
 using EasyAppDev.Blazor.Store.AsyncActions;
 using EasyAppDev.Blazor.Store.Utilities;
 
@@ -16,8 +18,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-// Register diagnostics service - only active in DEBUG builds
+// Register diagnostics service - only available in DEBUG builds
+#if DEBUG
 builder.Services.AddStoreDiagnostics();
+#endif
 
 // Register utility services required by StoreComponent
 // Note: AddStoreUtilities() registers IDebounceManager, IThrottleManager, and ILazyCache
@@ -34,32 +38,28 @@ builder.Services.AddAsyncActionExecutor<ComprehensiveDemoState>();
 // ============================================================================
 builder.Services.AddStore(
     new CounterState(0),
-    (store, sp) => store.WithDefaults(sp, "Counter Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Counter Store"));
 
 // ============================================================================
 // Debounce Store - Demonstrates debounce and throttle functionality
 // ============================================================================
 builder.Services.AddStore(
     new DebounceState(),
-    (store, sp) => store.WithDefaults(sp, "Debounce Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Debounce Store"));
 
 // ============================================================================
 // Todo Store - Demonstrates immutable collections (ImmutableList)
 // ============================================================================
 builder.Services.AddStore(
     TodoState.Empty,
-    (store, sp) => store.WithDefaults(sp, "Todo Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Todo Store"));
 
 // ============================================================================
 // User Profile Store - Demonstrates async actions and loading states
 // ============================================================================
 builder.Services.AddStore(
     UserProfileState.Empty,
-    (store, sp) => store.WithDefaults(sp, "User Profile Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "User Profile Store"));
 
 // ============================================================================
 // AsyncData Demo Store - Demonstrates AsyncData<T> wrapper pattern
@@ -67,8 +67,7 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     AsyncDataDemoState.Initial,
-    (store, sp) => store.WithDefaults(sp, "AsyncData Demo Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "AsyncData Demo Store"));
 
 // ============================================================================
 // User Management Store - Demonstrates ExecuteAsync helper
@@ -76,8 +75,7 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     UserManagementState.Initial,
-    (store, sp) => store.WithDefaults(sp, "User Management Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "User Management Store"));
 
 // ============================================================================
 // Shopping Cart Store - Demonstrates persistence with LocalStorage
@@ -87,8 +85,7 @@ builder.Services.AddStore(
 builder.Services.AddStore(
     ShoppingCartState.Empty,
     (store, sp) => store.WithDefaults(sp, "Shopping Cart Store")
-                        .WithPersistence(sp, "shopping-cart-state")
-                        .WithDiagnosticsIfAvailable(sp));
+                        .WithPersistence(sp, "shopping-cart-state"));
 
 // ============================================================================
 // Theme Store - Demonstrates selector optimization with SelectorStoreComponent
@@ -98,8 +95,7 @@ builder.Services.AddStore(
 builder.Services.AddStore(
     ThemeState.Default,
     (store, sp) => store.WithDefaults(sp, "Theme Store")
-                        .WithPersistence(sp, "theme-state")
-                        .WithDiagnosticsIfAvailable(sp));
+                        .WithPersistence(sp, "theme-state"));
 
 // ============================================================================
 // Product Catalog Store - Demonstrates LazyLoad with caching
@@ -107,8 +103,7 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     new ProductCatalogState(),
-    (store, sp) => store.WithDefaults(sp, "Product Catalog Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Product Catalog Store"));
 
 // ============================================================================
 // Comprehensive Demo Store - Demonstrates ALL async helpers working together
@@ -117,8 +112,7 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     ComprehensiveDemoState.Initial,
-    (store, sp) => store.WithDefaults(sp, "Comprehensive Demo Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Comprehensive Demo Store"));
 
 // ============================================================================
 // Form Validation Store - Demonstrates form state management and validation
@@ -127,8 +121,7 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     new FormValidationState(),
-    (store, sp) => store.WithDefaults(sp, "Form Validation Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Form Validation Store"));
 
 // ============================================================================
 // Cross-Store Demo Stores - Demonstrates Phase 1 updates
@@ -137,12 +130,10 @@ builder.Services.AddStore(
 // ============================================================================
 builder.Services.AddStore(
     AuthDemoState.Initial,
-    (store, sp) => store.WithDefaults(sp, "Auth Demo Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Auth Demo Store"));
 
 builder.Services.AddStore(
     CartDemoState.Empty,
-    (store, sp) => store.WithDefaults(sp, "Cart Demo Store")
-                        .WithDiagnosticsIfAvailable(sp));
+    (store, sp) => store.WithDefaults(sp, "Cart Demo Store"));
 
 await builder.Build().RunAsync();

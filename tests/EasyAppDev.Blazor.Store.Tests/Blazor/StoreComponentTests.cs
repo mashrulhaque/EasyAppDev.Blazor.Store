@@ -28,7 +28,7 @@ public class StoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_ReRendersWhenStateChanges()
+    public async Task Component_ReRendersWhenStateChanges()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial"));
@@ -37,7 +37,7 @@ public class StoreComponentTests : TestContext
         var cut = RenderComponent<TestStoreComponent>();
 
         // Act
-        store.Update(state => state with { Counter = 5 });
+        await store.UpdateAsync(state => state with { Counter = 5 });
 
         // Assert
         cut.Find("p").TextContent.Should().Be("Counter: 5");
@@ -61,7 +61,7 @@ public class StoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_DisposesSubscriptionOnDisposal()
+    public async Task Component_DisposesSubscriptionOnDisposal()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial"));
@@ -71,7 +71,7 @@ public class StoreComponentTests : TestContext
 
         // Act
         cut.Instance.Dispose();
-        store.Update(state => state with { Counter = 10 });
+        await store.UpdateAsync(state => state with { Counter = 10 });
 
         // Assert - component should not re-render after disposal
         cut.Find("p").TextContent.Should().Be("Counter: 0");
@@ -98,7 +98,7 @@ public class StoreComponentTests : TestContext
     }
 
     [Fact]
-    public void SubscribeToSelector_OnlyReRendersWhenSelectedValueChanges()
+    public async Task SubscribeToSelector_OnlyReRendersWhenSelectedValueChanges()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial"));
@@ -108,13 +108,13 @@ public class StoreComponentTests : TestContext
         var renderCount = cut.RenderCount;
 
         // Act - Change message only (not counter)
-        store.Update(state => state with { Message = "Changed" });
+        await store.UpdateAsync(state => state with { Message = "Changed" });
 
         // Assert - should not trigger re-render since selector watches Counter
         cut.RenderCount.Should().Be(renderCount);
 
         // Act - Change counter
-        store.Update(state => state with { Counter = 1 });
+        await store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert - should trigger re-render
         cut.RenderCount.Should().BeGreaterThan(renderCount);
@@ -136,9 +136,9 @@ public class StoreComponentTests : TestContext
             builder.CloseElement();
         }
 
-        private void Increment()
+        private async Task Increment()
         {
-            UpdateState(state => state with { Counter = state.Counter + 1 });
+            await Update(state => state with { Counter = state.Counter + 1 });
         }
     }
 
@@ -159,7 +159,7 @@ public class StoreComponentTests : TestContext
 
         private async Task IncrementAsync()
         {
-            await UpdateStateAsync(async state =>
+            await UpdateAsync(async state =>
             {
                 await Task.Delay(10);
                 return state with { Counter = state.Counter + 5 };

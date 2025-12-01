@@ -28,38 +28,39 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
-    public void Update_WithValidUpdater_UpdatesState()
+    public async Task Update_WithValidUpdater_UpdatesState()
     {
         // Act
-        _store.Update(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         _store.GetState().Counter.Should().Be(1);
     }
 
     [Fact]
-    public void Update_WithNullUpdater_ThrowsArgumentNullException()
+    public async Task Update_WithNullUpdater_ThrowsArgumentNullException()
     {
         // Act
-        Action act = () => _store.Update(null!);
+        Func<Task> act = async () => await _store.UpdateAsync((Func<TestState, TestState>)null!);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>();
+        await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
-    public void Update_WhenUpdaterReturnsNull_ThrowsInvalidOperationException()
+    public async Task Update_WhenUpdaterReturnsNull_ThrowsInvalidOperationException()
     {
         // Act
-        Action act = () => _store.Update(_ => null!);
+        Func<TestState, TestState> nullReturningUpdater = _ => null!;
+        Func<Task> act = async () => await _store.UpdateAsync(nullReturningUpdater);
 
         // Assert
-        act.Should().Throw<InvalidOperationException>()
+        await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*returned null*");
     }
 
     [Fact]
-    public void Subscribe_InvokesCallbackOnStateChange()
+    public async Task Subscribe_InvokesCallbackOnStateChange()
     {
         // Arrange
         var callbackInvoked = false;
@@ -72,7 +73,7 @@ public class StoreTests : IDisposable
         });
 
         // Act
-        _store.Update(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
         callbackInvoked.Should().BeTrue();
@@ -81,25 +82,25 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
-    public void Subscribe_WhenDisposed_StopsReceivingUpdates()
+    public async Task Subscribe_WhenDisposed_StopsReceivingUpdates()
     {
         // Arrange
         var callCount = 0;
         var subscription = _store.Subscribe(_ => callCount++);
 
-        _store.Update(state => state with { Counter = 1 });
+        await _store.UpdateAsync(state => state with { Counter = 1 });
         callCount.Should().Be(1);
 
         // Act
         subscription.Dispose();
-        _store.Update(state => state with { Counter = 2 });
+        await _store.UpdateAsync(state => state with { Counter = 2 });
 
         // Assert
         callCount.Should().Be(1); // No additional invocation
     }
 
     [Fact]
-    public void Subscribe_WithSelector_OnlyInvokesWhenSelectedValueChanges()
+    public async Task Subscribe_WithSelector_OnlyInvokesWhenSelectedValueChanges()
     {
         // Arrange
         var callCount = 0;
@@ -108,10 +109,10 @@ public class StoreTests : IDisposable
             counter => callCount++);
 
         // Act
-        _store.Update(state => state with { Message = "Changed" }); // Counter unchanged
+        await _store.UpdateAsync(state => state with { Message = "Changed" }); // Counter unchanged
         callCount.Should().Be(0);
 
-        _store.Update(state => state with { Counter = 1 }); // Counter changed
+        await _store.UpdateAsync(state => state with { Counter = 1 }); // Counter changed
         callCount.Should().Be(1);
     }
 
@@ -146,7 +147,7 @@ public class StoreTests : IDisposable
     }
 
     [Fact]
-    public void Dispose_ClearsSubscriptions()
+    public async Task Dispose_ClearsSubscriptions()
     {
         // Arrange
         var callCount = 0;
@@ -154,10 +155,10 @@ public class StoreTests : IDisposable
 
         // Act
         _store.Dispose();
-        Action act = () => _store.Update(state => state with { Counter = 1 });
+        Func<Task> act = async () => await _store.UpdateAsync(state => state with { Counter = 1 });
 
         // Assert
-        act.Should().Throw<ObjectDisposedException>();
+        await act.Should().ThrowAsync<ObjectDisposedException>();
         callCount.Should().Be(0);
     }
 

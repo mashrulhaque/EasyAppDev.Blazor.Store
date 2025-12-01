@@ -72,7 +72,7 @@ public class FullWorkflowTests : TestContext
     }
 
     [Fact]
-    public void CompleteWorkflow_WithMultipleMiddleware()
+    public async Task CompleteWorkflow_WithMultipleMiddleware()
     {
         // Arrange - Setup store with multiple middleware
         var logs = new List<string>();
@@ -90,7 +90,7 @@ public class FullWorkflowTests : TestContext
         var store = Services.GetRequiredService<IStore<CounterState>>();
 
         // Act
-        store.Update(state => state with { Count = 1, LastAction = "TEST" });
+        await store.UpdateAsync(state => state with { Count = 1, LastAction = "TEST" });
 
         // Assert - All middleware executed
         logs.Should().Contain(log => log.Contains("TEST"));
@@ -141,7 +141,7 @@ public class FullWorkflowTests : TestContext
     }
 
     [Fact]
-    public void StoreWithCustomComparer_SkipsUnnecessaryUpdates()
+    public async Task StoreWithCustomComparer_SkipsUnnecessaryUpdates()
     {
         // Arrange
         Services.AddStore(
@@ -153,13 +153,13 @@ public class FullWorkflowTests : TestContext
         store.Subscribe(_ => callCount++);
 
         // Act - Change only LastAction (Count unchanged)
-        store.Update(state => state with { LastAction = "CHANGED" });
+        await store.UpdateAsync(state => state with { LastAction = "CHANGED" });
 
         // Assert - No notification due to custom comparer
         callCount.Should().Be(0);
 
         // Act - Change Count
-        store.Update(state => state with { Count = 1 });
+        await store.UpdateAsync(state => state with { Count = 1 });
 
         // Assert - Notification triggered
         callCount.Should().Be(1);
@@ -182,10 +182,10 @@ public class FullWorkflowTests : TestContext
 
         // Act - Update with faulty middleware
         // The store implementation catches middleware exceptions and continues
-        Action act = () => store.Update(state => state with { Count = 1 });
+        Func<Task> act = async () => await store.UpdateAsync(state => state with { Count = 1 });
 
         // Assert - Store catches middleware exceptions, state still updates
-        act.Should().NotThrow();
+        await act.Should().NotThrowAsync();
         store.GetState().Count.Should().Be(1);
     }
 
@@ -206,9 +206,9 @@ public class FullWorkflowTests : TestContext
             builder.CloseElement();
         }
 
-        private void Increment()
+        private async Task Increment()
         {
-            UpdateState(
+            await Update(
                 state => state with
                 {
                     Count = state.Count + 1,

@@ -14,7 +14,7 @@ public class SelectorStoreComponentTests : TestContext
     private record TestState(int Counter, string Message, bool IsActive);
 
     [Fact]
-    public void Component_ShouldRenderInitialState()
+    public async Task Component_ShouldRenderInitialState()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(5, "Hello", true));
@@ -28,7 +28,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_OnlyReRendersWhenSelectedValueChanges()
+    public async Task Component_OnlyReRendersWhenSelectedValueChanges()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial", false));
@@ -39,28 +39,28 @@ public class SelectorStoreComponentTests : TestContext
         cut.RenderCount.Should().Be(1); // Initial render
 
         // Act 1: Change Counter (selected property)
-        store.Update(s => new TestState(1, "Initial", false));
+        await store.UpdateAsync(s => new TestState(1, "Initial", false));
 
         // Assert 1: Should re-render
         cut.WaitForAssertion(() => cut.Find("p").TextContent.Should().Be("Counter: 1"));
         cut.RenderCount.Should().Be(2);
 
         // Act 2: Change Message (NOT selected)
-        store.Update(s => new TestState(1, "Changed", false));
+        await store.UpdateAsync(s => new TestState(1, "Changed", false));
 
         // Assert 2: Should NOT re-render
         Thread.Sleep(50); // Give it time to potentially re-render
         cut.RenderCount.Should().Be(2); // Still 2, no re-render
 
         // Act 3: Change IsActive (NOT selected)
-        store.Update(s => new TestState(1, "Changed", true));
+        await store.UpdateAsync(s => new TestState(1, "Changed", true));
 
         // Assert 3: Should NOT re-render
         Thread.Sleep(50);
         cut.RenderCount.Should().Be(2); // Still 2, no re-render
 
         // Act 4: Change Counter again
-        store.Update(s => new TestState(2, "Changed", true));
+        await store.UpdateAsync(s => new TestState(2, "Changed", true));
 
         // Assert 4: Should re-render
         cut.WaitForAssertion(() => cut.Find("p").TextContent.Should().Be("Counter: 2"));
@@ -68,7 +68,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_ShouldProvideFullStateAccess()
+    public async Task Component_ShouldProvideFullStateAccess()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(5, "Hello", true));
@@ -84,7 +84,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_WithMultiplePropertiesSelector_ShouldReRenderWhenAnySelectedPropertyChanges()
+    public async Task Component_WithMultiplePropertiesSelector_ShouldReRenderWhenAnySelectedPropertyChanges()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial", false));
@@ -94,19 +94,19 @@ public class SelectorStoreComponentTests : TestContext
         cut.RenderCount.Should().Be(1);
 
         // Act 1: Change Counter (selected)
-        store.Update(s => new TestState(1, "Initial", false));
+        await store.UpdateAsync(s => new TestState(1, "Initial", false));
 
         // Assert 1: Should re-render
         cut.WaitForAssertion(() => cut.RenderCount.Should().Be(2));
 
         // Act 2: Change Message (selected)
-        store.Update(s => new TestState(1, "Changed", false));
+        await store.UpdateAsync(s => new TestState(1, "Changed", false));
 
         // Assert 2: Should re-render
         cut.WaitForAssertion(() => cut.RenderCount.Should().Be(3));
 
         // Act 3: Change IsActive (NOT selected)
-        store.Update(s => new TestState(1, "Changed", true));
+        await store.UpdateAsync(s => new TestState(1, "Changed", true));
 
         // Assert 3: Should NOT re-render
         Thread.Sleep(50);
@@ -114,7 +114,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_ShouldUpdateSelectedProperty()
+    public async Task Component_ShouldUpdateSelectedProperty()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(5, "Hello", true));
@@ -122,7 +122,7 @@ public class SelectorStoreComponentTests : TestContext
         var cut = RenderComponent<TestSelectorComponent>();
 
         // Act
-        store.Update(s => new TestState(10, "Hello", true));
+        await store.UpdateAsync(s => new TestState(10, "Hello", true));
 
         // Assert - Selected property should be updated
         cut.WaitForAssertion(() =>
@@ -136,7 +136,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_ShouldSupportUpdateMethods()
+    public async Task Component_ShouldSupportUpdateMethods()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial", false));
@@ -154,7 +154,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_ShouldDisposeSubscriptionOnDispose()
+    public async Task Component_ShouldDisposeSubscriptionOnDispose()
     {
         // Arrange
         var store = StoreTestHelpers.CreateStore(new TestState(0, "Initial", false));
@@ -165,7 +165,7 @@ public class SelectorStoreComponentTests : TestContext
         cut.Instance.Dispose();
 
         // Update store
-        store.Update(s => new TestState(1, "Changed", false));
+        await store.UpdateAsync(s => new TestState(1, "Changed", false));
 
         // Assert - Component should not receive updates after disposal
         Thread.Sleep(50);
@@ -174,7 +174,7 @@ public class SelectorStoreComponentTests : TestContext
     }
 
     [Fact]
-    public void Component_WithComputedSelector_ShouldReRenderOnlyWhenComputedValueChanges()
+    public async Task Component_WithComputedSelector_ShouldReRenderOnlyWhenComputedValueChanges()
     {
         // Arrange - Start with even number
         var store = StoreTestHelpers.CreateStore(new TestState(4, "Test", true));
@@ -184,20 +184,20 @@ public class SelectorStoreComponentTests : TestContext
         var initialRenderCount = cut.RenderCount;
 
         // Act 1: Change Counter from 4 to 6 (both even)
-        store.Update(s => new TestState(6, "Test", true));
+        await store.UpdateAsync(s => new TestState(6, "Test", true));
 
         // Assert 1: Should NOT re-render (both are even)
         Thread.Sleep(50);
         cut.RenderCount.Should().Be(initialRenderCount);
 
         // Act 2: Change Counter from 6 to 7 (even to odd)
-        store.Update(s => new TestState(7, "Test", true));
+        await store.UpdateAsync(s => new TestState(7, "Test", true));
 
         // Assert 2: Should re-render (parity changed)
         cut.WaitForAssertion(() => cut.RenderCount.Should().Be(initialRenderCount + 1));
 
         // Act 3: Change Counter from 7 to 9 (both odd)
-        store.Update(s => new TestState(9, "Test", true));
+        await store.UpdateAsync(s => new TestState(9, "Test", true));
 
         // Assert 3: Should NOT re-render (both are odd)
         Thread.Sleep(50);

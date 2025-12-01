@@ -8,15 +8,15 @@ namespace EasyAppDev.Blazor.Store.DevTools;
 
 /// <summary>
 /// Middleware that integrates with Redux DevTools browser extension.
-/// Supports both immediate IJSRuntime injection and lazy resolution via IServiceProvider
-/// for compatibility with Blazor Server, WebAssembly, and Auto render modes.
+/// Uses lazy IJSRuntime resolution via IServiceProvider for compatibility
+/// with Blazor Server, WebAssembly, and Auto render modes.
 /// </summary>
 /// <typeparam name="TState">The type of state managed by the store.</typeparam>
 public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
     where TState : notnull
 {
     private IJSRuntime? _jsRuntime;
-    private readonly IServiceProvider? _serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
     private readonly string _storeName;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly ILogger<DevToolsMiddleware<TState>>? _logger;
@@ -26,7 +26,8 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     /// <summary>
-    /// Initializes a new instance with lazy IJSRuntime resolution (recommended for Blazor Server/Auto).
+    /// Initializes a new instance with lazy IJSRuntime resolution.
+    /// Works in all render modes: Server, WebAssembly, and Auto.
     /// </summary>
     /// <param name="serviceProvider">Service provider to resolve IJSRuntime on-demand.</param>
     /// <param name="storeName">The name of the store for DevTools display.</param>
@@ -37,27 +38,6 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         ILogger<DevToolsMiddleware<TState>>? logger = null)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _storeName = storeName;
-        _logger = logger;
-        _jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
-        };
-    }
-
-    /// <summary>
-    /// Initializes a new instance with immediate IJSRuntime injection (for WebAssembly).
-    /// </summary>
-    /// <param name="jsRuntime">The JS runtime for interop.</param>
-    /// <param name="storeName">The name of the store for DevTools display.</param>
-    /// <param name="logger">Optional logger for error reporting.</param>
-    public DevToolsMiddleware(
-        IJSRuntime jsRuntime,
-        string storeName = "Store",
-        ILogger<DevToolsMiddleware<TState>>? logger = null)
-    {
-        _jsRuntime = jsRuntime ?? throw new ArgumentNullException(nameof(jsRuntime));
         _storeName = storeName;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
@@ -80,20 +60,11 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
 
             try
             {
-                // Lazy resolve IJSRuntime if using service provider
-                if (_jsRuntime == null && _serviceProvider != null)
-                {
-                    _jsRuntime = _serviceProvider.GetService(typeof(IJSRuntime)) as IJSRuntime;
-                    if (_jsRuntime == null)
-                    {
-                        _logger?.LogWarning("IJSRuntime not available in service provider for store: {StoreName}", _storeName);
-                        _initializationFailed = true;
-                        return;
-                    }
-                }
-
+                // Lazy resolve IJSRuntime from service provider
+                _jsRuntime ??= _serviceProvider.GetService(typeof(IJSRuntime)) as IJSRuntime;
                 if (_jsRuntime == null)
                 {
+                    _logger?.LogWarning("IJSRuntime not available in service provider for store: {StoreName}", _storeName);
                     _initializationFailed = true;
                     return;
                 }

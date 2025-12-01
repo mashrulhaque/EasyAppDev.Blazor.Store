@@ -59,7 +59,7 @@ public class FullIntegrationTests : TestContext
     }
 
     [Fact]
-    public void StoreWithConfiguration_WorksWithComponent()
+    public async Task StoreWithConfiguration_WorksWithComponent()
     {
         // Arrange - Register store with custom comparer
         Services.AddStore(
@@ -72,7 +72,7 @@ public class FullIntegrationTests : TestContext
         var store = Services.GetRequiredService<IStore<TestState>>();
 
         // Change message (counter stays same)
-        store.Update(s => s with { Message = "Changed" });
+        await store.UpdateAsync(s => s with { Message = "Changed" });
 
         // Assert - Component should not re-render due to custom comparer
         // (Custom comparer only checks Counter)
@@ -101,7 +101,7 @@ public class FullIntegrationTests : TestContext
     }
 
     [Fact]
-    public void ComponentDisposal_UnsubscribesFromStore()
+    public async Task ComponentDisposal_UnsubscribesFromStore()
     {
         // Arrange
         Services.AddStore(new TestState(0, "Test"));
@@ -113,7 +113,7 @@ public class FullIntegrationTests : TestContext
         cut.Instance.Dispose();
 
         // Update store after component disposal
-        store.Update(s => s with { Counter = 999 });
+        await store.UpdateAsync(s => s with { Counter = 999 });
 
         // Assert - Component should not re-render (still shows old value)
         cut.Find("p").TextContent.Should().Be("Counter: 0");
@@ -179,7 +179,7 @@ public class FullIntegrationTests : TestContext
 
         private void Increment()
         {
-            UpdateState(state => state with { Counter = state.Counter + 1 }, "Increment");
+            Update(state => state with { Counter = state.Counter + 1 }, "Increment");
         }
     }
 
@@ -203,7 +203,7 @@ public class FullIntegrationTests : TestContext
 
         private async Task IncrementAsync()
         {
-            await UpdateStateAsync(async state =>
+            await UpdateAsync(async state =>
             {
                 await Task.Delay(50);
                 return state with { Counter = state.Counter + 100 };

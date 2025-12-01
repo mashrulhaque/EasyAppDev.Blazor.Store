@@ -3,7 +3,6 @@ using EasyAppDev.Blazor.Store.Middleware;
 using EasyAppDev.Blazor.Store.DevTools;
 using EasyAppDev.Blazor.Store.Persistence;
 using Microsoft.Extensions.Logging;
-using Microsoft.JSInterop;
 
 namespace EasyAppDev.Blazor.Store.Core;
 
@@ -18,7 +17,6 @@ public class StoreBuilder<TState> where TState : notnull
     private ILogger<MiddlewarePipeline<TState>>? _middlewarePipelineLogger;
     private ILogger<Store<TState>>? _storeLogger;
     private ILogger<SubscriptionManager<TState>>? _subscriptionManagerLogger;
-    private IJSRuntime? _jsRuntime;
     private MiddlewarePipelineOptions? _middlewareOptions;
 
     private StoreBuilder(TState initialState)
@@ -144,17 +142,6 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
-    /// Sets the JSRuntime for DevTools and other JS interop features.
-    /// </summary>
-    /// <param name="jsRuntime">The JS runtime instance.</param>
-    /// <returns>The builder instance for chaining.</returns>
-    public StoreBuilder<TState> WithJSRuntime(IJSRuntime jsRuntime)
-    {
-        _jsRuntime = jsRuntime ?? throw new ArgumentNullException(nameof(jsRuntime));
-        return this;
-    }
-
-    /// <summary>
     /// Enables Redux DevTools integration with lazy IJSRuntime resolution.
     /// Works in all render modes: Server, WebAssembly, and Auto (Server → WASM).
     /// </summary>
@@ -167,47 +154,6 @@ public class StoreBuilder<TState> where TState : notnull
 
         var devToolsMiddleware = new DevToolsMiddleware<TState>(
             serviceProvider,
-            storeName ?? typeof(TState).Name);
-
-        return WithMiddleware(devToolsMiddleware);
-    }
-
-    /// <summary>
-    /// Enables Redux DevTools integration.
-    /// Note: This overload is deprecated. Use WithDevTools(IServiceProvider, string?) instead.
-    /// </summary>
-    /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
-    /// <returns>The builder instance for chaining.</returns>
-    [Obsolete("Use WithDevTools(IServiceProvider serviceProvider, string? storeName) instead for better compatibility with all render modes.")]
-    public StoreBuilder<TState> WithDevTools(string? storeName = null)
-    {
-        // Skip DevTools if JSRuntime is not available (Blazor Server scenario)
-        // DevTools middleware will be added later if needed
-        if (_jsRuntime != null)
-        {
-            var devToolsMiddleware = new DevToolsMiddleware<TState>(
-                _jsRuntime,
-                storeName ?? typeof(TState).Name);
-
-            return WithMiddleware(devToolsMiddleware);
-        }
-
-        return this;
-    }
-
-    /// <summary>
-    /// Enables Redux DevTools integration with an explicit JSRuntime.
-    /// </summary>
-    /// <param name="jsRuntime">The JS runtime instance.</param>
-    /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
-    /// <returns>The builder instance for chaining.</returns>
-    public StoreBuilder<TState> WithDevTools(IJSRuntime jsRuntime, string? storeName = null)
-    {
-        ArgumentNullException.ThrowIfNull(jsRuntime);
-
-        _jsRuntime = jsRuntime;
-        var devToolsMiddleware = new DevToolsMiddleware<TState>(
-            jsRuntime,
             storeName ?? typeof(TState).Name);
 
         return WithMiddleware(devToolsMiddleware);
@@ -239,53 +185,16 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
-    /// Loads persisted state synchronously if available.
+    /// Attempts to load persisted state. Since synchronous JS interop is not available
+    /// without explicit IJSInProcessRuntime, this method now returns the current builder.
+    /// Use <see cref="WithHydratedStateAsync"/> for async state hydration.
     /// </summary>
     private StoreBuilder<TState> TryLoadPersistedState(
         string key,
         JsonSerializerOptions? jsonOptions)
     {
-        if (_jsRuntime is not IJSInProcessRuntime jsInProcess)
-        {
-            return this;
-        }
-
-        try
-        {
-            var persistedJson = jsInProcess.Invoke<string?>("localStorage.getItem", key);
-
-            if (!string.IsNullOrEmpty(persistedJson))
-            {
-                var options = jsonOptions ?? new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-
-                var loadedState = JsonSerializer.Deserialize<TState>(persistedJson, options);
-
-                if (loadedState != null)
-                {
-                    var builder = new StoreBuilder<TState>(loadedState)
-                    {
-                        _comparer = this._comparer,
-                        _middlewarePipelineLogger = this._middlewarePipelineLogger,
-                        _storeLogger = this._storeLogger,
-                        _subscriptionManagerLogger = this._subscriptionManagerLogger,
-                        _jsRuntime = this._jsRuntime,
-                        _middlewareOptions = this._middlewareOptions
-                    };
-                    builder._middlewares.AddRange(this._middlewares);
-                    return builder;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            // Log at Debug level - user can enable diagnostics if needed
-            System.Diagnostics.Debug.WriteLine(
-                $"[EasyAppDev.Store] Failed to hydrate state for {typeof(TState).Name} from key '{key}': {ex.Message}");
-        }
-
+        // Synchronous hydration is not supported without IJSInProcessRuntime.
+        // Use WithHydratedStateAsync for async state hydration.
         return this;
     }
 
@@ -320,7 +229,6 @@ public class StoreBuilder<TState> where TState : notnull
                         _middlewarePipelineLogger = this._middlewarePipelineLogger,
                         _storeLogger = this._storeLogger,
                         _subscriptionManagerLogger = this._subscriptionManagerLogger,
-                        _jsRuntime = this._jsRuntime,
                         _middlewareOptions = this._middlewareOptions
                     };
                     builder._middlewares.AddRange(this._middlewares);

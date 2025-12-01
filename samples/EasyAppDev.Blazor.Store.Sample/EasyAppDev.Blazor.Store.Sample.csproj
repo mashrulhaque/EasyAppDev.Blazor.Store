@@ -15,4 +15,10 @@
     <ProjectReference Include="..\..\src\EasyAppDev.Blazor.Store\EasyAppDev.Blazor.Store.csproj" />
   </ItemGroup>
 
+  <!-- Exclude diagnostics page in Release builds (diagnostics is DEBUG-only) -->
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Content Remove="Pages/Diagnostics.razor" />
+    <Compile Remove="Pages/Diagnostics.razor" />
+  </ItemGroup>
+
 </Project>
