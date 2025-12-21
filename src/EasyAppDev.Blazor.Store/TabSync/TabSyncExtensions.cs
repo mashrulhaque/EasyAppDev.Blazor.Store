@@ -1,4 +1,5 @@
 using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Security;
 
 namespace EasyAppDev.Blazor.Store.TabSync;
 
@@ -63,5 +64,122 @@ public static class TabSyncExtensions
         where TState : notnull
     {
         return builder.WithTabSync(serviceProvider, opts => opts.Channel(channelName));
+    }
+}
+
+/// <summary>
+/// Extension methods for configuring TabSync message signing.
+/// </summary>
+public static class TabSyncSecurityExtensions
+{
+    /// <summary>
+    /// Enables message signing with a shared signing key for cross-tab verification.
+    /// </summary>
+    /// <param name="options">The TabSync options to configure.</param>
+    /// <param name="signingKey">The shared signing key (must be at least 32 bytes).</param>
+    /// <returns>The options instance for chaining.</returns>
+    /// <remarks>
+    /// Use <see cref="MessageSigner.DeriveKeyFromSeed"/> to generate a consistent key
+    /// from a seed string (e.g., your application name).
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.Services.AddStore(
+    ///     new AppState(),
+    ///     (store, sp) => store.WithTabSync(sp, opts => opts
+    ///         .WithSharedSigningKey(MessageSigner.DeriveKeyFromSeed("MyApp"))
+    ///     )
+    /// );
+    /// </code>
+    /// </example>
+    public static TabSyncOptions WithSharedSigningKey(this TabSyncOptions options, byte[] signingKey)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(signingKey);
+        if (signingKey.Length < 32)
+            throw new ArgumentException("Signing key must be at least 32 bytes", nameof(signingKey));
+
+        options.EnableMessageSigning = true;
+        options.SigningKey = signingKey;
+        return options;
+    }
+
+    /// <summary>
+    /// Enables message signing with automatic key derivation from window.location.origin.
+    /// All tabs from the same origin will share the same signing key.
+    /// </summary>
+    /// <param name="options">The TabSync options to configure.</param>
+    /// <returns>The options instance for chaining.</returns>
+    /// <remarks>
+    /// This provides a balance between security and convenience for same-origin tabs.
+    /// The key is derived using PBKDF2 with the origin as both password and salt source.
+    /// For higher security, use <see cref="WithSharedSigningKey"/> with a server-provided session key.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.Services.AddStore(
+    ///     new AppState(),
+    ///     (store, sp) => store.WithTabSync(sp, opts => opts
+    ///         .WithOriginDerivedKey()
+    ///     )
+    /// );
+    /// </code>
+    /// </example>
+    public static TabSyncOptions WithOriginDerivedKey(this TabSyncOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        options.EnableMessageSigning = true;
+        options.DeriveKeyFromOrigin = true;
+        return options;
+    }
+
+    /// <summary>
+    /// Enables message signing with a key derived from a custom seed string.
+    /// </summary>
+    /// <param name="options">The TabSync options to configure.</param>
+    /// <param name="seed">The seed string to derive the key from.</param>
+    /// <param name="iterations">Number of PBKDF2 iterations (default: 10000).</param>
+    /// <returns>The options instance for chaining.</returns>
+    /// <remarks>
+    /// This is a convenience method that derives the key immediately.
+    /// The seed should be consistent across all instances that need to communicate.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.Services.AddStore(
+    ///     new AppState(),
+    ///     (store, sp) => store.WithTabSync(sp, opts => opts
+    ///         .WithDerivedSigningKey("MyApp-ProductionEnvironment")
+    ///     )
+    /// );
+    /// </code>
+    /// </example>
+    public static TabSyncOptions WithDerivedSigningKey(this TabSyncOptions options, string seed, int iterations = 10000)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(seed);
+
+        var signingKey = MessageSigner.DeriveKeyFromSeed(seed, iterations);
+        return options.WithSharedSigningKey(signingKey);
+    }
+
+    /// <summary>
+    /// Disables message signing (default behavior).
+    /// </summary>
+    /// <param name="options">The TabSync options to configure.</param>
+    /// <returns>The options instance for chaining.</returns>
+    /// <remarks>
+    /// Use this to explicitly disable signing if it was previously enabled.
+    /// Without signing, messages can be tampered with by malicious scripts.
+    /// </remarks>
+    public static TabSyncOptions WithoutMessageSigning(this TabSyncOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        options.EnableMessageSigning = false;
+        options.SigningKey = null;
+        options.DeriveKeyFromOrigin = false;
+        return options;
     }
 }

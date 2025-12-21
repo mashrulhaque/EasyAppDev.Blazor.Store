@@ -1,6 +1,7 @@
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
+#if DEBUG
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
@@ -14,6 +15,8 @@ namespace EasyAppDev.Blazor.Store.DevTools;
 /// <summary>
 /// Enhanced middleware for Redux DevTools with full time-travel debugging,
 /// action replay, state editing, and performance tracing.
+/// IMPORTANT: This middleware is only available in DEBUG builds for security reasons.
+/// DevTools expose your application state and should never be used in production.
 /// </summary>
 /// <typeparam name="TState">The type of state managed by the store.</typeparam>
 public class EnhancedDevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
@@ -356,3 +359,60 @@ public class StateHistoryEntry<TState>
     /// </summary>
     public DateTime Timestamp { get; set; }
 }
+
+#else
+
+using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Middleware;
+
+namespace EasyAppDev.Blazor.Store.DevTools;
+
+/// <summary>
+/// No-op EnhancedDevTools middleware stub for Release builds.
+/// DevTools are disabled in production for security reasons.
+/// </summary>
+/// <typeparam name="TState">The type of state managed by the store.</typeparam>
+public class EnhancedDevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
+    where TState : notnull
+{
+    /// <summary>
+    /// No-op constructor for Release builds.
+    /// </summary>
+    public EnhancedDevToolsMiddleware(
+        IServiceProvider serviceProvider,
+        object? options = null,
+        object? logger = null)
+    {
+    }
+
+    internal void SetStore(IStore<TState> store) { }
+
+    /// <inheritdoc />
+    public Task OnBeforeUpdateAsync(TState currentState, string? action) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task OnAfterUpdateAsync(TState previousState, TState currentState, string? action) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>
+/// State history entry stub for Release builds.
+/// </summary>
+/// <typeparam name="TState">The type of state.</typeparam>
+public class StateHistoryEntry<TState>
+{
+    /// <summary>Gets or sets the state.</summary>
+    public required TState State { get; set; }
+    /// <summary>Gets or sets the action name.</summary>
+    public required string Action { get; set; }
+    /// <summary>Gets or sets the timestamp.</summary>
+    public DateTime Timestamp { get; set; }
+}
+
+#endif

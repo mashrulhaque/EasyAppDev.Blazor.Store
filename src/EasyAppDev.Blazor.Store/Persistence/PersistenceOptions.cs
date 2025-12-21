@@ -89,6 +89,67 @@ public class PersistenceOptions<TState> where TState : notnull
     /// Gets or sets a callback invoked when state validation fails.
     /// </summary>
     public Action<StateValidationResult>? OnValidationFailed { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether to enable HMAC-based integrity checking for persisted state.
+    /// When enabled, state is signed before saving and verified on load to detect tampering.
+    /// This prevents malicious modification of persisted state in browser storage.
+    /// Default: true.
+    /// </summary>
+    /// <remarks>
+    /// Security implications:
+    /// - Enabled (recommended): Detects tampered state, prevents loading compromised data
+    /// - Disabled: Allows any state to load, vulnerable to XSS-based state injection
+    /// The signing key is auto-generated per session by default. For persistent keys across sessions,
+    /// provide a custom key via SigningKey property.
+    /// </remarks>
+    public bool EnableIntegrityCheck { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets the HMAC signing key for integrity verification.
+    /// If null, a random key is generated per session (state won't be recoverable after app reload).
+    /// Provide a consistent key if you need to verify state across sessions.
+    /// </summary>
+    /// <remarks>
+    /// Key requirements:
+    /// - Must be at least 32 bytes
+    /// - Should be stored securely (not hardcoded in client code)
+    /// - Consider deriving from user session or app secret
+    /// </remarks>
+    public byte[]? SigningKey { get; init; }
+
+    /// <summary>
+    /// Gets or sets the maximum allowed size of serialized state in bytes.
+    /// Prevents quota exhaustion attacks and excessive storage usage.
+    /// Default: 1048576 (1 MB).
+    /// </summary>
+    /// <remarks>
+    /// Browser storage limits:
+    /// - LocalStorage: typically 5-10 MB per origin
+    /// - SessionStorage: typically 5-10 MB per origin
+    /// Setting a reasonable limit prevents a single state from consuming all available quota.
+    /// </remarks>
+    public int MaxStateSize { get; init; } = 1_048_576; // 1 MB
+
+    /// <summary>
+    /// Gets or sets whether to filter sensitive data before persisting state.
+    /// When enabled, properties marked with [SensitiveData] and common sensitive field names
+    /// (Password, Token, ApiKey, etc.) are replaced with "[FILTERED]" before storage.
+    /// Default: true.
+    /// </summary>
+    /// <remarks>
+    /// Security implications:
+    /// - Enabled (recommended): Prevents sensitive data from being stored in browser storage
+    /// - Disabled: Sensitive data persists in plaintext, vulnerable to XSS attacks
+    /// Note: This is a best-effort filter. Always avoid putting truly sensitive data in client state.
+    /// </remarks>
+    public bool FilterSensitiveData { get; init; } = true;
+
+    /// <summary>
+    /// Gets or sets the options for sensitive data filtering.
+    /// Only applies when FilterSensitiveData is true.
+    /// </summary>
+    public SensitiveDataFilterOptions? SensitiveDataFilterOptions { get; init; }
 }
 
 /// <summary>

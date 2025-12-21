@@ -651,6 +651,18 @@ public class MyPlugin : StorePluginBase<AppState>
 
 ## Security
 
+**IMPORTANT**: Review [`docs/SECURITY.md`](docs/SECURITY.md) before deploying to production.
+
+### Critical Security Requirements
+
+Before production deployment:
+
+1. **Disable DevTools** - Use `#if DEBUG` to remove `.WithDevTools()`
+2. **Mark Sensitive Data** - Add `[SensitiveData]` to passwords, tokens, keys
+3. **Validate External State** - Implement `IStateValidator<T>` for persistence/sync
+4. **Never Persist Secrets** - Use `TransformOnSave` to exclude sensitive fields
+5. **Enable Message Signing** - Call `.EnableMessageSigning()` for TabSync
+
 ### Sensitive Data Filtering
 
 Prevent passwords/tokens from appearing in DevTools:
@@ -663,6 +675,16 @@ public record UserState(
 );
 
 // In DevTools: { Name: "John", Password: "[REDACTED]", ApiToken: "[REDACTED]" }
+```
+
+**WARNING**: DevTools should NEVER be shipped to production. Always use:
+
+```csharp
+#if DEBUG
+    .WithDefaults(sp, "MyStore")     // DevTools + Logging
+#else
+    .WithLogging()                   // Logging only
+#endif
 ```
 
 ### State Validation

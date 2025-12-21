@@ -59,9 +59,42 @@ public sealed class TabSyncOptions
     /// <summary>
     /// Gets or sets whether to enable message signing for cross-tab messages.
     /// When enabled, messages are signed with HMAC to prevent tampering.
-    /// Default is false for backward compatibility.
+    /// Default is false.
     /// </summary>
+    /// <remarks>
+    /// IMPORTANT: To use message signing for cross-tab synchronization, you MUST configure
+    /// a shared signing key using one of these approaches:
+    /// 1. Set <see cref="SigningKey"/> to a shared key (use <see cref="Security.MessageSigner.DeriveKeyFromSeed"/>)
+    /// 2. Set <see cref="DeriveKeyFromOrigin"/> to true to auto-derive from window.location.origin
+    /// 3. Use the extension methods: <c>.WithSharedSigningKey(key)</c> or <c>.WithOriginDerivedKey()</c>
+    ///
+    /// Without a shared key, each tab will have a different random key and verification will fail.
+    /// This default is false to prevent silent verification failures.
+    /// </remarks>
     public bool EnableMessageSigning { get; set; }
+
+    /// <summary>
+    /// Gets or sets the shared signing key for cross-tab message verification.
+    /// If null and <see cref="EnableMessageSigning"/> is true, a random key will be generated
+    /// per tab instance (which will cause verification failures).
+    /// </summary>
+    /// <remarks>
+    /// Use <see cref="Security.MessageSigner.DeriveKeyFromSeed"/> to generate a consistent key
+    /// from a shared seed (e.g., your application name or domain).
+    /// </remarks>
+    public byte[]? SigningKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to automatically derive the signing key from window.location.origin.
+    /// When true, all tabs from the same origin will share the same signing key.
+    /// Default is false.
+    /// </summary>
+    /// <remarks>
+    /// This provides a balance between security and convenience for same-origin tabs.
+    /// The key is derived using PBKDF2 with the origin as both password and salt source.
+    /// For higher security, use <see cref="SigningKey"/> with a server-provided session key.
+    /// </remarks>
+    public bool DeriveKeyFromOrigin { get; set; }
 
     /// <summary>
     /// Gets or sets whether to require valid signatures on incoming messages.

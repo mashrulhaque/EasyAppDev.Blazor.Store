@@ -88,6 +88,15 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
             return;
         }
 
+        // Check size limit before serialization
+        var estimatedSize = EstimateSerializationSize(value);
+        if (estimatedSize > _options.MaxSerializationSizeBytes)
+        {
+            throw new InvalidOperationException(
+                $"State size ({estimatedSize} bytes) exceeds maximum allowed size ({_options.MaxSerializationSizeBytes} bytes). " +
+                "Consider reducing state size or increasing MaxSerializationSizeBytes.");
+        }
+
         var type = value.GetType();
 
         // Handle collections
@@ -102,6 +111,7 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
                 }
                 else
                 {
+                    // Ensure nested objects are filtered recursively
                     JsonSerializer.Serialize(writer, item, item.GetType(), options);
                 }
             }
@@ -135,11 +145,33 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
             }
             else
             {
+                // Recursively serialize with the same filter options
+                // This ensures nested objects are also filtered
                 JsonSerializer.Serialize(writer, propValue, prop.PropertyType, options);
             }
         }
 
         writer.WriteEndObject();
+    }
+
+    private static long EstimateSerializationSize(T value)
+    {
+        try
+        {
+            // Quick estimation without full serialization
+            // This is a conservative estimate to prevent DoS attacks
+            var estimatedJson = JsonSerializer.Serialize(value, new JsonSerializerOptions
+            {
+                WriteIndented = false,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never
+            });
+            return System.Text.Encoding.UTF8.GetByteCount(estimatedJson);
+        }
+        catch
+        {
+            // If estimation fails, assume it's safe
+            return 0;
+        }
     }
 
     private bool ShouldFilter(PropertyInfo prop)

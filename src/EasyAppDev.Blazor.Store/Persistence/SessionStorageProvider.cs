@@ -40,8 +40,19 @@ public class SessionStorageProvider : IPersistenceProvider
 
         try
         {
-            return await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", key)
+            var value = await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", key)
                 .ConfigureAwait(false);
+
+            if (value != null)
+            {
+                _logger?.LogDebug("Loaded from sessionStorage key: {Key}, Size: {Size:N0} bytes", key, value.Length);
+            }
+            else
+            {
+                _logger?.LogDebug("No value found in sessionStorage for key: {Key}", key);
+            }
+
+            return value;
         }
         catch (Exception ex)
         {
@@ -58,12 +69,25 @@ public class SessionStorageProvider : IPersistenceProvider
 
         try
         {
+            _logger?.LogDebug("Saving to sessionStorage key: {Key}, Size: {Size:N0} bytes", key, value.Length);
+
             await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", key, value)
                 .ConfigureAwait(false);
+
+            _logger?.LogDebug("Successfully saved to sessionStorage key: {Key}", key);
+        }
+        catch (JSException jsEx) when (jsEx.Message.Contains("QuotaExceededError") || jsEx.Message.Contains("quota"))
+        {
+            _logger?.LogError(jsEx, "sessionStorage quota exceeded for key: {Key}. Size: {Size:N0} bytes. " +
+                "Consider reducing state size or clearing old data.", key, value.Length);
+            throw new InvalidOperationException(
+                $"Browser sessionStorage quota exceeded. Cannot save state (size: {value.Length:N0} bytes). " +
+                "Try clearing old data or reducing state size.", jsEx);
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to save to sessionStorage key: {Key}", key);
+            throw;
         }
     }
 

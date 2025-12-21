@@ -137,4 +137,18 @@
     window.__getTabSyncChannelCount = function () {
         return storage.size;
     };
+
+    /**
+     * Gets key material for deriving a consistent signing key across tabs.
+     * Returns window.location.origin as the seed for PBKDF2 key derivation.
+     * All tabs from the same origin will receive the same value.
+     * @returns {string} - The origin (protocol + hostname + port)
+     */
+    window.__getTabSyncKeyMaterial = function () {
+        if (typeof window === 'undefined' || !window.location) {
+            console.warn('[TabSync] Cannot derive key material: window.location not available');
+            return '';
+        }
+        return window.location.origin;
+    };
 })();

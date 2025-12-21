@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -10,6 +10,8 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
+    <!-- NU1510: Package pruning warnings during multi-targeting (false positive for conditional references) -->
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -70,12 +72,29 @@ v2.1.0 - Phase 4: Advanced Features
     <InternalsVisibleTo Include="EasyAppDev.Blazor.Store.Tests" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- .NET 8 Package References -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
     <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- .NET 9 Package References (System.Collections.Immutable is built-in) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <!-- .NET 10 Package References (System.Collections.Immutable is built-in) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0-preview.1.25120.3" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0-preview.1.25120.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0-preview.1.25080.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0-preview.1.25080.5" />
   </ItemGroup>
 
   <!--
@@ -93,6 +112,12 @@ v2.1.0 - Phase 4: Advanced Features
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Content Remove="Diagnostics\Components\*.razor" />
     <Compile Remove="Diagnostics\Components\*.razor" />
+  </ItemGroup>
+
+  <!-- Exclude DevTools JavaScript files from Release builds (DEBUG-only feature) -->
+  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+    <Content Remove="wwwroot\devtools.js" />
+    <Content Remove="wwwroot\devtools-enhanced.js" />
   </ItemGroup>
 
 </Project>

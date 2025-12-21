@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Middleware;
 using EasyAppDev.Blazor.Store.Security;
@@ -20,6 +21,8 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
     private readonly ILogger<PersistenceMiddleware<TState>>? _logger;
     private readonly PersistenceOptions<TState>? _options;
     private CancellationTokenSource? _debounceCts;
+    private readonly MessageSigner? _messageSigner;
+    private readonly JsonSerializerOptions? _filteredJsonOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PersistenceMiddleware{TState}"/> class.
@@ -69,6 +72,24 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         _debounceMs = options.DebounceMs;
         _debounce = options.DebounceMs > 0;
         _logger = logger;
+
+        // Initialize message signer if integrity check is enabled
+        if (options.EnableIntegrityCheck)
+        {
+            _messageSigner = options.SigningKey != null
+                ? new MessageSigner(options.SigningKey)
+                : new MessageSigner();
+        }
+
+        // Initialize filtered JSON options if sensitive data filtering is enabled
+        if (options.FilterSensitiveData)
+        {
+            var filterOptions = options.SensitiveDataFilterOptions ?? new SensitiveDataFilterOptions
+            {
+                Enabled = true
+            };
+            _filteredJsonOptions = SensitiveDataFilterExtensions.CreateFilteredJsonOptions(filterOptions);
+        }
     }
 
     /// <inheritdoc />
@@ -124,8 +145,45 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
     {
         try
         {
-            var json = JsonSerializer.Serialize(state, _jsonOptions);
-            await _provider.SaveAsync(_key, json).ConfigureAwait(false);
+            // Serialize state with optional sensitive data filtering
+            var serializationOptions = _filteredJsonOptions ?? _jsonOptions;
+            var stateJson = JsonSerializer.Serialize(state, serializationOptions);
+            var stateBytes = Encoding.UTF8.GetByteCount(stateJson);
+
+            // Check size limit
+            if (_options != null && stateBytes > _options.MaxStateSize)
+            {
+                var ex = new StateSizeExceededException(stateBytes, _options.MaxStateSize);
+                _logger?.LogError(ex, "State size exceeds limit for key: {Key}. Size: {Size:N0} bytes, Limit: {Limit:N0} bytes",
+                    _key, stateBytes, _options.MaxStateSize);
+                throw ex;
+            }
+
+            // Create wrapper with optional signature
+            var wrapper = new PersistedStateWrapper
+            {
+                State = stateJson,
+                Size = stateBytes,
+                Timestamp = DateTimeOffset.UtcNow
+            };
+
+            // Sign state if integrity check is enabled
+            if (_messageSigner != null)
+            {
+                wrapper.Signature = _messageSigner.Sign(stateJson);
+            }
+
+            // Serialize and save wrapper
+            var wrapperJson = JsonSerializer.Serialize(wrapper, _jsonOptions);
+            await _provider.SaveAsync(_key, wrapperJson).ConfigureAwait(false);
+
+            _logger?.LogDebug("Persisted state to key: {Key}. Size: {Size:N0} bytes, Signed: {Signed}",
+                _key, stateBytes, wrapper.Signature != null);
+        }
+        catch (StateSizeExceededException)
+        {
+            // Re-throw size exceptions
+            throw;
         }
         catch (Exception ex)
         {
@@ -148,7 +206,57 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
                 return default;
             }
 
-            var loadedState = JsonSerializer.Deserialize<TState>(json, _jsonOptions);
+            // Try to deserialize as new format (with wrapper)
+            string stateJson;
+            PersistedStateWrapper? wrapper = null;
+
+            try
+            {
+                wrapper = JsonSerializer.Deserialize<PersistedStateWrapper>(json, _jsonOptions);
+            }
+            catch
+            {
+                // Ignore deserialization errors, will fall back to legacy format
+            }
+
+            if (wrapper != null && !string.IsNullOrEmpty(wrapper.State))
+            {
+                // New format detected
+                stateJson = wrapper.State;
+
+                // Verify signature if integrity check is enabled
+                if (_messageSigner != null && !string.IsNullOrEmpty(wrapper.Signature))
+                {
+                    if (!_messageSigner.Verify(stateJson, wrapper.Signature))
+                    {
+                        var integrityEx = new StateIntegrityException(
+                            $"State integrity verification failed for key '{_key}'. The persisted state may have been tampered with.");
+
+                        _logger?.LogError(integrityEx, "Integrity check failed for key: {Key}", _key);
+                        _options?.OnHydrationFailure?.Invoke(integrityEx);
+
+                        return default;
+                    }
+
+                    _logger?.LogDebug("State integrity verified for key: {Key}", _key);
+                }
+                else if (_messageSigner != null && string.IsNullOrEmpty(wrapper.Signature))
+                {
+                    // Wrapper exists but no signature - this is migration from old secured format
+                    _logger?.LogWarning("State loaded without signature for key: {Key}. This may be a legacy state.", _key);
+                }
+
+                _logger?.LogDebug("Loaded state from key: {Key}. Size: {Size:N0} bytes, Age: {Age}",
+                    _key, wrapper.Size, DateTimeOffset.UtcNow - wrapper.Timestamp);
+            }
+            else
+            {
+                // Legacy format (plaintext JSON state) - backward compatibility
+                stateJson = json;
+                _logger?.LogDebug("Loaded legacy state format from key: {Key}. Consider re-saving to update to secured format.", _key);
+            }
+
+            var loadedState = JsonSerializer.Deserialize<TState>(stateJson, _jsonOptions);
             if (loadedState == null)
             {
                 _options?.OnHydrationSkipped?.Invoke();
@@ -184,6 +292,11 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
 
             _options?.OnHydrationSuccess?.Invoke(transformedState);
             return transformedState;
+        }
+        catch (StateIntegrityException)
+        {
+            // Re-throw integrity exceptions
+            throw;
         }
         catch (Exception ex)
         {

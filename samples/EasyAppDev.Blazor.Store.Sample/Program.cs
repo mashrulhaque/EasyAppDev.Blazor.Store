@@ -23,7 +23,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-// Register diagnostics service - only available in DEBUG builds
+// ============================================================================
+// SECURITY NOTE: Diagnostics are DEBUG-only and expose full state snapshots
+// Never ship diagnostic features to production
+// ============================================================================
 #if DEBUG
 builder.Services.AddStoreDiagnostics();
 #endif
@@ -46,6 +49,8 @@ builder.Services.AddSingleton<AnalyticsDemoPlugin>();
 
 // ============================================================================
 // Counter Store - Basic example with DevTools and Logging
+// SECURITY: WithDefaults() includes DevTools - only use in DEBUG builds
+// For production, use .WithLogging() instead
 // ============================================================================
 builder.Services.AddStore(
     new CounterState(0),
@@ -92,6 +97,8 @@ builder.Services.AddStore(
 // Shopping Cart Store - Demonstrates persistence with LocalStorage
 // State survives page refreshes and browser restarts
 // WithPersistence automatically loads and saves state - no manual hydration needed!
+// SECURITY: For production with sensitive data, use TransformOnSave to exclude
+// sensitive fields and add IStateValidator to validate hydrated state
 // ============================================================================
 builder.Services.AddStore(
     ShoppingCartState.Empty,
@@ -185,6 +192,11 @@ builder.Services.AddStore(
 // ============================================================================
 // Tab Sync Demo Store - Demonstrates cross-tab synchronization
 // Real-time state sync across browser tabs using BroadcastChannel
+// SECURITY: For production with sensitive data, enable message signing:
+//   .EnableMessageSigning()
+//   .RequireValidSignature(true)
+//   .MaxMessageAgeSeconds(30)
+//   .ValidateTimestamp(true)
 // ============================================================================
 builder.Services.AddStore(
     TabSyncDemoState.Initial,
@@ -207,6 +219,9 @@ builder.Services.AddStore(
 // ============================================================================
 // Security Demo Store - Demonstrates sensitive data filtering
 // Properties marked with [SensitiveData] are filtered from DevTools
+// SECURITY BEST PRACTICE: Always mark passwords, tokens, API keys, and PII
+// with [SensitiveData] attribute to prevent exposure in DevTools/logs
+// Example: [property: SensitiveData] string Password
 // ============================================================================
 builder.Services.AddStore(
     SecurityDemoState.Initial,

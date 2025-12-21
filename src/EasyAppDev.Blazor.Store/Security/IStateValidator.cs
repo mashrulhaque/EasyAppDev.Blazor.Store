@@ -116,3 +116,85 @@ public sealed class CompositeStateValidator<TState> : IStateValidator<TState> wh
             : StateValidationResult.Success();
     }
 }
+
+/// <summary>
+/// Validator that ensures state is not null.
+/// Recommended as a baseline validator for all stores that handle external state.
+/// </summary>
+/// <typeparam name="TState">The type of state.</typeparam>
+public sealed class RequiredStateValidator<TState> : IStateValidator<TState> where TState : notnull
+{
+    /// <summary>
+    /// Singleton instance.
+    /// </summary>
+    public static readonly RequiredStateValidator<TState> Instance = new();
+
+    private RequiredStateValidator() { }
+
+    /// <inheritdoc />
+    public StateValidationResult Validate(TState state)
+    {
+        if (state is null)
+        {
+            return StateValidationResult.Failure("State cannot be null");
+        }
+
+        return StateValidationResult.Success();
+    }
+}
+
+/// <summary>
+/// Base class for schema-based state validation.
+/// Extend this class to implement custom validation rules for your state.
+/// </summary>
+/// <typeparam name="TState">The type of state to validate.</typeparam>
+/// <remarks>
+/// This validator is recommended for stores that:
+/// <list type="bullet">
+/// <item>Accept state from untrusted sources (persistence, tab sync, server sync)</item>
+/// <item>Have business rules or constraints that must be enforced</item>
+/// <item>Need to prevent invalid state from corrupting the application</item>
+/// </list>
+/// </remarks>
+/// <example>
+/// <code>
+/// public class UserStateValidator : SchemaStateValidator&lt;UserState&gt;
+/// {
+///     protected override StateValidationResult ValidateState(UserState state)
+///     {
+///         var errors = new List&lt;string&gt;();
+///
+///         if (string.IsNullOrWhiteSpace(state.Username))
+///             errors.Add("Username is required");
+///
+///         if (state.Age &lt; 0 || state.Age &gt; 150)
+///             errors.Add("Age must be between 0 and 150");
+///
+///         return errors.Count &gt; 0
+///             ? StateValidationResult.Failure(errors)
+///             : StateValidationResult.Success();
+///     }
+/// }
+/// </code>
+/// </example>
+public abstract class SchemaStateValidator<TState> : IStateValidator<TState> where TState : notnull
+{
+    /// <inheritdoc />
+    public StateValidationResult Validate(TState state)
+    {
+        if (state is null)
+        {
+            return StateValidationResult.Failure("State cannot be null");
+        }
+
+        return ValidateState(state);
+    }
+
+    /// <summary>
+    /// Override this method to implement custom validation logic.
+    /// State is guaranteed to be non-null when this method is called.
+    /// </summary>
+    /// <param name="state">The state to validate.</param>
+    /// <returns>A validation result indicating success or failure.</returns>
+    protected abstract StateValidationResult ValidateState(TState state);
+}

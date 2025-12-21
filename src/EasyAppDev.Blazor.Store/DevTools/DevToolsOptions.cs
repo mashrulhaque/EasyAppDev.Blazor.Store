@@ -19,9 +19,10 @@ public class DevToolsOptions<TState> where TState : notnull
 
     /// <summary>
     /// Gets or sets whether time-travel debugging is enabled.
-    /// Default is true.
+    /// Default is false for security. Time-travel allows jumping to previous states,
+    /// which can expose historical sensitive data.
     /// </summary>
-    public bool EnableTimeTravel { get; set; } = true;
+    public bool EnableTimeTravel { get; set; } = false;
 
     /// <summary>
     /// Gets or sets the maximum number of actions to keep in history.
@@ -31,13 +32,15 @@ public class DevToolsOptions<TState> where TState : notnull
 
     /// <summary>
     /// Gets or sets whether action replay is enabled.
-    /// Default is true.
+    /// Default is false for security. Action replay allows re-executing actions,
+    /// which could have unintended side effects in production environments.
     /// </summary>
-    public bool EnableActionReplay { get; set; } = true;
+    public bool EnableActionReplay { get; set; } = false;
 
     /// <summary>
     /// Gets or sets whether state editing from DevTools is enabled.
-    /// Default is false for safety.
+    /// Default is false for security. State editing allows arbitrary state modifications
+    /// from the browser DevTools, which is a serious security risk in production.
     /// </summary>
     public bool EnableStateEditing { get; set; } = false;
 

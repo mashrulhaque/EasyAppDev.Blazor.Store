@@ -7,6 +7,62 @@ namespace EasyAppDev.Blazor.Store.ServerSync;
 /// Interface for the server-side SignalR hub for state synchronization.
 /// Implement this interface in your server project or use StoreHubBase.
 /// </summary>
+/// <remarks>
+/// <para><b>SECURITY REQUIREMENTS:</b></para>
+/// <para>
+/// Hub implementations MUST add proper authorization to prevent unauthorized access.
+/// At minimum, add the [Authorize] attribute to the hub class:
+/// <code>
+/// [Authorize]
+/// public class StoreHub : Hub&lt;IStoreHubClient&gt;, IStoreHub
+/// {
+///     // Implementation
+/// }
+/// </code>
+/// </para>
+/// <para><b>Document Access Validation:</b></para>
+/// <para>
+/// When using multi-tenant scenarios (DocumentId), you MUST validate that the current user
+/// has permission to access the requested document in JoinDocument():
+/// <code>
+/// public async Task JoinDocument(string documentId, string? displayName)
+/// {
+///     // REQUIRED: Validate user has access to this document
+///     var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+///     if (!await _authService.CanAccessDocument(userId, documentId))
+///     {
+///         throw new HubException("Access denied to this document");
+///     }
+///
+///     // ... rest of implementation
+/// }
+/// </code>
+/// </para>
+/// <para><b>Rate Limiting:</b></para>
+/// <para>
+/// Consider implementing server-side rate limiting middleware to prevent abuse:
+/// <code>
+/// builder.Services.AddRateLimiter(options =>
+/// {
+///     options.AddFixedWindowLimiter("signalr", opt =>
+///     {
+///         opt.Window = TimeSpan.FromSeconds(1);
+///         opt.PermitLimit = 10;
+///     });
+/// });
+/// </code>
+/// </para>
+/// <para><b>Message Size Limits:</b></para>
+/// <para>
+/// Configure SignalR to enforce message size limits in your server's Program.cs:
+/// <code>
+/// builder.Services.AddSignalR(options =>
+/// {
+///     options.MaximumReceiveMessageSize = 1_048_576; // 1MB
+/// });
+/// </code>
+/// </para>
+/// </remarks>
 public interface IStoreHub
 {
     /// <summary>

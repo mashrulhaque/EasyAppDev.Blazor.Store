@@ -1,3 +1,4 @@
+#if DEBUG
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Text.Json;
@@ -10,6 +11,8 @@ namespace EasyAppDev.Blazor.Store.DevTools;
 /// Middleware that integrates with Redux DevTools browser extension.
 /// Uses lazy IJSRuntime resolution via IServiceProvider for compatibility
 /// with Blazor Server, WebAssembly, and Auto render modes.
+/// IMPORTANT: This middleware is only available in DEBUG builds for security reasons.
+/// DevTools expose your application state and should never be used in production.
 /// </summary>
 /// <typeparam name="TState">The type of state managed by the store.</typeparam>
 public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
@@ -188,3 +191,54 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         GC.SuppressFinalize(this);
     }
 }
+
+#else
+
+using EasyAppDev.Blazor.Store.Middleware;
+
+namespace EasyAppDev.Blazor.Store.DevTools;
+
+/// <summary>
+/// No-op DevTools middleware stub for Release builds.
+/// DevTools are disabled in production for security reasons.
+/// </summary>
+/// <typeparam name="TState">The type of state managed by the store.</typeparam>
+public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
+    where TState : notnull
+{
+    /// <summary>
+    /// No-op constructor for Release builds.
+    /// </summary>
+    public DevToolsMiddleware(
+        IServiceProvider serviceProvider,
+        string storeName = "Store",
+        object? logger = null)
+    {
+    }
+
+    /// <summary>
+    /// No-op constructor for Release builds.
+    /// </summary>
+    public DevToolsMiddleware(
+        IServiceProvider serviceProvider,
+        string storeName,
+        object? options,
+        object? logger = null)
+    {
+    }
+
+    /// <inheritdoc />
+    public Task OnBeforeUpdateAsync(TState currentState, string? action) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task OnAfterUpdateAsync(TState previousState, TState currentState, string? action) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
+}
+
+#endif

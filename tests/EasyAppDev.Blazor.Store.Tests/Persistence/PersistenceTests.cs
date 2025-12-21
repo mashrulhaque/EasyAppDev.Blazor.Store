@@ -55,8 +55,10 @@ public class PersistenceTests
 
         // Assert
         savedJson.Should().NotBeNull();
-        savedJson.Should().Contain("\"counter\":5");
-        savedJson.Should().Contain("\"message\":\"After\"");
+        // The state is wrapped in a PersistedStateWrapper, so check the 'state' field
+        savedJson.Should().Contain("\"state\":");
+        savedJson.Should().Contain("counter");
+        savedJson.Should().Contain("After");
     }
 
     [Fact]

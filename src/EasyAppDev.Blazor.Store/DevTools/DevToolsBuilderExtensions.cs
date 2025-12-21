@@ -12,8 +12,11 @@ namespace EasyAppDev.Blazor.Store.DevTools;
 /// </summary>
 public static class DevToolsBuilderExtensions
 {
+#if DEBUG
     /// <summary>
     /// Enables enhanced Redux DevTools integration with full time-travel support.
+    /// WARNING: DevTools are only available in DEBUG builds. In Release builds, this method is a no-op.
+    /// DevTools expose your application state and should never be used in production.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
@@ -25,7 +28,7 @@ public static class DevToolsBuilderExtensions
     /// builder.WithEnhancedDevTools(sp, options =>
     /// {
     ///     options.Name = "MyStore";
-    ///     options.EnableStateEditing = true;
+    ///     options.EnableStateEditing = false;  // Disabled by default for security
     ///     options.MaxHistory = 50;
     ///     options.StateSanitizer = state => state with { Password = "***" };
     /// });
@@ -51,6 +54,8 @@ public static class DevToolsBuilderExtensions
 
     /// <summary>
     /// Enables enhanced Redux DevTools with default configuration.
+    /// WARNING: DevTools are only available in DEBUG builds. In Release builds, this method is a no-op.
+    /// DevTools expose your application state and should never be used in production.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
@@ -68,4 +73,33 @@ public static class DevToolsBuilderExtensions
             options.Name = storeName;
         });
     }
+#else
+    /// <summary>
+    /// DevTools stub for Release builds. This method does nothing in production.
+    /// DevTools are disabled in Release builds for security reasons.
+    /// </summary>
+    public static StoreBuilder<TState> WithEnhancedDevTools<TState>(
+        this StoreBuilder<TState> builder,
+        IServiceProvider serviceProvider,
+        Action<DevToolsOptions<TState>>? configure = null)
+        where TState : notnull
+    {
+        // No-op in Release builds
+        return builder;
+    }
+
+    /// <summary>
+    /// DevTools stub for Release builds. This method does nothing in production.
+    /// DevTools are disabled in Release builds for security reasons.
+    /// </summary>
+    public static StoreBuilder<TState> WithEnhancedDevTools<TState>(
+        this StoreBuilder<TState> builder,
+        IServiceProvider serviceProvider,
+        string storeName)
+        where TState : notnull
+    {
+        // No-op in Release builds
+        return builder;
+    }
+#endif
 }

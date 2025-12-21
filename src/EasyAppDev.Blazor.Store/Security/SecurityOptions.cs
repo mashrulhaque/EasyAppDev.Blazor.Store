@@ -49,7 +49,18 @@ public sealed class SensitiveDataAttribute : Attribute
 
 /// <summary>
 /// Options for filtering sensitive data from serialization.
+/// Filtering is enabled by default to prevent accidental exposure of sensitive information
+/// in DevTools, diagnostics, persistence, and synchronization features.
 /// </summary>
+/// <remarks>
+/// When enabled, properties will be replaced with the <see cref="ReplacementValue"/> if:
+/// <list type="bullet">
+/// <item>They are marked with <see cref="SensitiveDataAttribute"/></item>
+/// <item>Their name matches any entry in <see cref="FilteredPropertyNames"/></item>
+/// <item>Their name contains any keyword from <see cref="FilteredPropertyNames"/> (case-insensitive)</item>
+/// </list>
+/// Filtering applies recursively to nested objects during serialization.
+/// </remarks>
 public sealed class SensitiveDataFilterOptions
 {
     /// <summary>
@@ -60,6 +71,8 @@ public sealed class SensitiveDataFilterOptions
 
     /// <summary>
     /// Gets or sets additional property names to filter.
+    /// Property names are matched case-insensitively and support partial matching.
+    /// Default list includes common sensitive field names.
     /// </summary>
     public HashSet<string> FilteredPropertyNames { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -71,7 +84,13 @@ public sealed class SensitiveDataFilterOptions
         "RefreshToken",
         "PrivateKey",
         "Credential",
-        "Credentials"
+        "Credentials",
+        "Ssn",
+        "SocialSecurityNumber",
+        "CreditCard",
+        "CardNumber",
+        "Cvv",
+        "Pin"
     };
 
     /// <summary>
@@ -81,7 +100,16 @@ public sealed class SensitiveDataFilterOptions
     public string ReplacementValue { get; set; } = "[FILTERED]";
 
     /// <summary>
-    /// Gets or sets whether filtering is enabled. Default is false for backward compatibility.
+    /// Gets or sets whether filtering is enabled.
+    /// Default is true to prevent accidental exposure of sensitive data.
+    /// Set to false only if you are certain your state contains no sensitive information.
     /// </summary>
-    public bool Enabled { get; set; }
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum serialization size in bytes before rejecting.
+    /// Prevents memory exhaustion from maliciously large payloads.
+    /// Default is 1MB (1,048,576 bytes).
+    /// </summary>
+    public int MaxSerializationSizeBytes { get; set; } = 1_048_576;
 }

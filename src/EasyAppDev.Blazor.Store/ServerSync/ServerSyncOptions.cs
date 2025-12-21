@@ -188,6 +188,8 @@ public class ServerSyncOptions<TState> where TState : notnull
     /// <summary>
     /// Gets or sets the state validator for validating incoming state from the server.
     /// Default is null (no validation).
+    /// WARNING: It is strongly recommended to configure a StateValidator for production use
+    /// to prevent accepting malicious or corrupted state from the server.
     /// </summary>
     public IStateValidator<TState>? StateValidator { get; set; }
 
@@ -200,9 +202,71 @@ public class ServerSyncOptions<TState> where TState : notnull
     public bool RejectInvalidState { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets a callback invoked when state validation fails.
+    /// Gets or sets whether to require a StateValidator to be configured.
+    /// If true and StateValidator is null, middleware initialization will throw.
+    /// Default is true for security.
+    /// WARNING: Setting this to false bypasses validation security. Only disable
+    /// if you have alternative validation mechanisms in place.
+    /// </summary>
+    public bool RequireValidation { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum message size in bytes to prevent DoS attacks.
+    /// Messages larger than this will be rejected before deserialization.
+    /// Default is 1MB (1048576 bytes).
+    /// </summary>
+    public int MaxMessageSize { get; set; } = 1_048_576; // 1MB
+
+    /// <summary>
+    /// Gets or sets the maximum number of messages allowed per second per connection.
+    /// Exceeding this rate will result in messages being dropped.
+    /// Default is 10 messages per second.
+    /// Set to 0 to disable rate limiting (not recommended for production).
+    /// </summary>
+    public int RateLimitPerSecond { get; set; } = 10;
+
+    /// <summary>
+    /// Gets or sets whether to enable message signing for integrity verification.
+    /// When enabled, messages are signed with HMAC-SHA256 and verified on receipt.
+    /// Default is false for backward compatibility.
+    /// RECOMMENDED: Enable this for production environments handling sensitive data.
+    /// </summary>
+    public bool EnableMessageSigning { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the signing key for HMAC message signing.
+    /// If null and EnableMessageSigning is true, a random key will be generated.
+    /// NOTE: A random key means messages can only be verified within the same session.
+    /// Provide a consistent key if you need cross-session verification.
+    /// </summary>
+    public byte[]? SigningKey { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to apply sensitive data filtering before sending state to server.
+    /// When enabled, properties marked with [SensitiveData] are filtered out.
+    /// Default is true.
+    /// </summary>
+    public bool FilterSensitiveData { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when validation fails.
     /// </summary>
     public Action<StateValidationResult>? OnValidationFailed { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when a message is rejected due to rate limiting.
+    /// </summary>
+    public Action<string>? OnRateLimitExceeded { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when a message is rejected due to size limits.
+    /// </summary>
+    public Action<int>? OnMessageSizeExceeded { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when message signature verification fails.
+    /// </summary>
+    public Action<string>? OnSignatureVerificationFailed { get; set; }
 }
 
 /// <summary>

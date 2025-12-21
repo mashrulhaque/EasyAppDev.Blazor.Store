@@ -2,6 +2,7 @@ using System.Text.Json;
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Middleware;
 using EasyAppDev.Blazor.Store.Security;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace EasyAppDev.Blazor.Store.TabSync;
@@ -24,7 +25,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     private readonly TabSyncOptions _options;
     private readonly string _tabId = Guid.NewGuid().ToString("N")[..8];
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly MessageSigner? _messageSigner;
+    private readonly ILogger<TabSyncMiddleware<TState>>? _logger;
 
     private IJSRuntime? _jsRuntime;
     private IJSObjectReference? _jsModule;
@@ -35,6 +36,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     private bool _isInitialized;
     private bool _jsModuleLoaded;
     private CancellationTokenSource? _debounceCts;
+    private MessageSigner? _messageSigner;
 
     /// <summary>
     /// Creates a new tab sync middleware.
@@ -45,18 +47,13 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _options = options ?? new TabSyncOptions();
+        _logger = serviceProvider.GetService(typeof(ILogger<TabSyncMiddleware<TState>>)) as ILogger<TabSyncMiddleware<TState>>;
 
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         };
-
-        // Initialize message signer if signing is enabled
-        if (_options.EnableMessageSigning)
-        {
-            _messageSigner = new MessageSigner();
-        }
     }
 
     /// <summary>
@@ -112,6 +109,12 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
             // Try to load JS module first
             await EnsureJsModuleLoadedAsync().ConfigureAwait(false);
 
+            // Initialize message signer if signing is enabled
+            if (_options.EnableMessageSigning)
+            {
+                await InitializeMessageSignerAsync().ConfigureAwait(false);
+            }
+
             // Initialize the channel
             var initialized = await _jsRuntime.InvokeAsync<bool>(
                 "__initTabSync", _channelName, _dotNetRef).ConfigureAwait(false);
@@ -127,6 +130,50 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         catch
         {
             // JS interop failed - SSR, prerendering, or unsupported browser
+        }
+    }
+
+    private async Task InitializeMessageSignerAsync()
+    {
+        if (_messageSigner != null)
+            return;
+
+        byte[]? signingKey = null;
+
+        // Priority 1: Use explicitly configured signing key
+        if (_options.SigningKey != null && _options.SigningKey.Length >= 32)
+        {
+            signingKey = _options.SigningKey;
+        }
+        // Priority 2: Derive key from origin if configured
+        else if (_options.DeriveKeyFromOrigin && _jsRuntime != null)
+        {
+            try
+            {
+                var origin = await _jsRuntime.InvokeAsync<string>("__getTabSyncKeyMaterial").ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(origin))
+                {
+                    signingKey = MessageSigner.DeriveKeyFromSeed(origin);
+                    _logger?.LogDebug("[TabSync] Derived signing key from origin: {Origin}", origin);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "[TabSync] Failed to derive key from origin, falling back to random key");
+            }
+        }
+
+        // Priority 3: Fallback to random key (will cause verification failures across tabs)
+        if (signingKey != null)
+        {
+            _messageSigner = new MessageSigner(signingKey);
+        }
+        else
+        {
+            _messageSigner = new MessageSigner();
+            _logger?.LogWarning(
+                "[TabSync] Using random signing key. Message verification will fail across tabs. " +
+                "Set TabSyncOptions.SigningKey or TabSyncOptions.DeriveKeyFromOrigin = true for cross-tab verification.");
         }
     }
 

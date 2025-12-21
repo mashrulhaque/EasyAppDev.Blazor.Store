@@ -25,6 +25,8 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     private readonly Dictionary<string, CursorInfo> _cursors = new();
     private readonly Queue<StateUpdate> _offlineQueue = new();
     private readonly Queue<StateOperation> _offlineOperationQueue = new();
+    private readonly MessageSigner? _messageSigner;
+    private readonly Queue<DateTime> _messageTimestamps = new();
 
     private HubConnection? _hubConnection;
     private IStore<TState>? _store;
@@ -38,6 +40,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     private TState? _previousState;
     private readonly object _syncLock = new();
     private readonly object _cursorLock = new();
+    private readonly object _rateLimitLock = new();
 
     /// <summary>
     /// Creates a new server sync middleware.
@@ -48,10 +51,48 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger;
-        _jsonOptions = new JsonSerializerOptions
+
+        // Validate security configuration
+        if (_options.RequireValidation && _options.StateValidator == null)
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
+            throw new InvalidOperationException(
+                "ServerSync requires a StateValidator to be configured for security. " +
+                "Either provide a StateValidator or set RequireValidation to false (not recommended for production). " +
+                "Configure via: options.StateValidator = new YourValidator()");
+        }
+
+        // Initialize message signer if enabled
+        if (_options.EnableMessageSigning)
+        {
+            _messageSigner = _options.SigningKey != null
+                ? new MessageSigner(_options.SigningKey)
+                : new MessageSigner();
+
+            _logger?.LogInformation(
+                "ServerSync message signing enabled. Using {KeyType} key.",
+                _options.SigningKey != null ? "provided" : "generated");
+        }
+
+        // Configure JSON options with optional sensitive data filtering
+        if (_options.FilterSensitiveData)
+        {
+            _jsonOptions = SensitiveDataFilterExtensions.CreateFilteredJsonOptions(
+                new SensitiveDataFilterOptions { Enabled = true });
+        }
+        else
+        {
+            _jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+        }
+
+        _logger?.LogInformation(
+            "ServerSync middleware initialized. Validation: {Validation}, Rate Limit: {RateLimit}/s, Max Size: {MaxSize} bytes, Signing: {Signing}",
+            _options.StateValidator != null ? "Enabled" : "Disabled",
+            _options.RateLimitPerSecond,
+            _options.MaxMessageSize,
+            _options.EnableMessageSigning);
     }
 
     /// <summary>
@@ -415,6 +456,12 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
         try
         {
+            // Sign message if enabled
+            if (_options.EnableMessageSigning && _messageSigner != null)
+            {
+                update.Signature = _messageSigner.Sign(update.StateJson);
+            }
+
             await _hubConnection.InvokeAsync("SendUpdate", update).ConfigureAwait(false);
             _logger?.LogDebug("Sent state update: {Action}", update.Action);
         }
@@ -478,6 +525,84 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         }
     }
 
+    private bool CheckRateLimit()
+    {
+        if (_options.RateLimitPerSecond <= 0)
+            return true;
+
+        lock (_rateLimitLock)
+        {
+            var now = DateTime.UtcNow;
+            var oneSecondAgo = now.AddSeconds(-1);
+
+            // Remove timestamps older than 1 second
+            while (_messageTimestamps.Count > 0 && _messageTimestamps.Peek() < oneSecondAgo)
+            {
+                _messageTimestamps.Dequeue();
+            }
+
+            // Check if we're at the limit
+            if (_messageTimestamps.Count >= _options.RateLimitPerSecond)
+            {
+                _logger?.LogWarning(
+                    "Rate limit exceeded: {Count} messages in the last second (limit: {Limit})",
+                    _messageTimestamps.Count,
+                    _options.RateLimitPerSecond);
+
+                _options.OnRateLimitExceeded?.Invoke(
+                    $"Rate limit of {_options.RateLimitPerSecond} messages/second exceeded");
+
+                return false;
+            }
+
+            _messageTimestamps.Enqueue(now);
+            return true;
+        }
+    }
+
+    private bool ValidateMessageSize(string json, string messageType)
+    {
+        var messageSize = System.Text.Encoding.UTF8.GetByteCount(json);
+
+        if (messageSize > _options.MaxMessageSize)
+        {
+            _logger?.LogWarning(
+                "{MessageType} rejected: size {Size} bytes exceeds limit of {Limit} bytes",
+                messageType,
+                messageSize,
+                _options.MaxMessageSize);
+
+            _options.OnMessageSizeExceeded?.Invoke(messageSize);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool VerifyMessageSignature(StateUpdate update)
+    {
+        if (!_options.EnableMessageSigning || _messageSigner == null)
+            return true; // Signing not enabled
+
+        if (string.IsNullOrEmpty(update.Signature))
+        {
+            _logger?.LogWarning("Message signature missing but signing is enabled");
+            _options.OnSignatureVerificationFailed?.Invoke("Missing signature");
+            return false;
+        }
+
+        var isValid = _messageSigner.Verify(update.StateJson, update.Signature);
+
+        if (!isValid)
+        {
+            _logger?.LogWarning("Message signature verification failed");
+            _options.OnSignatureVerificationFailed?.Invoke("Invalid signature");
+        }
+
+        return isValid;
+    }
+
     private async Task HandleReceiveUpdate(StateUpdate update)
     {
         if (_store == null)
@@ -485,6 +610,18 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
         // Skip our own updates
         if (update.SenderId == _hubConnection?.ConnectionId)
+            return;
+
+        // Check rate limit
+        if (!CheckRateLimit())
+            return;
+
+        // Validate message size before deserialization
+        if (!ValidateMessageSize(update.StateJson, "StateUpdate"))
+            return;
+
+        // Verify message signature
+        if (!VerifyMessageSignature(update))
             return;
 
         var localState = _store.GetState();
@@ -737,6 +874,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     {
         _debounceTimer?.Dispose();
         _cursorDebounceTimer?.Dispose();
+        _messageSigner?.Dispose();
         await DisconnectAsync().ConfigureAwait(false);
         GC.SuppressFinalize(this);
     }

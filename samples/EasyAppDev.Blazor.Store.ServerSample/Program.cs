@@ -13,6 +13,8 @@ builder.Services.AddStoreUtilities();
 
 // ============================================================================
 // SINGLETON STORE - Shared across ALL users (demonstrates the problem)
+// SECURITY: Singleton stores should NOT contain user-specific data
+// Use scoped stores for per-user isolation
 // ============================================================================
 builder.Services.AddStore(
     new SingletonCounterState(),
@@ -21,6 +23,8 @@ builder.Services.AddStore(
 // ============================================================================
 // SCOPED STORES - Isolated per user/circuit (the solution!)
 // With IServiceProvider access, DevTools now work!
+// SECURITY: Scoped stores provide per-user isolation - use for user-specific data
+// For production, wrap DevTools with #if DEBUG
 // ============================================================================
 
 // Scoped counter - each user gets their own

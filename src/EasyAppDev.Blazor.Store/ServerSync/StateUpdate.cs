@@ -37,6 +37,12 @@ public class StateUpdate
     /// Gets or sets a version number for conflict detection.
     /// </summary>
     public long Version { get; set; }
+
+    /// <summary>
+    /// Gets or sets the HMAC-SHA256 signature for message integrity verification.
+    /// Only set when EnableMessageSigning is true in ServerSyncOptions.
+    /// </summary>
+    public string? Signature { get; set; }
 }
 
 /// <summary>
@@ -45,6 +51,14 @@ public class StateUpdate
 /// </summary>
 public class StateOperation
 {
+    private static readonly HashSet<string> ValidOperationTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SET", "INSERT", "DELETE", "UPDATE"
+    };
+
+    private string _operationType = string.Empty;
+    private string _path = string.Empty;
+
     /// <summary>
     /// Gets or sets a unique identifier for this operation.
     /// </summary>
@@ -52,13 +66,44 @@ public class StateOperation
 
     /// <summary>
     /// Gets or sets the type of operation (e.g., "SET", "INSERT", "DELETE", "UPDATE").
+    /// Only predefined operation types are allowed to prevent injection attacks.
     /// </summary>
-    public required string OperationType { get; set; }
+    public required string OperationType
+    {
+        get => _operationType;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("OperationType cannot be null or empty", nameof(OperationType));
+
+            if (!ValidOperationTypes.Contains(value))
+                throw new ArgumentException(
+                    $"Invalid OperationType '{value}'. Allowed values: {string.Join(", ", ValidOperationTypes)}",
+                    nameof(OperationType));
+
+            _operationType = value;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the path to the property being modified (e.g., "user.profile.name").
+    /// Path traversal patterns (../) are not allowed for security.
     /// </summary>
-    public required string Path { get; set; }
+    public required string Path
+    {
+        get => _path;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Path cannot be null or empty", nameof(Path));
+
+            // Prevent path traversal attacks
+            if (value.Contains(".."))
+                throw new ArgumentException("Path cannot contain '..' for security reasons", nameof(Path));
+
+            _path = value;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the new value as JSON.
