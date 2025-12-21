@@ -15,6 +15,14 @@
 
 > **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v300) for migration guide.
 
+### Supported Platforms
+
+| .NET Version | Status |
+|--------------|--------|
+| .NET 8.0 | ✅ Fully Supported |
+| .NET 9.0 | ✅ Fully Supported |
+| .NET 10.0 | ✅ Fully Supported |
+
 ---
 
 ## Why This Library?
@@ -717,8 +725,11 @@ builder.Services.AddScoped<IStateValidator<CartState>, CartValidator>();
 
 ```csharp
 .WithTabSync(sp, opts => opts
-    .EnableMessageSigning()        // HMAC-SHA256
-    .WithSigningKey(customKey))    // Optional custom key
+    .WithOriginDerivedKey())       // Recommended: derives key from origin
+
+// Or with explicit key
+.WithTabSync(sp, opts => opts
+    .WithSharedSigningKey(MessageSigner.DeriveKeyFromSeed("MyApp")))
 ```
 
 ---
