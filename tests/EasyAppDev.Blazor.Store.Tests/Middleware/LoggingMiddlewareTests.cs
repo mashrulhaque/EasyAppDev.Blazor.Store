@@ -52,7 +52,11 @@ public class LoggingMiddlewareTests
     {
         // Arrange
         var logs = new List<string>();
-        var middleware = new LoggingMiddleware<TestState>(log => logs.Add(log));
+        var options = new LoggingMiddlewareOptions
+        {
+            LogStateDetails = true // Explicitly enable state logging
+        };
+        var middleware = new LoggingMiddleware<TestState>(log => logs.Add(log), options);
 
         var store = StoreBuilder<TestState>
             .Create(new TestState(0, "Initial"))

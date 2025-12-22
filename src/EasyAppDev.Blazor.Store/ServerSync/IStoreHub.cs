@@ -5,10 +5,27 @@ namespace EasyAppDev.Blazor.Store.ServerSync;
 
 /// <summary>
 /// Interface for the server-side SignalR hub for state synchronization.
-/// Implement this interface in your server project or use StoreHubBase.
+/// For secure implementations, use SecureStoreHubBase (copy from ServerSync/SecureStoreHubBase.cs)
+/// which provides built-in authorization, rate limiting, and audit logging.
 /// </summary>
 /// <remarks>
-/// <para><b>SECURITY REQUIREMENTS:</b></para>
+/// <para><b>RECOMMENDED:</b> Use SecureStoreHubBase instead of implementing this interface directly.</para>
+/// <para>
+/// Copy the SecureStoreHubBase.cs file from the library source to your server project and add
+/// &lt;FrameworkReference Include="Microsoft.AspNetCore.App" /&gt; to your project file.
+/// Then implement the abstract authorization methods:
+/// <code>
+/// public class DocumentHub : SecureStoreHubBase&lt;DocumentState&gt;
+/// {
+///     protected override Task&lt;bool&gt; CanAccessDocumentAsync(string documentId, ClaimsPrincipal user)
+///         => _authService.HasReadAccessAsync(user.GetUserId(), documentId);
+///
+///     protected override Task&lt;bool&gt; CanEditDocumentAsync(string documentId, ClaimsPrincipal user)
+///         => _authService.HasWriteAccessAsync(user.GetUserId(), documentId);
+/// }
+/// </code>
+/// </para>
+/// <para><b>SECURITY REQUIREMENTS (if implementing directly):</b></para>
 /// <para>
 /// Hub implementations MUST add proper authorization to prevent unauthorized access.
 /// At minimum, add the [Authorize] attribute to the hub class:

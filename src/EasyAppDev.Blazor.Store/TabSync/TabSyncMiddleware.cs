@@ -26,13 +26,14 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     private readonly string _tabId = Guid.NewGuid().ToString("N")[..8];
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly ILogger<TabSyncMiddleware<TState>>? _logger;
+    private readonly IStateValidator<object>? _resolvedValidator;
 
     private IJSRuntime? _jsRuntime;
     private IJSObjectReference? _jsModule;
     private DotNetObjectReference<TabSyncMiddleware<TState>>? _dotNetRef;
     private IStore<TState>? _store;
     private string? _channelName;
-    private bool _isSyncUpdate;
+    private int _syncUpdateCount; // Thread-safe counter for concurrent sync operations
     private bool _isInitialized;
     private bool _jsModuleLoaded;
     private CancellationTokenSource? _debounceCts;
@@ -49,11 +50,37 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         _options = options ?? new TabSyncOptions();
         _logger = serviceProvider.GetService(typeof(ILogger<TabSyncMiddleware<TState>>)) as ILogger<TabSyncMiddleware<TState>>;
 
+        // Resolve validator from DI if not explicitly configured
+        _resolvedValidator = ResolveValidator(serviceProvider);
+
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
+            WriteIndented = false,
+            MaxDepth = _options.MaxJsonDepth // Prevent stack overflow from deeply nested payloads
         };
+    }
+
+    /// <summary>
+    /// Resolves the state validator, preferring explicit configuration over DI resolution.
+    /// </summary>
+    private IStateValidator<object>? ResolveValidator(IServiceProvider serviceProvider)
+    {
+        // Use explicitly configured validator first
+        if (_options.StateValidator != null)
+        {
+            return _options.StateValidator;
+        }
+
+        // Try to resolve typed validator from DI
+        var typedValidator = serviceProvider.GetService(typeof(IStateValidator<TState>)) as IStateValidator<TState>;
+        if (typedValidator != null)
+        {
+            _logger?.LogDebug("[TabSync] Resolved IStateValidator<{StateType}> from DI", typeof(TState).Name);
+            return new StateValidatorWrapper<TState>(typedValidator);
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -188,7 +215,38 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
 
         try
         {
-            var message = JsonSerializer.Deserialize<SyncMessage>(messageJson, _jsonOptions);
+            // Validate message size before deserialization to prevent DoS
+            if (_options.MaxMessageSizeBytes > 0)
+            {
+                var messageSize = System.Text.Encoding.UTF8.GetByteCount(messageJson);
+                if (messageSize > _options.MaxMessageSizeBytes)
+                {
+                    _logger?.LogWarning(
+                        "[TabSync] Message rejected: size {Size} bytes exceeds limit of {Limit} bytes",
+                        messageSize,
+                        _options.MaxMessageSizeBytes);
+                    _options.OnMessageSizeExceeded?.Invoke(messageSize);
+                    _options.OnSyncError?.Invoke(new InvalidOperationException(
+                        $"Message size ({messageSize} bytes) exceeds maximum allowed ({_options.MaxMessageSizeBytes} bytes)"));
+                    return;
+                }
+            }
+
+            SyncMessage? message;
+            try
+            {
+                message = JsonSerializer.Deserialize<SyncMessage>(messageJson, _jsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                _logger?.LogWarning(
+                    "[TabSync] Message deserialization failed: {Error}. Possible deeply nested or malformed JSON.",
+                    ex.Message);
+                _options.OnSyncError?.Invoke(new InvalidOperationException(
+                    $"Failed to deserialize message: {ex.Message}. This may indicate a malformed payload or deeply nested structure exceeding MaxJsonDepth ({_options.MaxJsonDepth}).", ex));
+                return;
+            }
+
             if (message == null || message.TabId == _tabId) return;
 
             // Verify message signature if signing is enabled
@@ -217,14 +275,33 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
                 }
             }
 
-            // Validate message timestamp to prevent replay attacks
+            // Validate message timestamp to prevent replay attacks and future-dated messages
             if (_options.ValidateTimestamp && _options.MaxMessageAgeSeconds > 0)
             {
                 var messageAge = DateTime.UtcNow - message.Timestamp;
+
+                // Check for messages too old (replay attack prevention)
                 if (messageAge.TotalSeconds > _options.MaxMessageAgeSeconds)
                 {
+                    _logger?.LogWarning(
+                        "[TabSync] Message rejected: too old ({Age:F1}s > max {Max}s)",
+                        messageAge.TotalSeconds,
+                        _options.MaxMessageAgeSeconds);
                     _options.OnSyncError?.Invoke(new InvalidOperationException(
                         $"Message too old: {messageAge.TotalSeconds:F1}s (max: {_options.MaxMessageAgeSeconds}s)"));
+                    return;
+                }
+
+                // Check for future-dated messages (clock manipulation prevention)
+                if (messageAge.TotalSeconds < -_options.ClockSkewToleranceSeconds)
+                {
+                    _logger?.LogWarning(
+                        "[TabSync] Message rejected: future timestamp ({Age:F1}s in future, tolerance: {Tolerance}s)",
+                        -messageAge.TotalSeconds,
+                        _options.ClockSkewToleranceSeconds);
+                    _options.OnSyncError?.Invoke(new InvalidOperationException(
+                        $"Message has future timestamp: {-messageAge.TotalSeconds:F1}s in future (tolerance: {_options.ClockSkewToleranceSeconds}s). " +
+                        "Possible clock manipulation attempt."));
                     return;
                 }
             }
@@ -236,14 +313,33 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
                 var state = JsonSerializer.Deserialize<TState>(message.State, _jsonOptions);
                 if (state != null)
                 {
-                    _isSyncUpdate = true;
+                    // Validate state before applying if validator is configured or resolved from DI
+                    if (_resolvedValidator != null)
+                    {
+                        var validationResult = ValidateState(state);
+                        if (!validationResult.IsValid)
+                        {
+                            _logger?.LogWarning(
+                                "[TabSync] State validation failed: {Errors}",
+                                string.Join(", ", validationResult.Errors));
+
+                            _options.OnValidationFailed?.Invoke(validationResult with { Source = "TabSync" });
+
+                            if (_options.RejectInvalidState)
+                            {
+                                return;
+                            }
+                        }
+                    }
+
+                    Interlocked.Increment(ref _syncUpdateCount);
                     try
                     {
                         await _store.UpdateAsync(_ => state, $"SYNC_{message.Action ?? "UPDATE"}").ConfigureAwait(false);
                     }
                     finally
                     {
-                        _isSyncUpdate = false;
+                        Interlocked.Decrement(ref _syncUpdateCount);
                     }
                 }
             }
@@ -263,8 +359,8 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     /// <inheritdoc />
     async Task IMiddleware<TState>.OnAfterUpdateAsync(TState previousState, TState currentState, string? action)
     {
-        // Don't broadcast updates received from other tabs
-        if (_isSyncUpdate) return;
+        // Don't broadcast updates received from other tabs (thread-safe check)
+        if (Volatile.Read(ref _syncUpdateCount) > 0) return;
 
         // Check if action should be synced
         if (!_options.ShouldSyncAction(action)) return;
@@ -354,6 +450,27 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
 
         _dotNetRef?.Dispose();
         _messageSigner?.Dispose();
+    }
+
+    /// <summary>
+    /// Validates state using the configured or DI-resolved validator.
+    /// </summary>
+    private StateValidationResult ValidateState(TState state)
+    {
+        if (_resolvedValidator == null)
+        {
+            return StateValidationResult.Success();
+        }
+
+        try
+        {
+            return _resolvedValidator.Validate(state!);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[TabSync] State validator threw exception");
+            return StateValidationResult.Failure($"Validator threw exception: {ex.Message}");
+        }
     }
 
     private sealed class SyncMessage

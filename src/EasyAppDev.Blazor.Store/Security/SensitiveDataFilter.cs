@@ -4,6 +4,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace EasyAppDev.Blazor.Store.Security;
 
@@ -52,6 +53,7 @@ public sealed class SensitiveDataFilterConverterFactory : JsonConverterFactory
 public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
 {
     private readonly SensitiveDataFilterOptions _options;
+    private readonly List<Regex> _compiledPatterns;
     private static readonly Dictionary<Type, PropertyInfo[]> PropertyCache = new();
     private static readonly object CacheLock = new();
 
@@ -62,6 +64,22 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
     public SensitiveDataFilterConverter(SensitiveDataFilterOptions options)
     {
         _options = options;
+
+        // Pre-compile regex patterns for better performance
+        _compiledPatterns = new List<Regex>();
+        foreach (var pattern in _options.FilteredPropertyPatterns)
+        {
+            try
+            {
+                _compiledPatterns.Add(new Regex(pattern,
+                    RegexOptions.IgnoreCase | RegexOptions.Compiled,
+                    TimeSpan.FromMilliseconds(100))); // Timeout to prevent ReDoS attacks
+            }
+            catch (ArgumentException)
+            {
+                // Skip invalid patterns
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -176,6 +194,12 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
 
     private bool ShouldFilter(PropertyInfo prop)
     {
+        // Check for [AlwaysInclude] attribute - this overrides all other filtering
+        if (prop.GetCustomAttribute<AlwaysIncludeAttribute>() != null)
+        {
+            return false;
+        }
+
         // Check for [SensitiveData] attribute
         if (_options.FilterSensitiveAttributes &&
             prop.GetCustomAttribute<SensitiveDataAttribute>() != null)
@@ -190,17 +214,45 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
         }
 
         // Check property name against filter list
-        if (_options.FilteredPropertyNames.Contains(prop.Name))
+        if (_options.UseExactMatch)
         {
-            return true;
-        }
-
-        // Check if property name contains sensitive keywords
-        foreach (var keyword in _options.FilteredPropertyNames)
-        {
-            if (prop.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+            // Exact match only
+            if (_options.FilteredPropertyNames.Contains(prop.Name))
             {
                 return true;
+            }
+        }
+        else
+        {
+            // Exact match first
+            if (_options.FilteredPropertyNames.Contains(prop.Name))
+            {
+                return true;
+            }
+
+            // Then partial match (contains keyword)
+            foreach (var keyword in _options.FilteredPropertyNames)
+            {
+                if (prop.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Check regex patterns
+        foreach (var regex in _compiledPatterns)
+        {
+            try
+            {
+                if (regex.IsMatch(prop.Name))
+                {
+                    return true;
+                }
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // Pattern timed out (possible ReDoS), skip it
             }
         }
 

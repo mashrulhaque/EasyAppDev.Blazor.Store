@@ -1025,9 +1025,6 @@ public override Task OnAfterUpdateAsync(AppState previousState, AppState newStat
 ## Documentation
 
 - [Full Documentation](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/)
-- [Architecture Guide](./docs/ARCHITECTURE.md)
-- [Coding Standards](./docs/CODING_STANDARDS.md)
-- [Testing Strategy](./docs/TESTING_STRATEGY.md)
 
 ---
 

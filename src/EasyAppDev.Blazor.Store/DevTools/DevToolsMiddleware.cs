@@ -74,6 +74,15 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
             _filteredJsonOptions = SensitiveDataFilterExtensions.CreateFilteredJsonOptions(
                 options.SensitiveDataFilter);
         }
+        else
+        {
+            // Log warning when sensitive data filtering is disabled
+            _logger?.LogWarning(
+                "[DevTools] SECURITY: Sensitive data filtering is DISABLED for store '{StoreName}'. " +
+                "State containing passwords, tokens, or PII will be exposed in browser DevTools. " +
+                "Consider enabling SensitiveDataFilter in DevToolsOptions for production safety.",
+                storeName);
+        }
     }
 
     private async Task EnsureInitializedAsync()

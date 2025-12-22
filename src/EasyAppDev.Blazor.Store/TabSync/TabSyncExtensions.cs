@@ -45,6 +45,13 @@ public static class TabSyncExtensions
         var options = new TabSyncOptions();
         configure?.Invoke(options);
 
+        // Propagate validator from builder if not explicitly set in options
+        if (options.StateValidator == null && builder.StateValidator != null)
+        {
+            // Wrap the typed validator for the untyped TabSyncOptions.StateValidator
+            options.StateValidator = new StateValidatorWrapper<TState>(builder.StateValidator);
+        }
+
         var middleware = new TabSyncMiddleware<TState>(serviceProvider, options);
         return builder.WithMiddleware(middleware);
     }

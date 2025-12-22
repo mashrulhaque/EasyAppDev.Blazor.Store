@@ -198,3 +198,33 @@ public abstract class SchemaStateValidator<TState> : IStateValidator<TState> whe
     /// <returns>A validation result indicating success or failure.</returns>
     protected abstract StateValidationResult ValidateState(TState state);
 }
+
+/// <summary>
+/// Wraps a typed <see cref="IStateValidator{TState}"/> to implement <see cref="IStateValidator{T}"/>
+/// for object type. Used internally to propagate validators from StoreBuilder to untyped middleware options.
+/// </summary>
+/// <typeparam name="TState">The type of state the wrapped validator handles.</typeparam>
+internal sealed class StateValidatorWrapper<TState> : IStateValidator<object> where TState : notnull
+{
+    private readonly IStateValidator<TState> _innerValidator;
+
+    /// <summary>
+    /// Creates a new wrapper around a typed validator.
+    /// </summary>
+    /// <param name="innerValidator">The typed validator to wrap.</param>
+    public StateValidatorWrapper(IStateValidator<TState> innerValidator)
+    {
+        _innerValidator = innerValidator ?? throw new ArgumentNullException(nameof(innerValidator));
+    }
+
+    /// <inheritdoc />
+    public StateValidationResult Validate(object state)
+    {
+        if (state is TState typedState)
+        {
+            return _innerValidator.Validate(typedState);
+        }
+
+        return StateValidationResult.Failure($"Expected state of type {typeof(TState).Name} but got {state?.GetType().Name ?? "null"}");
+    }
+}

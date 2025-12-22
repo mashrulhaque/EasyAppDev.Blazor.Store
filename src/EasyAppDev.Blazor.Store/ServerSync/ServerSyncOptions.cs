@@ -267,6 +267,57 @@ public class ServerSyncOptions<TState> where TState : notnull
     /// Gets or sets a callback invoked when message signature verification fails.
     /// </summary>
     public Action<string>? OnSignatureVerificationFailed { get; set; }
+
+    // --- Session management options ---
+
+    /// <summary>
+    /// Gets or sets the session timeout in minutes.
+    /// After this time, the session will be considered expired on reconnect.
+    /// Default is 0 (no timeout). Set to a positive value to enable session expiry.
+    /// </summary>
+    public int SessionTimeoutMinutes { get; set; } = 0;
+
+    /// <summary>
+    /// Gets or sets whether to require session validation on reconnect.
+    /// When true, reconnection will fail if session validation fails.
+    /// Default is false for backward compatibility.
+    /// RECOMMENDED: Set to true for production environments.
+    /// </summary>
+    public bool RequireSessionValidation { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when the session expires.
+    /// </summary>
+    public Action? OnSessionExpired { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when session validation fails on reconnect.
+    /// </summary>
+    public Action<string>? OnSessionValidationFailed { get; set; }
+
+    // --- Version conflict detection options ---
+
+    /// <summary>
+    /// Gets or sets the maximum allowed version jump before triggering suspicious activity.
+    /// A version jump larger than this delta is considered suspicious and may indicate
+    /// an attack or data corruption.
+    /// Default is 1000.
+    /// </summary>
+    public long MaxVersionJump { get; set; } = 1000;
+
+    /// <summary>
+    /// Gets or sets whether to reject state updates with suspicious version jumps.
+    /// When true, state updates with version jumps exceeding MaxVersionJump are rejected.
+    /// Default is false for backward compatibility.
+    /// RECOMMENDED: Set to true for production environments.
+    /// </summary>
+    public bool RejectSuspiciousVersions { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when suspicious activity is detected.
+    /// This includes version jumps, unusual patterns, or potential attacks.
+    /// </summary>
+    public Action<string>? OnSuspiciousActivity { get; set; }
 }
 
 /// <summary>

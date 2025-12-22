@@ -98,10 +98,16 @@ v2.1.0 - Phase 4: Advanced Features
   </ItemGroup>
 
   <!--
-    Note: StoreHubBase requires ASP.NET Core and should be used in server projects.
+    Note: SecureStoreHubBase requires ASP.NET Core and should be used in server projects.
     Server projects should add: <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    For WebAssembly projects, the hub base is excluded at compile time.
+    For client library builds, the hub base is excluded.
   -->
+
+  <!-- Exclude server-side hub components from client builds - they require ASP.NET Core SignalR -->
+  <ItemGroup>
+    <Compile Remove="ServerSync/SecureStoreHubBase.cs" />
+    <Compile Remove="ServerSync/RateLimitingHubFilter.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />

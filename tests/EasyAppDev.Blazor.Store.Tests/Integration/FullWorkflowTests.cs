@@ -89,8 +89,8 @@ public class FullWorkflowTests : TestContext
 
         var store = Services.GetRequiredService<IStore<CounterState>>();
 
-        // Act
-        await store.UpdateAsync(state => state with { Count = 1, LastAction = "TEST" });
+        // Act - Pass action name explicitly so it appears in logs
+        await store.UpdateAsync(state => state with { Count = 1, LastAction = "TEST" }, action: "TEST");
 
         // Assert - All middleware executed
         logs.Should().Contain(log => log.Contains("TEST"));

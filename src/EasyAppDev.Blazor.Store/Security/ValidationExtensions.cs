@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using EasyAppDev.Blazor.Store.Core;
+using EasyAppDev.Blazor.Store.Middleware;
+using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Security;
 
@@ -13,26 +15,25 @@ public static class ValidationExtensions
 {
     /// <summary>
     /// Configures the store to require validation and reject invalid state.
-    /// Throws an exception if no validator has been configured.
+    /// When called, the store will verify during Build() that a validator has been configured.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
     /// <returns>The builder for chaining.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown if no validator has been configured via SecurityOptions.
+    /// Thrown at Build() time if no validator has been configured via WithValidator().
     /// </exception>
     /// <remarks>
     /// This method should be called after configuring persistence, tab sync, or server sync
-    /// to ensure validation is enforced. It verifies that a proper validator has been set
-    /// in the SecurityOptions for any middleware that uses it.
+    /// to ensure validation is enforced. It verifies that a proper validator has been set.
     /// </remarks>
     /// <example>
     /// <code>
     /// builder.Services.AddStore(
     ///     new UserState(),
     ///     (store, sp) => store
-    ///         .WithPersistence(sp, "user-state")
     ///         .WithValidator(new UserStateValidator())
+    ///         .WithPersistence(sp, "user-state")
     ///         .RequireValidation()
     /// );
     /// </code>
@@ -43,9 +44,15 @@ public static class ValidationExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        // Note: Validation requirement is checked at runtime by middleware
-        // This method serves as a documentation and intent declaration
-        return builder;
+        if (builder.StateValidator == null)
+        {
+            throw new InvalidOperationException(
+                "RequireValidation() was called but no validator has been configured. " +
+                "Call WithValidator() before RequireValidation() to configure a state validator. " +
+                "Example: builder.WithValidator(new MyStateValidator()).RequireValidation()");
+        }
+
+        return builder.WithRequiredValidation();
     }
 
     /// <summary>
@@ -61,15 +68,15 @@ public static class ValidationExtensions
     /// <item>Null state rejection via <see cref="RequiredStateValidator{TState}"/></item>
     /// </list>
     /// For more sophisticated validation, implement <see cref="SchemaStateValidator{TState}"/>
-    /// or <see cref="IStateValidator{TState}"/> and configure it via the appropriate middleware options.
+    /// or <see cref="IStateValidator{TState}"/> and use WithValidator() instead.
     /// </remarks>
     /// <example>
     /// <code>
     /// builder.Services.AddStore(
     ///     new AppState(),
     ///     (store, sp) => store
-    ///         .WithPersistence(sp, "app-state")
     ///         .WithDefaultValidation()
+    ///         .WithPersistence(sp, "app-state")
     /// );
     /// </code>
     /// </example>
@@ -79,25 +86,23 @@ public static class ValidationExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        // Note: Default validator is RequiredStateValidator which checks for null
-        // Specific middleware (Persistence, TabSync, ServerSync) use SecurityOptions<TState>
-        // This method serves as documentation for the intent to use default validation
-        return builder;
+        return builder.WithStateValidator(RequiredStateValidator<TState>.Instance);
     }
 
     /// <summary>
-    /// Adds a custom validator to the store's security options.
-    /// The validator will be applied by persistence, tab sync, and server sync middleware
-    /// to reject invalid state from external sources.
+    /// Adds a custom validator to the store.
+    /// The validator will be stored in the builder and automatically used by
+    /// persistence, tab sync, and server sync middleware to reject invalid state.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
     /// <param name="validator">The validator to use for state validation.</param>
     /// <returns>The builder for chaining.</returns>
     /// <remarks>
-    /// This extension method provides a convenient way to configure validation
-    /// without directly accessing SecurityOptions. The validator will be used by
-    /// any middleware that consumes SecurityOptions (Persistence, TabSync, ServerSync).
+    /// The validator is stored in the StoreBuilder and can be accessed via the
+    /// StateValidator property. Middleware extensions (WithPersistence, WithTabSync,
+    /// WithServerSync) will automatically use this validator if no validator is
+    /// explicitly configured in their options.
     /// </remarks>
     /// <example>
     /// <code>
@@ -122,8 +127,8 @@ public static class ValidationExtensions
     /// builder.Services.AddStore(
     ///     new UserState(),
     ///     (store, sp) => store
-    ///         .WithPersistence(sp, "user-state")
     ///         .WithValidator(new UserStateValidator())
+    ///         .WithPersistence(sp, "user-state")
     /// );
     /// </code>
     /// </example>
@@ -135,11 +140,115 @@ public static class ValidationExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(validator);
 
-        // Note: The validator should be configured via SecurityOptions in the specific middleware
-        // This method provides a fluent API hint but actual configuration happens in middleware
-        // For a complete implementation, this would need to store the validator somewhere
-        // accessible to all middleware instances (e.g., via a shared configuration service)
+        return builder.WithStateValidator(validator);
+    }
 
-        return builder;
+    /// <summary>
+    /// Adds validation middleware that validates all state changes.
+    /// This is useful when you want to validate state regardless of the source.
+    /// </summary>
+    /// <typeparam name="TState">The type of state.</typeparam>
+    /// <param name="builder">The store builder.</param>
+    /// <param name="validator">The validator to use.</param>
+    /// <param name="rejectInvalid">If true, throws an exception for invalid state. If false, logs a warning.</param>
+    /// <param name="logger">Optional logger for validation messages.</param>
+    /// <returns>The builder for chaining.</returns>
+    public static StoreBuilder<TState> WithValidationMiddleware<TState>(
+        this StoreBuilder<TState> builder,
+        IStateValidator<TState> validator,
+        bool rejectInvalid = true,
+        ILogger? logger = null)
+        where TState : notnull
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(validator);
+
+        var middleware = new ValidationMiddleware<TState>(validator, rejectInvalid, logger);
+        return builder.WithMiddleware(middleware).WithStateValidator(validator);
+    }
+}
+
+/// <summary>
+/// Middleware that validates all state changes before they are applied.
+/// </summary>
+/// <typeparam name="TState">The type of state.</typeparam>
+public sealed class ValidationMiddleware<TState> : IMiddleware<TState>
+    where TState : notnull
+{
+    private readonly IStateValidator<TState> _validator;
+    private readonly bool _rejectInvalid;
+    private readonly ILogger? _logger;
+
+    /// <summary>
+    /// Creates a new validation middleware.
+    /// </summary>
+    /// <param name="validator">The validator to use.</param>
+    /// <param name="rejectInvalid">If true, throws an exception for invalid state.</param>
+    /// <param name="logger">Optional logger for validation messages.</param>
+    public ValidationMiddleware(
+        IStateValidator<TState> validator,
+        bool rejectInvalid = true,
+        ILogger? logger = null)
+    {
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _rejectInvalid = rejectInvalid;
+        _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public Task OnBeforeUpdateAsync(TState currentState, string? action)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task OnAfterUpdateAsync(TState previousState, TState currentState, string? action)
+    {
+        var result = _validator.Validate(currentState);
+
+        if (!result.IsValid)
+        {
+            var errorMessage = $"State validation failed after action '{action ?? "unknown"}': {string.Join(", ", result.Errors)}";
+
+            if (_rejectInvalid)
+            {
+                _logger?.LogError("{ErrorMessage}", errorMessage);
+                throw new StateValidationException(result, action);
+            }
+            else
+            {
+                _logger?.LogWarning("{ErrorMessage}", errorMessage);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Exception thrown when state validation fails.
+/// </summary>
+public sealed class StateValidationException : Exception
+{
+    /// <summary>
+    /// Gets the validation result that caused this exception.
+    /// </summary>
+    public StateValidationResult ValidationResult { get; }
+
+    /// <summary>
+    /// Gets the action that caused the validation failure.
+    /// </summary>
+    public string? Action { get; }
+
+    /// <summary>
+    /// Creates a new state validation exception.
+    /// </summary>
+    /// <param name="result">The validation result.</param>
+    /// <param name="action">The action that caused the failure.</param>
+    public StateValidationException(StateValidationResult result, string? action = null)
+        : base($"State validation failed: {string.Join(", ", result.Errors)}")
+    {
+        ValidationResult = result;
+        Action = action;
     }
 }

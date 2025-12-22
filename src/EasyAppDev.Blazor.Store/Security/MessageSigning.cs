@@ -268,20 +268,19 @@ public sealed class MessageSigner : IDisposable
     /// Derives a consistent HMAC key from a seed string using PBKDF2.
     /// </summary>
     /// <param name="seed">The seed string to derive the key from (e.g., window.location.origin).</param>
-    /// <param name="iterations">Number of PBKDF2 iterations (default: 10000).</param>
+    /// <param name="iterations">Number of PBKDF2 iterations (default: 100000). Minimum is 10000.</param>
     /// <returns>A 32-byte key suitable for HMAC-SHA256.</returns>
     /// <remarks>
-    /// This method uses PBKDF2 with a static salt derived from the seed itself.
-    /// While not cryptographically ideal, it provides consistency across tab instances
-    /// while maintaining reasonable security for cross-tab message verification.
+    /// This method uses PBKDF2-SHA256 with a salt derived from the seed itself.
+    /// The default of 100,000 iterations meets OWASP 2024 recommendations for PBKDF2-SHA256.
     /// For production applications with high security requirements, consider using
     /// a server-provided session key instead.
     /// </remarks>
-    public static byte[] DeriveKeyFromSeed(string seed, int iterations = 10000)
+    public static byte[] DeriveKeyFromSeed(string seed, int iterations = 100_000)
     {
         ArgumentNullException.ThrowIfNull(seed);
-        if (iterations < 1000)
-            throw new ArgumentException("Iterations must be at least 1000 for security", nameof(iterations));
+        if (iterations < 10_000)
+            throw new ArgumentException("Iterations must be at least 10,000 for security (OWASP recommendation)", nameof(iterations));
 
         // Use SHA256 of seed as salt for deterministic behavior
         var saltBytes = SHA256.HashData(Encoding.UTF8.GetBytes(seed));
@@ -389,4 +388,201 @@ public sealed class MessageSecurityOptions
     /// Gets or sets whether to validate message timestamps.
     /// </summary>
     public bool ValidateTimestamp { get; set; } = true;
+}
+
+/// <summary>
+/// Provides secure key generation and management utilities.
+/// </summary>
+public static class SecureKeyManager
+{
+    /// <summary>
+    /// Default PBKDF2 iterations (100,000) per OWASP 2024 recommendations.
+    /// </summary>
+    public const int DefaultIterations = 100_000;
+
+    /// <summary>
+    /// Minimum recommended iterations for PBKDF2.
+    /// </summary>
+    public const int MinimumIterations = 10_000;
+
+    /// <summary>
+    /// Default salt size in bytes.
+    /// </summary>
+    public const int DefaultSaltSize = 32;
+
+    /// <summary>
+    /// Default key size in bytes for HMAC-SHA256.
+    /// </summary>
+    public const int DefaultKeySize = 32;
+
+    /// <summary>
+    /// Generates a cryptographically secure random salt.
+    /// </summary>
+    /// <param name="sizeBytes">The size of the salt in bytes. Default is 32.</param>
+    /// <returns>A random salt suitable for key derivation.</returns>
+    public static byte[] GenerateRandomSalt(int sizeBytes = DefaultSaltSize)
+    {
+        if (sizeBytes < 16)
+            throw new ArgumentException("Salt size must be at least 16 bytes", nameof(sizeBytes));
+
+        var salt = new byte[sizeBytes];
+        RandomNumberGenerator.Fill(salt);
+        return salt;
+    }
+
+    /// <summary>
+    /// Generates a cryptographically secure random key.
+    /// </summary>
+    /// <param name="sizeBytes">The size of the key in bytes. Default is 32.</param>
+    /// <returns>A random key suitable for HMAC operations.</returns>
+    public static byte[] GenerateRandomKey(int sizeBytes = DefaultKeySize)
+    {
+        if (sizeBytes < 32)
+            throw new ArgumentException("Key size must be at least 32 bytes", nameof(sizeBytes));
+
+        var key = new byte[sizeBytes];
+        RandomNumberGenerator.Fill(key);
+        return key;
+    }
+
+    /// <summary>
+    /// Derives a key from a passphrase using PBKDF2-SHA256 with a random salt.
+    /// Returns both the derived key and the salt used (salt must be stored for later key recreation).
+    /// </summary>
+    /// <param name="passphrase">The passphrase to derive the key from.</param>
+    /// <param name="salt">Output: the random salt used for derivation.</param>
+    /// <param name="iterations">Number of PBKDF2 iterations. Default is 100,000.</param>
+    /// <param name="keySize">Size of the derived key in bytes. Default is 32.</param>
+    /// <returns>The derived key.</returns>
+    /// <remarks>
+    /// The salt is generated randomly and MUST be stored alongside the derived key
+    /// to allow recreating the same key later. The salt does not need to be secret.
+    /// </remarks>
+    public static byte[] DeriveKeyWithRandomSalt(
+        string passphrase,
+        out byte[] salt,
+        int iterations = DefaultIterations,
+        int keySize = DefaultKeySize)
+    {
+        ArgumentNullException.ThrowIfNull(passphrase);
+        if (iterations < MinimumIterations)
+            throw new ArgumentException($"Iterations must be at least {MinimumIterations}", nameof(iterations));
+
+        salt = GenerateRandomSalt();
+
+#if NET9_0_OR_GREATER
+        return Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(passphrase),
+            salt,
+            iterations,
+            HashAlgorithmName.SHA256,
+            keySize);
+#else
+        using var pbkdf2 = new Rfc2898DeriveBytes(
+            Encoding.UTF8.GetBytes(passphrase),
+            salt,
+            iterations,
+            HashAlgorithmName.SHA256);
+        return pbkdf2.GetBytes(keySize);
+#endif
+    }
+
+    /// <summary>
+    /// Derives a key from a passphrase using PBKDF2-SHA256 with a provided salt.
+    /// Use this to recreate a key from a previously stored salt.
+    /// </summary>
+    /// <param name="passphrase">The passphrase to derive the key from.</param>
+    /// <param name="salt">The salt to use for derivation.</param>
+    /// <param name="iterations">Number of PBKDF2 iterations. Default is 100,000.</param>
+    /// <param name="keySize">Size of the derived key in bytes. Default is 32.</param>
+    /// <returns>The derived key.</returns>
+    public static byte[] DeriveKey(
+        string passphrase,
+        byte[] salt,
+        int iterations = DefaultIterations,
+        int keySize = DefaultKeySize)
+    {
+        ArgumentNullException.ThrowIfNull(passphrase);
+        ArgumentNullException.ThrowIfNull(salt);
+        if (salt.Length < 16)
+            throw new ArgumentException("Salt must be at least 16 bytes", nameof(salt));
+        if (iterations < MinimumIterations)
+            throw new ArgumentException($"Iterations must be at least {MinimumIterations}", nameof(iterations));
+
+#if NET9_0_OR_GREATER
+        return Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(passphrase),
+            salt,
+            iterations,
+            HashAlgorithmName.SHA256,
+            keySize);
+#else
+        using var pbkdf2 = new Rfc2898DeriveBytes(
+            Encoding.UTF8.GetBytes(passphrase),
+            salt,
+            iterations,
+            HashAlgorithmName.SHA256);
+        return pbkdf2.GetBytes(keySize);
+#endif
+    }
+
+    /// <summary>
+    /// Creates key rotation data with the new key and a timestamp.
+    /// Useful for implementing key rotation with grace periods.
+    /// </summary>
+    /// <param name="keyGenerator">Function to generate or derive the new key.</param>
+    /// <returns>Key rotation data including the key and rotation timestamp.</returns>
+    public static KeyRotationData CreateRotationData(Func<byte[]> keyGenerator)
+    {
+        ArgumentNullException.ThrowIfNull(keyGenerator);
+
+        return new KeyRotationData
+        {
+            Key = keyGenerator(),
+            RotatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Checks if a key rotation should occur based on the rotation interval.
+    /// </summary>
+    /// <param name="lastRotation">The timestamp of the last rotation.</param>
+    /// <param name="rotationInterval">The interval between rotations.</param>
+    /// <returns>True if rotation should occur.</returns>
+    public static bool ShouldRotate(DateTimeOffset lastRotation, TimeSpan rotationInterval)
+    {
+        return DateTimeOffset.UtcNow - lastRotation >= rotationInterval;
+    }
+}
+
+/// <summary>
+/// Data for key rotation including the key and metadata.
+/// </summary>
+public sealed record KeyRotationData
+{
+    /// <summary>
+    /// Gets the key bytes.
+    /// </summary>
+    public required byte[] Key { get; init; }
+
+    /// <summary>
+    /// Gets when this key was rotated/created.
+    /// </summary>
+    public DateTimeOffset RotatedAt { get; init; }
+
+    /// <summary>
+    /// Gets or sets the key ID for identification.
+    /// </summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>
+    /// Gets or sets when this key expires (after which it should not be used for signing).
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>
+    /// Gets whether this key has expired for signing purposes.
+    /// Expired keys may still be valid for verification during grace period.
+    /// </summary>
+    public bool IsExpired => ExpiresAt.HasValue && DateTimeOffset.UtcNow >= ExpiresAt.Value;
 }

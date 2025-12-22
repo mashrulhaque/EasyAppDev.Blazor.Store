@@ -126,6 +126,48 @@ public sealed class TabSyncOptions
     public Action<StateValidationResult>? OnValidationFailed { get; set; }
 
     /// <summary>
+    /// Gets or sets the state validator for validating incoming state from other tabs.
+    /// Default is null (no validation).
+    /// </summary>
+    /// <remarks>
+    /// It is recommended to configure a validator when syncing sensitive state
+    /// to prevent accepting malicious or corrupted state from compromised tabs.
+    /// </remarks>
+    public IStateValidator<object>? StateValidator { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to reject invalid states from other tabs.
+    /// If false, invalid states are logged but still applied. Default is true.
+    /// </summary>
+    public bool RejectInvalidState { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the maximum allowed message size in bytes.
+    /// Messages larger than this limit are rejected to prevent DoS attacks.
+    /// Default is 1MB (1,048,576 bytes).
+    /// </summary>
+    public int MaxMessageSizeBytes { get; set; } = 1_048_576;
+
+    /// <summary>
+    /// Gets or sets the clock skew tolerance in seconds for timestamp validation.
+    /// Messages with timestamps outside the range (now - MaxMessageAgeSeconds, now + ClockSkewToleranceSeconds)
+    /// are rejected. Default is 5 seconds.
+    /// </summary>
+    public int ClockSkewToleranceSeconds { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets a callback invoked when a message is rejected due to size limits.
+    /// </summary>
+    public Action<int>? OnMessageSizeExceeded { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum JSON deserialization depth.
+    /// Prevents stack overflow attacks from deeply nested payloads.
+    /// Default is 32.
+    /// </summary>
+    public int MaxJsonDepth { get; set; } = 32;
+
+    /// <summary>
     /// Sets the channel name.
     /// </summary>
     /// <param name="channelName">The channel name.</param>

@@ -2,6 +2,7 @@ using System.Text.Json;
 using EasyAppDev.Blazor.Store.Middleware;
 using EasyAppDev.Blazor.Store.DevTools;
 using EasyAppDev.Blazor.Store.Persistence;
+using EasyAppDev.Blazor.Store.Security;
 using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Core;
@@ -19,6 +20,8 @@ public class StoreBuilder<TState> where TState : notnull
     private ILogger<SubscriptionManager<TState>>? _subscriptionManagerLogger;
     private MiddlewarePipelineOptions? _middlewareOptions;
     private StoreErrorHandler<TState>? _errorHandler;
+    private IStateValidator<TState>? _stateValidator;
+    private bool _requireValidation;
 
     private StoreBuilder(TState initialState)
     {
@@ -33,6 +36,39 @@ public class StoreBuilder<TState> where TState : notnull
     public static StoreBuilder<TState> Create(TState initialState)
     {
         return new StoreBuilder<TState>(initialState);
+    }
+
+    /// <summary>
+    /// Gets the configured state validator, if any.
+    /// </summary>
+    public IStateValidator<TState>? StateValidator => _stateValidator;
+
+    /// <summary>
+    /// Gets whether validation is required.
+    /// </summary>
+    public bool RequiresValidation => _requireValidation;
+
+    /// <summary>
+    /// Sets the state validator for validating state from external sources.
+    /// The validator will be automatically used by persistence, tab sync, and server sync middleware.
+    /// </summary>
+    /// <param name="validator">The validator to use.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithStateValidator(IStateValidator<TState> validator)
+    {
+        _stateValidator = validator ?? throw new ArgumentNullException(nameof(validator));
+        return this;
+    }
+
+    /// <summary>
+    /// Marks that validation is required. When set, the store will throw at build time
+    /// if no validator has been configured but middleware that requires validation is present.
+    /// </summary>
+    /// <returns>The builder instance for chaining.</returns>
+    public StoreBuilder<TState> WithRequiredValidation()
+    {
+        _requireValidation = true;
+        return this;
     }
 
     /// <summary>
@@ -310,7 +346,9 @@ public class StoreBuilder<TState> where TState : notnull
                         _storeLogger = this._storeLogger,
                         _subscriptionManagerLogger = this._subscriptionManagerLogger,
                         _middlewareOptions = this._middlewareOptions,
-                        _errorHandler = this._errorHandler
+                        _errorHandler = this._errorHandler,
+                        _stateValidator = this._stateValidator,
+                        _requireValidation = this._requireValidation
                     };
                     builder._middlewares.AddRange(this._middlewares);
                     return builder;

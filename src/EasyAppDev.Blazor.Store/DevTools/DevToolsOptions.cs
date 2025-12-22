@@ -108,18 +108,26 @@ public class DevToolsOptions<TState> where TState : notnull
     /// sensitive property names (Password, Token, Secret, etc.) are redacted.
     /// </summary>
     /// <remarks>
-    /// This provides automatic protection against accidentally exposing sensitive
-    /// data in the browser's Redux DevTools extension. Consider enabling this
-    /// for any store that may contain user credentials, tokens, or PII.
+    /// <para><b>SECURITY:</b></para>
+    /// <para>
+    /// This is enabled by default to provide automatic protection against accidentally
+    /// exposing sensitive data in the browser's Redux DevTools extension.
+    /// </para>
+    /// <para>
+    /// Setting this to null disables filtering. Only do this if you are CERTAIN
+    /// your state contains no sensitive information (passwords, tokens, PII, etc.).
+    /// </para>
     /// </remarks>
-    public SensitiveDataFilterOptions? SensitiveDataFilter { get; set; }
+    public SensitiveDataFilterOptions? SensitiveDataFilter { get; set; } = new SensitiveDataFilterOptions { Enabled = true };
 
     /// <summary>
     /// Creates default options with the given store name.
+    /// Sensitive data filtering is enabled by default for security.
     /// </summary>
     public static DevToolsOptions<TState> Default(string? name = null) => new()
     {
-        Name = name ?? typeof(TState).Name
+        Name = name ?? typeof(TState).Name,
+        SensitiveDataFilter = new SensitiveDataFilterOptions { Enabled = true }
     };
 
     /// <summary>
@@ -127,9 +135,28 @@ public class DevToolsOptions<TState> where TState : notnull
     /// </summary>
     /// <param name="name">Optional store name.</param>
     /// <returns>Options with sensitive data filtering enabled.</returns>
+    [Obsolete("Sensitive data filtering is now enabled by default. Use Default() instead.")]
     public static DevToolsOptions<TState> WithSensitiveDataFiltering(string? name = null) => new()
     {
         Name = name ?? typeof(TState).Name,
         SensitiveDataFilter = new SensitiveDataFilterOptions { Enabled = true }
+    };
+
+    /// <summary>
+    /// Creates options with sensitive data filtering DISABLED.
+    /// </summary>
+    /// <param name="name">Optional store name.</param>
+    /// <returns>Options with sensitive data filtering disabled.</returns>
+    /// <remarks>
+    /// <para><b>SECURITY WARNING:</b></para>
+    /// <para>
+    /// Only use this if you are CERTAIN your state contains no sensitive information.
+    /// Disabling filtering may expose passwords, tokens, and PII in browser DevTools.
+    /// </para>
+    /// </remarks>
+    public static DevToolsOptions<TState> WithoutSensitiveDataFiltering(string? name = null) => new()
+    {
+        Name = name ?? typeof(TState).Name,
+        SensitiveDataFilter = null
     };
 }

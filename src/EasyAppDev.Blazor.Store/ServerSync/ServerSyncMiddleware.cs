@@ -41,6 +41,8 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     private readonly object _syncLock = new();
     private readonly object _cursorLock = new();
     private readonly object _rateLimitLock = new();
+    private string? _sessionToken;
+    private DateTime _sessionCreatedAt;
 
     /// <summary>
     /// Creates a new server sync middleware.
@@ -163,13 +165,18 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             await _hubConnection.StartAsync().ConfigureAwait(false);
             SetConnectionState(SyncConnectionState.Connected);
 
+            // Generate session token for this connection
+            _sessionToken = GenerateSessionToken();
+            _sessionCreatedAt = DateTime.UtcNow;
+
             // Join document if specified
             if (_options.DocumentId != null)
             {
                 await _hubConnection.InvokeAsync(
                     "JoinDocument",
                     _options.DocumentId,
-                    _options.UserDisplayName)
+                    _options.UserDisplayName,
+                    _sessionToken)
                     .ConfigureAwait(false);
             }
 
@@ -690,33 +697,58 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
     private TState? ResolveConflict(TState local, TState remote, long remoteVersion)
     {
-        if (remoteVersion <= _currentVersion)
+        // Detect suspicious version jumps (potential attack or corruption)
+        var versionDelta = remoteVersion - _currentVersion;
+        if (versionDelta > _options.MaxVersionJump)
         {
-            switch (_options.ConflictResolution)
+            _logger?.LogWarning(
+                "Suspicious version jump detected: current={Current}, remote={Remote}, delta={Delta} (max allowed: {Max})",
+                _currentVersion,
+                remoteVersion,
+                versionDelta,
+                _options.MaxVersionJump);
+
+            _options.OnSuspiciousActivity?.Invoke(
+                $"Version jump: {_currentVersion} → {remoteVersion} (delta: {versionDelta}, max: {_options.MaxVersionJump})");
+
+            if (_options.RejectSuspiciousVersions)
             {
-                case ConflictResolution.ClientWins:
-                    return default; // Keep local state
-
-                case ConflictResolution.ServerWins:
-                    return remote;
-
-                case ConflictResolution.LastWriteWins:
-                    // Use remote if it's newer or same version
-                    return remote;
-
-                case ConflictResolution.Custom:
-                    if (_options.CustomConflictResolver != null)
-                    {
-                        return _options.CustomConflictResolver.Resolve(local, remote, _previousState);
-                    }
-                    return remote;
-
-                default:
-                    return remote;
+                _logger?.LogWarning("Rejecting state update due to suspicious version jump");
+                return default; // Reject the update
             }
         }
 
-        return remote;
+        // Always apply conflict resolution, regardless of version
+        // This prevents attackers from using high version numbers to bypass conflict resolution
+        switch (_options.ConflictResolution)
+        {
+            case ConflictResolution.ClientWins:
+                // Client always wins - reject remote state
+                return default;
+
+            case ConflictResolution.ServerWins:
+                // Server always wins - use remote state
+                return remote;
+
+            case ConflictResolution.LastWriteWins:
+                // Use remote if it's newer (higher version)
+                if (remoteVersion > _currentVersion)
+                {
+                    return remote;
+                }
+                return default; // Keep local
+
+            case ConflictResolution.Custom:
+                if (_options.CustomConflictResolver != null)
+                {
+                    return _options.CustomConflictResolver.Resolve(local, remote, _previousState);
+                }
+                // Fallback to ServerWins if no custom resolver
+                return remote;
+
+            default:
+                return remote;
+        }
     }
 
     private async Task HandleReceiveFullState(string stateJson, long version)
@@ -842,24 +874,62 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     {
         SetConnectionState(SyncConnectionState.Connected);
 
-        // Rejoin document
-        if (_options.DocumentId != null)
+        // Validate session before rejoining to prevent session hijacking
+        if (_options.DocumentId != null && _sessionToken != null)
         {
             try
             {
+                // Check if session has expired
+                if (_options.SessionTimeoutMinutes > 0)
+                {
+                    var sessionAge = DateTime.UtcNow - _sessionCreatedAt;
+                    if (sessionAge.TotalMinutes > _options.SessionTimeoutMinutes)
+                    {
+                        _logger?.LogWarning(
+                            "Session expired after {Age:F1} minutes (timeout: {Timeout} minutes). Disconnecting.",
+                            sessionAge.TotalMinutes,
+                            _options.SessionTimeoutMinutes);
+                        _options.OnSessionExpired?.Invoke();
+                        await DisconnectAsync().ConfigureAwait(false);
+                        return;
+                    }
+                }
+
+                // Validate session with server before rejoining
+                var isValid = await _hubConnection!.InvokeAsync<bool>(
+                    "ValidateSession",
+                    _sessionToken,
+                    _options.DocumentId)
+                    .ConfigureAwait(false);
+
+                if (!isValid)
+                {
+                    _logger?.LogWarning("Session validation failed on reconnect. Possible session hijacking attempt.");
+                    _options.OnSessionValidationFailed?.Invoke("Session validation failed on reconnect");
+                    await DisconnectAsync().ConfigureAwait(false);
+                    return;
+                }
+
                 await _hubConnection!.InvokeAsync(
                     "JoinDocument",
                     _options.DocumentId,
-                    _options.UserDisplayName)
+                    _options.UserDisplayName,
+                    _sessionToken)
                     .ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Failed to rejoin document after reconnect");
+                _logger?.LogWarning(ex, "Failed to validate session or rejoin document after reconnect");
+                // If session validation is required and fails, disconnect
+                if (_options.RequireSessionValidation)
+                {
+                    await DisconnectAsync().ConfigureAwait(false);
+                    return;
+                }
             }
         }
 
-        // Flush offline queue
+        // Only flush offline queue after successful session validation
         await FlushOfflineQueueAsync().ConfigureAwait(false);
     }
 
@@ -867,6 +937,17 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     {
         _connectionState = state;
         _options.OnConnectionStateChanged?.Invoke(state);
+    }
+
+    /// <summary>
+    /// Generates a cryptographically secure session token.
+    /// </summary>
+    private static string GenerateSessionToken()
+    {
+        var bytes = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes);
     }
 
     /// <inheritdoc />
