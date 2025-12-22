@@ -28,6 +28,12 @@
 
 ---
 
+## What is State Management?
+
+In Blazor applications, "state" is any data your app needs to remember—user input, fetched data, UI flags like "is loading" or "is sidebar open." Without a state management library, you end up passing data through component parameters, juggling `EventCallback` chains, or scattering state across services. This quickly becomes hard to track and debug. A state management library gives you a single source of truth: one place where state lives, one way to update it, and automatic notifications to any component that cares. Think of it as a central database for your UI that keeps everything in sync.
+
+---
+
 ## Why This Library?
 
 No actions. No reducers. No dispatchers. Just C# records with pure methods.
