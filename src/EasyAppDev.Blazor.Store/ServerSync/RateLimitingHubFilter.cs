@@ -82,7 +82,7 @@ public sealed class RateLimitingOptions
 /// });
 /// </code>
 /// </remarks>
-public sealed class RateLimitingHubFilter : IHubFilter
+public sealed class RateLimitingHubFilter : IHubFilter, IDisposable
 {
     private readonly RateLimitingOptions _options;
     private readonly ILogger<RateLimitingHubFilter>? _logger;
@@ -320,5 +320,15 @@ public sealed class RateLimitingHubFilter : IHubFilter
     {
         public Queue<DateTime> RecentMessages { get; } = new();
         public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Disposes the rate limiting hub filter and stops the cleanup timer.
+    /// </summary>
+    public void Dispose()
+    {
+        _cleanupTimer.Dispose();
+        _connectionLimits.Clear();
+        _documentLimits.Clear();
     }
 }

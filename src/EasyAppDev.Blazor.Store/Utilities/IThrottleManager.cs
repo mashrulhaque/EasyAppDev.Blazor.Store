@@ -53,6 +53,13 @@ public interface IThrottleManager : IDisposable
         bool leading = true);
 
     /// <summary>
+    /// Cancels a pending throttled action for a specific key.
+    /// </summary>
+    /// <param name="key">The key identifying the throttled action to cancel.</param>
+    /// <returns>A task that completes when the action has been cancelled.</returns>
+    Task CancelAsync(string key);
+
+    /// <summary>
     /// Cancels all pending throttled actions across all keys.
     /// </summary>
     /// <returns>A task that completes when all pending throttled actions have been cancelled.</returns>

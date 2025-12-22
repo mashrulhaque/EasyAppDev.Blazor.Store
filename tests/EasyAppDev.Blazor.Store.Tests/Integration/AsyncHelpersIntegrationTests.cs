@@ -330,7 +330,8 @@ public class AsyncHelpersIntegrationTests : TestContext
             await ExecuteAsync(
                 async () =>
                 {
-                    await Task.Delay(50);
+                    // Longer delay to ensure loading state can be observed
+                    await Task.Delay(200);
                     return "test data";
                 },
                 loading: s => s with { Data = s.Data.ToLoading() },

@@ -98,20 +98,37 @@ public sealed class QueryClient : IQueryClient, IDisposable
 
         _invalidatedKeys[key] = true;
 
-        // Fire and forget with proper error handling
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await TriggerRefetchAsync(key).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Error triggering refetch for invalidated query {Key}", key);
-            }
-        });
+        // Use a tracked task for better reliability - fire and forget but logged
+        _ = InvalidateQueriesInternalAsync(key);
 
         _logger?.LogDebug("Query invalidated for key {Key}", key);
+    }
+
+    /// <summary>
+    /// Invalidates queries for the specified key and awaits the refetch operation.
+    /// Use this when you need to ensure the refetch completes before continuing.
+    /// </summary>
+    /// <param name="key">The query key to invalidate.</param>
+    public async Task InvalidateQueriesAsync(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        _invalidatedKeys[key] = true;
+        await TriggerRefetchAsync(key).ConfigureAwait(false);
+
+        _logger?.LogDebug("Query invalidated and refetched for key {Key}", key);
+    }
+
+    private async Task InvalidateQueriesInternalAsync(string key)
+    {
+        try
+        {
+            await TriggerRefetchAsync(key).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Error triggering refetch for invalidated query {Key}", key);
+        }
     }
 
     /// <inheritdoc />
@@ -237,22 +254,31 @@ public sealed class QueryClient : IQueryClient, IDisposable
         var now = DateTime.UtcNow;
         var expiredKeys = new List<string>();
 
-        foreach (var kvp in _cache)
+        // Create a snapshot of the cache to avoid concurrent modification issues
+        var cacheSnapshot = _cache.ToArray();
+
+        foreach (var kvp in cacheSnapshot)
         {
-            var entryType = kvp.Value.GetType();
-            if (entryType.IsGenericType && entryType.GetGenericTypeDefinition() == typeof(QueryCacheEntry<>))
+            try
             {
-                var expiresAtProp = entryType.GetProperty("ExpiresAt");
-                if (expiresAtProp?.GetValue(kvp.Value) is DateTime expiresAt && now >= expiresAt)
+                // Use interface for type-safe expiration check without reflection
+                if (kvp.Value is IQueryCacheEntry entry && now >= entry.ExpiresAt)
                 {
                     expiredKeys.Add(kvp.Key);
                 }
+            }
+            catch (Exception ex)
+            {
+                // Entry may have been modified/removed during iteration
+                _logger?.LogDebug(ex, "Error checking cache entry {Key} during cleanup", kvp.Key);
             }
         }
 
         foreach (var key in expiredKeys)
         {
             _cache.TryRemove(key, out _);
+            // Also clean up invalidation flags to prevent memory leak
+            _invalidatedKeys.TryRemove(key, out _);
             _logger?.LogDebug("Expired cache entry removed for key {Key}", key);
         }
     }

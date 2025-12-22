@@ -218,6 +218,13 @@ public class ServerSyncOptions<TState> where TState : notnull
     public int MaxMessageSize { get; set; } = 1_048_576; // 1MB
 
     /// <summary>
+    /// Gets or sets the maximum JSON deserialization depth.
+    /// Prevents stack overflow attacks from deeply nested payloads.
+    /// Default is 32.
+    /// </summary>
+    public int MaxJsonDepth { get; set; } = 32;
+
+    /// <summary>
     /// Gets or sets the maximum number of messages allowed per second per connection.
     /// Exceeding this rate will result in messages being dropped.
     /// Default is 10 messages per second.

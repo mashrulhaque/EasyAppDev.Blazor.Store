@@ -80,12 +80,14 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         {
             _jsonOptions = SensitiveDataFilterExtensions.CreateFilteredJsonOptions(
                 new SensitiveDataFilterOptions { Enabled = true });
+            _jsonOptions.MaxDepth = _options.MaxJsonDepth; // Prevent stack overflow from deeply nested payloads
         }
         else
         {
             _jsonOptions = new JsonSerializerOptions
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                MaxDepth = _options.MaxJsonDepth // Prevent stack overflow from deeply nested payloads
             };
         }
 
@@ -380,49 +382,59 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     {
         var flushedCount = 0;
 
-        // Flush state updates
-        while (true)
+        // Take snapshots of queues while holding lock to prevent race conditions
+        StateUpdate[] updates;
+        StateOperation[] operations;
+        lock (_syncLock)
         {
-            StateUpdate? update;
-            lock (_syncLock)
-            {
-                if (_offlineQueue.Count == 0) break;
-                update = _offlineQueue.Dequeue();
-            }
+            updates = _offlineQueue.ToArray();
+            _offlineQueue.Clear();
+            operations = _offlineOperationQueue.ToArray();
+            _offlineOperationQueue.Clear();
+        }
 
+        // Flush state updates sequentially (order matters)
+        for (var i = 0; i < updates.Length; i++)
+        {
             try
             {
-                await _hubConnection!.InvokeAsync("SendUpdate", update).ConfigureAwait(false);
+                await _hubConnection!.InvokeAsync("SendUpdate", updates[i]).ConfigureAwait(false);
                 flushedCount++;
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Failed to flush offline update");
-                // Re-queue failed update
-                QueueOfflineUpdate(update);
+                _logger?.LogWarning(ex, "Failed to flush offline update at index {Index}", i);
+                // Re-queue remaining updates (including the failed one) to preserve order
+                lock (_syncLock)
+                {
+                    for (var j = i; j < updates.Length; j++)
+                    {
+                        _offlineQueue.Enqueue(updates[j]);
+                    }
+                }
                 break;
             }
         }
 
-        // Flush operations
-        while (true)
+        // Flush operations sequentially
+        for (var i = 0; i < operations.Length; i++)
         {
-            StateOperation? operation;
-            lock (_syncLock)
-            {
-                if (_offlineOperationQueue.Count == 0) break;
-                operation = _offlineOperationQueue.Dequeue();
-            }
-
             try
             {
-                await _hubConnection!.InvokeAsync("SendOperation", operation).ConfigureAwait(false);
+                await _hubConnection!.InvokeAsync("SendOperation", operations[i]).ConfigureAwait(false);
                 flushedCount++;
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Failed to flush offline operation");
-                QueueOfflineOperation(operation);
+                _logger?.LogWarning(ex, "Failed to flush offline operation at index {Index}", i);
+                // Re-queue remaining operations to preserve order
+                lock (_syncLock)
+                {
+                    for (var j = i; j < operations.Length; j++)
+                    {
+                        _offlineOperationQueue.Enqueue(operations[j]);
+                    }
+                }
                 break;
             }
         }
@@ -631,7 +643,9 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         if (!VerifyMessageSignature(update))
             return;
 
-        var localState = _store.GetState();
+        // Capture current local state BEFORE any processing for accurate conflict resolution
+        var localStateAtReceive = _store.GetState();
+
         var remoteState = JsonSerializer.Deserialize<TState>(update.StateJson, _jsonOptions);
         if (remoteState == null)
             return;
@@ -655,15 +669,15 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             }
         }
 
-        // Apply conflict resolution
-        var resolvedState = ResolveConflict(localState, remoteState, update.Version);
+        // Apply conflict resolution with the captured local state
+        var resolvedState = ResolveConflict(localStateAtReceive, remoteState, update.Version, localStateAtReceive);
         if (resolvedState == null)
             return; // Client wins, keep local
 
         try
         {
             _isReceivingUpdate = true;
-            _currentVersion = Math.Max(_currentVersion, update.Version);
+            UpdateVersionMax(update.Version);
 
             await _store.UpdateAsync(_ => resolvedState, "@@SYNC").ConfigureAwait(false);
             _logger?.LogDebug("Applied state update from: {Sender}", update.SenderId);
@@ -688,14 +702,14 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         if (operation.SenderId == _hubConnection?.ConnectionId)
             return Task.CompletedTask;
 
-        _currentVersion = Math.Max(_currentVersion, operation.Version);
+        UpdateVersionMax(operation.Version);
         _options.OnOperationReceived?.Invoke(operation);
 
         _logger?.LogDebug("Received operation: {Type} at {Path}", operation.OperationType, operation.Path);
         return Task.CompletedTask;
     }
 
-    private TState? ResolveConflict(TState local, TState remote, long remoteVersion)
+    private TState? ResolveConflict(TState local, TState remote, long remoteVersion, TState? baseState = default)
     {
         // Detect suspicious version jumps (potential attack or corruption)
         var versionDelta = remoteVersion - _currentVersion;
@@ -741,7 +755,8 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             case ConflictResolution.Custom:
                 if (_options.CustomConflictResolver != null)
                 {
-                    return _options.CustomConflictResolver.Resolve(local, remote, _previousState);
+                    // Pass the captured base state (state at receive time) instead of potentially stale _previousState
+                    return _options.CustomConflictResolver.Resolve(local, remote, baseState ?? local);
                 }
                 // Fallback to ServerWins if no custom resolver
                 return remote;
@@ -782,7 +797,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             }
 
             _isReceivingUpdate = true;
-            _currentVersion = version;
+            Interlocked.Exchange(ref _currentVersion, version);
 
             await _store.UpdateAsync(_ => newState, "@@SYNC_FULL").ConfigureAwait(false);
             _logger?.LogDebug("Applied full state sync, version: {Version}", version);
@@ -895,12 +910,25 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
                     }
                 }
 
-                // Validate session with server before rejoining
-                var isValid = await _hubConnection!.InvokeAsync<bool>(
-                    "ValidateSession",
-                    _sessionToken,
-                    _options.DocumentId)
-                    .ConfigureAwait(false);
+                // Validate session with server before rejoining with timeout to prevent deadlock
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                bool isValid;
+                try
+                {
+                    isValid = await _hubConnection!.InvokeAsync<bool>(
+                        "ValidateSession",
+                        _sessionToken,
+                        _options.DocumentId,
+                        cts.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.LogWarning("Session validation timed out after 30 seconds. Disconnecting to prevent deadlock.");
+                    _options.OnSessionValidationFailed?.Invoke("Session validation timeout");
+                    await DisconnectAsync().ConfigureAwait(false);
+                    return;
+                }
 
                 if (!isValid)
                 {
@@ -916,6 +944,12 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
                     _options.UserDisplayName,
                     _sessionToken)
                     .ConfigureAwait(false);
+
+                // Refresh session token and reset creation time after successful reconnection
+                // This prevents session expiry from accumulating across reconnects
+                _sessionToken = GenerateSessionToken();
+                _sessionCreatedAt = DateTime.UtcNow;
+                _logger?.LogDebug("Session token refreshed after successful reconnection");
             }
             catch (Exception ex)
             {
@@ -948,6 +982,22 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         rng.GetBytes(bytes);
         return Convert.ToBase64String(bytes);
+    }
+
+    /// <summary>
+    /// Atomically updates _currentVersion to the maximum of its current value and the provided value.
+    /// Uses Interlocked.CompareExchange for thread-safe operation.
+    /// </summary>
+    private void UpdateVersionMax(long newVersion)
+    {
+        long current;
+        do
+        {
+            current = Volatile.Read(ref _currentVersion);
+            if (newVersion <= current)
+                return; // New version is not greater, no update needed
+        }
+        while (Interlocked.CompareExchange(ref _currentVersion, newVersion, current) != current);
     }
 
     /// <inheritdoc />

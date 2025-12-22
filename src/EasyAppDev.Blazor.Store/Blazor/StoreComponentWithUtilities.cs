@@ -17,6 +17,10 @@ namespace EasyAppDev.Blazor.Store.Blazor;
 public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TState>
     where TState : notnull
 {
+    private readonly HashSet<string> _registeredDebounceKeys = new();
+    private readonly HashSet<string> _registeredThrottleKeys = new();
+    private readonly object _keysLock = new();
+
     /// <summary>
     /// Gets the injected debounce manager.
     /// </summary>
@@ -69,12 +73,24 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
         ArgumentNullException.ThrowIfNull(updater);
 
         var key = $"{GetType().Name}_{action ?? "update"}";
+        TrackDebounceKey(key);
         return DebounceManager.Debounce(key, async () =>
         {
-            await InvokeAsync(async () =>
+            // Check if disposed before invoking to prevent operations on disposed component
+            if (IsDisposed) return;
+
+            try
             {
-                await Store.UpdateAsync(updater, action);
-            });
+                await InvokeAsync(async () =>
+                {
+                    if (IsDisposed) return;
+                    await Store.UpdateAsync(updater, action);
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component was disposed during async invoke - expected behavior
+            }
         }, delayMilliseconds);
     }
 
@@ -92,12 +108,24 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
         ArgumentNullException.ThrowIfNull(asyncUpdater);
 
         var key = $"{GetType().Name}_{action ?? "update"}";
+        TrackDebounceKey(key);
         return DebounceManager.Debounce(key, async () =>
         {
-            await InvokeAsync(async () =>
+            // Check if disposed before invoking to prevent operations on disposed component
+            if (IsDisposed) return;
+
+            try
             {
-                await Store.UpdateAsync(asyncUpdater, action);
-            });
+                await InvokeAsync(async () =>
+                {
+                    if (IsDisposed) return;
+                    await Store.UpdateAsync(asyncUpdater, action);
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component was disposed during async invoke - expected behavior
+            }
         }, delayMilliseconds);
     }
 
@@ -115,12 +143,24 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
         ArgumentNullException.ThrowIfNull(updater);
 
         var key = $"{GetType().Name}_{action ?? "update"}";
+        TrackThrottleKey(key);
         return ThrottleManager.Throttle(key, async () =>
         {
-            await InvokeAsync(async () =>
+            // Check if disposed before invoking to prevent operations on disposed component
+            if (IsDisposed) return;
+
+            try
             {
-                await Store.UpdateAsync(updater, action);
-            });
+                await InvokeAsync(async () =>
+                {
+                    if (IsDisposed) return;
+                    await Store.UpdateAsync(updater, action);
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component was disposed during async invoke - expected behavior
+            }
         }, intervalMilliseconds);
     }
 
@@ -138,12 +178,24 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
         ArgumentNullException.ThrowIfNull(asyncUpdater);
 
         var key = $"{GetType().Name}_{action ?? "update"}";
+        TrackThrottleKey(key);
         return ThrottleManager.Throttle(key, async () =>
         {
-            await InvokeAsync(async () =>
+            // Check if disposed before invoking to prevent operations on disposed component
+            if (IsDisposed) return;
+
+            try
             {
-                await Store.UpdateAsync(asyncUpdater, action);
-            });
+                await InvokeAsync(async () =>
+                {
+                    if (IsDisposed) return;
+                    await Store.UpdateAsync(asyncUpdater, action);
+                });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Component was disposed during async invoke - expected behavior
+            }
         }, intervalMilliseconds);
     }
 
@@ -238,5 +290,68 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
         ArgumentNullException.ThrowIfNull(loader);
 
         return LazyCache.GetOrLoadAsync(cacheKey, loader, cacheFor);
+    }
+
+    /// <summary>
+    /// Tracks a debounce key for cleanup on disposal.
+    /// </summary>
+    private void TrackDebounceKey(string key)
+    {
+        lock (_keysLock)
+        {
+            _registeredDebounceKeys.Add(key);
+        }
+    }
+
+    /// <summary>
+    /// Tracks a throttle key for cleanup on disposal.
+    /// </summary>
+    private void TrackThrottleKey(string key)
+    {
+        lock (_keysLock)
+        {
+            _registeredThrottleKeys.Add(key);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // Cancel all registered debounce and throttle operations for this component
+            CancelPendingOperations();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// Cancels all pending debounce and throttle operations registered by this component.
+    /// </summary>
+    private void CancelPendingOperations()
+    {
+        string[] debounceKeys;
+        string[] throttleKeys;
+
+        lock (_keysLock)
+        {
+            debounceKeys = _registeredDebounceKeys.ToArray();
+            throttleKeys = _registeredThrottleKeys.ToArray();
+            _registeredDebounceKeys.Clear();
+            _registeredThrottleKeys.Clear();
+        }
+
+        // Cancel debounce operations (fire-and-forget since we're disposing)
+        foreach (var key in debounceKeys)
+        {
+            _ = DebounceManager.CancelAsync(key);
+        }
+
+        // Cancel throttle operations
+        foreach (var key in throttleKeys)
+        {
+            _ = ThrottleManager.CancelAsync(key);
+        }
     }
 }

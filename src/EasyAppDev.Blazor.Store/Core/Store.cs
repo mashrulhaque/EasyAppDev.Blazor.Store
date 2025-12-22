@@ -19,7 +19,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     private readonly MiddlewarePipeline<TState>? _middlewarePipeline;
     private readonly ILogger<Store<TState>>? _logger;
     private readonly StoreErrorHandler<TState>? _errorHandler;
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed, 1 = disposed (using int for Interlocked)
     private readonly AsyncLocal<int> _updateDepth = new();
 
     /// <summary>
@@ -60,6 +60,8 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     public TState GetState()
     {
         ThrowIfDisposed();
+        // Memory barrier ensures visibility of the latest state value across threads
+        Thread.MemoryBarrier();
         return _state;
     }
 
@@ -82,6 +84,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
                     _updateDepth.Value);
             }
 
+            TState? stateSnapshot = default;
             bool shouldNotify;
             await _lock.WaitAsync().ConfigureAwait(false);
             try
@@ -113,6 +116,8 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
                             .ConfigureAwait(false);
                     }
 
+                    // Capture state snapshot for consistent notification
+                    stateSnapshot = _state;
                     shouldNotify = true;
                 }
             }
@@ -122,9 +127,10 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
             }
 
             // Notify subscribers AFTER releasing lock to prevent reentrancy deadlocks
+            // Pass captured snapshot for consistent state across all subscribers
             if (shouldNotify)
             {
-                NotifySubscribers();
+                NotifySubscribers(stateSnapshot!);
             }
         }
         finally
@@ -152,6 +158,7 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
                     _updateDepth.Value);
             }
 
+            TState? stateSnapshot = default;
             bool shouldNotify;
             await _lock.WaitAsync().ConfigureAwait(false);
             try
@@ -183,6 +190,8 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
                             .ConfigureAwait(false);
                     }
 
+                    // Capture state snapshot for consistent notification
+                    stateSnapshot = _state;
                     shouldNotify = true;
                 }
             }
@@ -192,9 +201,10 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
             }
 
             // Notify subscribers AFTER releasing lock to prevent reentrancy deadlocks
+            // Pass captured snapshot for consistent state across all subscribers
             if (shouldNotify)
             {
-                NotifySubscribers();
+                NotifySubscribers(stateSnapshot!);
             }
         }
         finally
@@ -250,14 +260,14 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
             EqualityComparer<TSelected>.Default);
     }
 
-    private void NotifySubscribers()
+    private void NotifySubscribers(TState capturedState)
     {
-        _subscriptionManager.NotifyAll();
+        _subscriptionManager.NotifyAll(capturedState);
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
             throw new ObjectDisposedException(nameof(Store<TState>));
     }
 
@@ -283,10 +293,9 @@ public class Store<TState> : IStore<TState>, IDisposable where TState : notnull
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_disposed)
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
             return;
-
-        _disposed = true;
 
         _subscriptionManager.Clear();
         _subscriptionManager.Dispose();

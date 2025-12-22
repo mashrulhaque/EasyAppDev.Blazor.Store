@@ -20,7 +20,7 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
     where TState : notnull
 {
     private IDisposable? _subscription;
-    private bool _disposed;
+    private volatile bool _disposed;
 #if DEBUG
     private Guid _subscriptionId;
 #endif
@@ -54,6 +54,11 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
     /// Gets the current state from the store.
     /// </summary>
     protected TState State => Store.GetState();
+
+    /// <summary>
+    /// Gets whether the component has been disposed.
+    /// </summary>
+    protected bool IsDisposed => _disposed;
 
     /// <summary>
     /// Updates the state using a transformation function (Zustand-style).
@@ -162,7 +167,19 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
             value =>
             {
                 callback?.Invoke(value);
-                InvokeAsync(StateHasChanged);
+                // Use try-catch to handle component disposal during async invoke
+                try
+                {
+                    InvokeAsync(StateHasChanged);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Component was disposed during notification - this is expected
+                }
+                catch (Exception ex)
+                {
+                    Logger?.LogWarning(ex, "Error invoking StateHasChanged in {ComponentType}", GetType().Name);
+                }
             });
     }
 

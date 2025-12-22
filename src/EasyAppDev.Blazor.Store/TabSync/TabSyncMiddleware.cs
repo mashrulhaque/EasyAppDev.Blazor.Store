@@ -122,6 +122,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     {
         if (_isInitialized) return;
 
+        DotNetObjectReference<TabSyncMiddleware<TState>>? dotNetRef = null;
         try
         {
             _jsRuntime = _serviceProvider.GetService(typeof(IJSRuntime)) as IJSRuntime;
@@ -130,7 +131,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
                 return;
             }
 
-            _dotNetRef = DotNetObjectReference.Create(this);
+            dotNetRef = DotNetObjectReference.Create(this);
             _channelName = _options.ChannelName ?? $"store-{typeof(TState).Name}";
 
             // Try to load JS module first
@@ -144,19 +145,28 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
 
             // Initialize the channel
             var initialized = await _jsRuntime.InvokeAsync<bool>(
-                "__initTabSync", _channelName, _dotNetRef).ConfigureAwait(false);
+                "__initTabSync", _channelName, dotNetRef).ConfigureAwait(false);
 
             if (!initialized)
             {
                 // BroadcastChannel not supported or init failed
+                dotNetRef.Dispose();
                 return;
             }
 
+            // Only store the reference after successful initialization
+            _dotNetRef = dotNetRef;
+            dotNetRef = null; // Prevent disposal in finally
             _isInitialized = true;
         }
         catch
         {
             // JS interop failed - SSR, prerendering, or unsupported browser
+        }
+        finally
+        {
+            // Dispose if we created but didn't successfully initialize
+            dotNetRef?.Dispose();
         }
     }
 
@@ -375,8 +385,9 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     /// <inheritdoc />
     async Task IMiddleware<TState>.OnAfterUpdateAsync(TState previousState, TState currentState, string? action)
     {
-        // Don't broadcast updates received from other tabs (thread-safe check)
-        if (Volatile.Read(ref _syncUpdateCount) > 0) return;
+        // Don't broadcast updates received from other tabs
+        // Use Interlocked.CompareExchange for atomic read to prevent race conditions
+        if (Interlocked.CompareExchange(ref _syncUpdateCount, 0, 0) > 0) return;
 
         // Check if action should be synced
         if (!_options.ShouldSyncAction(action)) return;
@@ -392,11 +403,14 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         {
             if (_options.DebounceMs > 0)
             {
-                // Cancel previous debounced sync
-                _debounceCts?.Cancel();
+                // Cancel and dispose previous debounced sync to prevent memory leak
+                var oldCts = _debounceCts;
                 _debounceCts = new CancellationTokenSource();
-
                 var cts = _debounceCts;
+
+                oldCts?.Cancel();
+                oldCts?.Dispose();
+
                 await Task.Delay(_options.DebounceMs, cts.Token).ConfigureAwait(false);
 
                 if (cts.Token.IsCancellationRequested) return;

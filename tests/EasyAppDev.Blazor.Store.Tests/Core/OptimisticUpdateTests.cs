@@ -269,6 +269,83 @@ public class OptimisticUpdateTests : IDisposable
         await updateTask;
     }
 
+    [Fact]
+    public async Task UpdateOptimistic_WithConcurrentUpdate_ThrowsConcurrentModificationException()
+    {
+        // Arrange
+        var item = new CartItem("1", "Test Item", 1);
+        var concurrentItem = new CartItem("concurrent", "Concurrent Item", 1);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<AggregateException>(async () =>
+        {
+            await _store.UpdateOptimistic(
+                optimistic: s => s with { Items = s.Items.Append(item).ToList() },
+                action: async () =>
+                {
+                    // During the "server call", another update modifies the state
+                    await _store.UpdateAsync(s => s with
+                    {
+                        Items = s.Items.Append(concurrentItem).ToList()
+                    });
+
+                    await Task.Delay(10);
+                    throw new InvalidOperationException("Server failed");
+                },
+                actionName: "ADD_ITEM"
+            );
+        });
+
+        // Should contain both server exception and ConcurrentModificationException
+        exception.InnerExceptions.Should().HaveCount(2);
+        exception.InnerExceptions.Should().ContainSingle(e =>
+            e.GetType() == typeof(InvalidOperationException));
+        exception.InnerExceptions.Should().ContainSingle(e =>
+            e.GetType() == typeof(ConcurrentModificationException));
+
+        // State should still have both items since rollback failed
+        var state = _store.GetState();
+        state.Items.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task UpdateOptimisticWithConfirm_WithConcurrentUpdate_ThrowsConcurrentModificationException()
+    {
+        // Arrange
+        var tempItem = new CartItem("temp-1", "New Item", 1);
+        var concurrentItem = new CartItem("concurrent", "Concurrent Item", 1);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ConcurrentModificationException>(async () =>
+        {
+            await _store.UpdateOptimisticWithConfirm(
+                optimistic: s => s with { Items = s.Items.Append(tempItem).ToList() },
+                action: async () =>
+                {
+                    // During the "server call", another update modifies the state
+                    await _store.UpdateAsync(s => s with
+                    {
+                        Items = s.Items.Append(concurrentItem).ToList()
+                    });
+
+                    await Task.Delay(10);
+                    throw new InvalidOperationException("Server failed");
+#pragma warning disable CS0162
+                    return new CartItem("server-123", "New Item", 1);
+#pragma warning restore CS0162
+                },
+                confirm: (s, result) => s with
+                {
+                    Items = s.Items.Select(i => i.Id == tempItem.Id ? result : i).ToList()
+                }
+            );
+        });
+
+        // State should still have both items since rollback failed
+        var state = _store.GetState();
+        state.Items.Should().HaveCount(2);
+    }
+
     public void Dispose()
     {
         _store.Dispose();

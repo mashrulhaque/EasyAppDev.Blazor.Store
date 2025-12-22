@@ -36,9 +36,10 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
 {
     private IDisposable? _subscription;
     private bool _disposed;
-    private object? _selectedValue;
+    private volatile object? _selectedValue;
     private object? _lastRenderedValue;
-    private bool _isFirstRender = true;
+    private int _isFirstRender = 1; // 1 = true, 0 = false (for thread-safe access)
+    private readonly object _valueLock = new();
 #if DEBUG
     private Guid _subscriptionId;
 #endif
@@ -141,15 +142,19 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     /// <inheritdoc />
     protected override bool ShouldRender()
     {
-        // Always render on first render
-        if (_isFirstRender)
+        // Always render on first render (thread-safe read using Volatile)
+        if (Volatile.Read(ref _isFirstRender) == 1)
         {
             return true;
         }
 
         // Only render if the selected value has actually changed since last render
         // This prevents duplicate renders from Blazor's internal rendering mechanism
-        var currentSelected = _selectedValue;
+        object? currentSelected;
+        lock (_valueLock)
+        {
+            currentSelected = _selectedValue;
+        }
 
         if (currentSelected == null && _lastRenderedValue == null)
         {
@@ -169,8 +174,12 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     {
         base.OnAfterRender(firstRender);
 
-        _isFirstRender = false;
-        _lastRenderedValue = _selectedValue;
+        // Thread-safe write using Volatile
+        Volatile.Write(ref _isFirstRender, 0);
+        lock (_valueLock)
+        {
+            _lastRenderedValue = _selectedValue;
+        }
 
 #if DEBUG
         // Record render event for diagnostics
@@ -225,8 +234,20 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
                 // This is now safe with ShouldRender() optimization preventing cascade renders
                 DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
 #endif
-                _selectedValue = value;
-                InvokeAsync(StateHasChanged);
+                // Thread-safe write to _selectedValue
+                lock (_valueLock)
+                {
+                    _selectedValue = value;
+                }
+                // Use try-catch to handle component disposal during async invoke
+                try
+                {
+                    InvokeAsync(StateHasChanged);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Component was disposed during notification - this is expected
+                }
             });
     }
 

@@ -43,6 +43,13 @@ public interface IDebounceManager : IDisposable
     Task Debounce(string key, Func<Task> action, int delayMilliseconds);
 
     /// <summary>
+    /// Cancels a pending debounced action for a specific key.
+    /// </summary>
+    /// <param name="key">The key identifying the debounced action to cancel.</param>
+    /// <returns>A task that completes when the action has been cancelled.</returns>
+    Task CancelAsync(string key);
+
+    /// <summary>
     /// Cancels all pending debounced actions across all keys.
     /// </summary>
     /// <returns>A task that completes when all pending actions have been cancelled.</returns>

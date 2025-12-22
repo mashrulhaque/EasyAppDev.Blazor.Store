@@ -22,7 +22,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     private T? _data;
     private Exception? _error;
     private QueryStatus _status = QueryStatus.Idle;
-    private bool _isFetching;
+    private int _isFetching; // 0 = not fetching, 1 = fetching (using int for Interlocked)
     private DateTime? _dataUpdatedAt;
     private int _failureCount;
     private bool _isPlaceholderData;
@@ -52,9 +52,9 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
             _isPlaceholderData = true;
         }
 
-        // Try to get cached data
+        // Try to get cached data (only if not invalidated)
         var cachedEntry = _queryClient.GetCacheEntry<T>(_options.Key);
-        if (cachedEntry is not null)
+        if (cachedEntry is not null && !_queryClient.IsInvalidated(_options.Key))
         {
             _data = cachedEntry.Data;
             _dataUpdatedAt = cachedEntry.UpdatedAt;
@@ -96,7 +96,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     /// <summary>
     /// Gets whether any fetch is in progress (including background refetch).
     /// </summary>
-    public bool IsFetching => _isFetching;
+    public bool IsFetching => Volatile.Read(ref _isFetching) != 0;
 
     /// <summary>
     /// Gets whether the data is stale (older than staleTime).
@@ -178,13 +178,19 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         if (_disposed) return;
         // Only check Enabled for automatic fetches, not manual refetch
         if (!forceRefetch && !_options.Enabled()) return;
-        if (_isFetching && !forceRefetch) return;
+
+        // Thread-safe check to prevent duplicate fetches
+        // For force refetch, always proceed; otherwise check if already fetching
+        if (!forceRefetch && Interlocked.CompareExchange(ref _isFetching, 1, 0) != 0)
+            return;
+
+        // For force refetch, set the flag (may already be 1)
+        if (forceRefetch)
+            Interlocked.Exchange(ref _isFetching, 1);
 
         // Cancel any existing fetch
         _fetchCts?.Cancel();
         _fetchCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
-
-        _isFetching = true;
 
         // Only set to Loading if we don't have data
         if (_status != QueryStatus.Success && !_isPlaceholderData)
@@ -204,7 +210,10 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
                 var result = await _options.QueryFn(_fetchCts.Token);
 
                 if (_disposed || _fetchCts.Token.IsCancellationRequested)
+                {
+                    Interlocked.Exchange(ref _isFetching, 0);
                     return;
+                }
 
                 // Apply transformation if specified
                 if (result is not null && _options.Select is not null)
@@ -218,7 +227,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
                 _error = null;
                 _failureCount = 0;
                 _isPlaceholderData = false;
-                _isFetching = false;
+                Interlocked.Exchange(ref _isFetching, 0);
 
                 // Update cache
                 if (result is not null)
@@ -233,7 +242,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
             }
             catch (OperationCanceledException) when (_fetchCts.Token.IsCancellationRequested)
             {
-                _isFetching = false;
+                Interlocked.Exchange(ref _isFetching, 0);
                 return;
             }
             catch (Exception ex)
@@ -251,7 +260,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
                     }
                     catch (OperationCanceledException)
                     {
-                        _isFetching = false;
+                        Interlocked.Exchange(ref _isFetching, 0);
                         return;
                     }
                 }
@@ -259,11 +268,15 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         }
 
         // All retries exhausted
-        if (_disposed) return;
+        if (_disposed)
+        {
+            Interlocked.Exchange(ref _isFetching, 0);
+            return;
+        }
 
         _error = lastException;
         _status = QueryStatus.Error;
-        _isFetching = false;
+        Interlocked.Exchange(ref _isFetching, 0);
 
         _options.OnError?.Invoke(lastException!);
         _options.OnSettled?.Invoke();

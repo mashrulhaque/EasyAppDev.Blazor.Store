@@ -87,7 +87,7 @@ public class StateOperation
 
     /// <summary>
     /// Gets or sets the path to the property being modified (e.g., "user.profile.name").
-    /// Path traversal patterns (../) are not allowed for security.
+    /// Path traversal patterns (../) and absolute paths are not allowed for security.
     /// </summary>
     public required string Path
     {
@@ -100,6 +100,16 @@ public class StateOperation
             // Prevent path traversal attacks
             if (value.Contains(".."))
                 throw new ArgumentException("Path cannot contain '..' for security reasons", nameof(Path));
+
+            // Prevent absolute paths (Windows drive letters, UNC paths, Unix absolute paths that are not just "/")
+            // Allow "/" as root path for the state object
+            if (value != "/" && (
+                value.StartsWith('/') && value.Length > 1 && value[1] == '/' || // UNC-like //
+                value.StartsWith('\\') || // Windows UNC
+                (value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':'))) // Windows drive letter
+            {
+                throw new ArgumentException("Absolute file system paths are not allowed for security reasons", nameof(Path));
+            }
 
             _path = value;
         }

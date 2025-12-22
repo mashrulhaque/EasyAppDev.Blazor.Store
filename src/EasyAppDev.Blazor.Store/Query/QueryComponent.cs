@@ -11,6 +11,8 @@ namespace EasyAppDev.Blazor.Store.Query;
 public abstract class QueryComponent : ComponentBase, IDisposable
 {
     private readonly List<IDisposable> _disposables = new();
+    private readonly List<Task> _pendingInitializations = new();
+    private readonly object _initLock = new();
     private bool _disposed;
     private bool _initialized;
 
@@ -32,9 +34,14 @@ public abstract class QueryComponent : ComponentBase, IDisposable
         _disposables.Add(query);
 
         // If component is already initialized, initialize the query immediately
+        // Track the task to ensure proper completion
         if (_initialized)
         {
-            _ = InitializeQueryAsync(query);
+            var initTask = InitializeQueryAsync(query);
+            lock (_initLock)
+            {
+                _pendingInitializations.Add(initTask);
+            }
         }
 
         return query;
@@ -42,9 +49,16 @@ public abstract class QueryComponent : ComponentBase, IDisposable
 
     private async Task InitializeQueryAsync(IDisposable query)
     {
-        if (query is IQueryInitializable initializable)
+        try
         {
-            await initializable.InitializeAsync();
+            if (query is IQueryInitializable initializable)
+            {
+                await initializable.InitializeAsync().ConfigureAwait(false);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed during initialization - expected behavior
         }
     }
 
@@ -166,6 +180,20 @@ public abstract class QueryComponent : ComponentBase, IDisposable
 
         if (disposing)
         {
+            // Wait for any pending initializations to complete to prevent orphaned tasks
+            Task[] pendingTasks;
+            lock (_initLock)
+            {
+                pendingTasks = _pendingInitializations.ToArray();
+                _pendingInitializations.Clear();
+            }
+
+            if (pendingTasks.Length > 0)
+            {
+                // Give a short timeout for pending initializations
+                Task.WhenAll(pendingTasks).Wait(TimeSpan.FromSeconds(1));
+            }
+
             foreach (var disposable in _disposables)
             {
                 disposable.Dispose();

@@ -119,6 +119,18 @@ public class PersistenceOptions<TState> where TState : notnull
     public byte[]? SigningKey { get; init; }
 
     /// <summary>
+    /// Gets or sets whether to reject state without a valid signature when EnableIntegrityCheck is true.
+    /// If true, unsigned state (e.g., legacy data or migrated state) will be rejected.
+    /// If false, unsigned state is allowed with a warning (backward compatible).
+    /// Default: false.
+    /// </summary>
+    /// <remarks>
+    /// Security recommendation: Set to true for high-security applications after migrating
+    /// existing unsigned state. This prevents signature bypass attacks.
+    /// </remarks>
+    public bool RequireSignature { get; init; } = false;
+
+    /// <summary>
     /// Gets or sets the maximum allowed size of serialized state in bytes.
     /// Prevents quota exhaustion attacks and excessive storage usage.
     /// Default: 1048576 (1 MB).
@@ -150,6 +162,24 @@ public class PersistenceOptions<TState> where TState : notnull
     /// Only applies when FilterSensitiveData is true.
     /// </summary>
     public SensitiveDataFilterOptions? SensitiveDataFilterOptions { get; init; }
+
+    /// <summary>
+    /// Gets or sets a callback invoked when a persistence error occurs during save.
+    /// Use this to handle or log errors without breaking the application flow.
+    /// </summary>
+    public Action<Exception>? OnPersistenceError { get; init; }
+
+    /// <summary>
+    /// Gets or sets whether to throw exceptions when persistence errors occur.
+    /// When true, persistence errors are re-thrown after invoking OnPersistenceError callback.
+    /// When false (default), errors are only logged and callback invoked, but not thrown.
+    /// Default: false (for backward compatibility).
+    /// </summary>
+    /// <remarks>
+    /// Set to true when you need to know if state persistence failed and handle it appropriately.
+    /// This is recommended for critical state that must be persisted reliably.
+    /// </remarks>
+    public bool ThrowOnPersistenceError { get; init; } = false;
 }
 
 /// <summary>

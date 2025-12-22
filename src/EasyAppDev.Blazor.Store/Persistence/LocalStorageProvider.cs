@@ -75,7 +75,7 @@ public class LocalStorageProvider : IPersistenceProvider
 
             _logger?.LogDebug("Successfully saved to localStorage key: {Key}", key);
         }
-        catch (JSException jsEx) when (jsEx.Message.Contains("QuotaExceededError") || jsEx.Message.Contains("quota"))
+        catch (JSException jsEx) when (IsQuotaExceededException(jsEx))
         {
             _logger?.LogError(jsEx, "localStorage quota exceeded for key: {Key}. Size: {Size:N0} bytes. " +
                 "Consider reducing state size or clearing old data.", key, value.Length);
@@ -113,5 +113,40 @@ public class LocalStorageProvider : IPersistenceProvider
 
         var value = await LoadAsync(key).ConfigureAwait(false);
         return value != null;
+    }
+
+    /// <summary>
+    /// Determines if a JSException represents a storage quota exceeded error.
+    /// Handles various browser-specific error messages.
+    /// </summary>
+    private static bool IsQuotaExceededException(JSException ex)
+    {
+        var message = ex.Message;
+        if (string.IsNullOrEmpty(message))
+            return false;
+
+        // Standard DOMException name (Chrome, Firefox, Safari, Edge)
+        if (message.Contains("QuotaExceededError", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Legacy error name
+        if (message.Contains("QUOTA_EXCEEDED_ERR", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Firefox legacy format
+        if (message.Contains("NS_ERROR_DOM_QUOTA_REACHED", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Generic quota keyword as fallback
+        if (message.Contains("quota", StringComparison.OrdinalIgnoreCase) &&
+            message.Contains("exceed", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check for storage full indicators
+        if (message.Contains("storage", StringComparison.OrdinalIgnoreCase) &&
+            message.Contains("full", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 }

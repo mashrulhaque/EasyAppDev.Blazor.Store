@@ -4,6 +4,21 @@ namespace EasyAppDev.Blazor.Store.Middleware;
 /// Middleware implementation that wraps a functional delegate.
 /// Allows inline middleware definition without creating a class.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Note: The <c>next</c> parameter passed to handlers is a no-op delegate since
+/// IMiddleware implementations are invoked in parallel by the MiddlewarePipeline,
+/// not chained sequentially. The parameter exists for compatibility with express-style
+/// middleware patterns. If you need true chaining, implement a custom pipeline.
+/// </para>
+/// <para>
+/// <b>Lifetime Consideration:</b> If you pass an <see cref="IServiceProvider"/> to the constructor,
+/// ensure it has a lifetime equal to or longer than the middleware. Passing a scoped provider
+/// to a singleton middleware will cause issues when the scope is disposed. For Blazor Server,
+/// prefer resolving services within your handler using the application's root provider or
+/// use <see cref="IServiceScopeFactory"/> to create scopes as needed.
+/// </para>
+/// </remarks>
 /// <typeparam name="TState">The type of state.</typeparam>
 public class FunctionalMiddleware<TState> : IMiddleware<TState>
     where TState : notnull
@@ -18,7 +33,10 @@ public class FunctionalMiddleware<TState> : IMiddleware<TState>
     /// The handler is called during both Before and After phases.
     /// </summary>
     /// <param name="handler">The middleware handler function.</param>
-    /// <param name="serviceProvider">Optional service provider for dependency resolution.</param>
+    /// <param name="serviceProvider">
+    /// Optional service provider for dependency resolution. Must have a lifetime
+    /// equal to or longer than the middleware. See class remarks for details.
+    /// </param>
     public FunctionalMiddleware(
         Func<MiddlewareContext<TState>, Func<Task>, Task> handler,
         IServiceProvider? serviceProvider = null)
@@ -32,7 +50,10 @@ public class FunctionalMiddleware<TState> : IMiddleware<TState>
     /// </summary>
     /// <param name="beforeHandler">Handler for the Before phase (can be null to skip).</param>
     /// <param name="afterHandler">Handler for the After phase (can be null to skip).</param>
-    /// <param name="serviceProvider">Optional service provider for dependency resolution.</param>
+    /// <param name="serviceProvider">
+    /// Optional service provider for dependency resolution. Must have a lifetime
+    /// equal to or longer than the middleware. See class remarks for details.
+    /// </param>
     public FunctionalMiddleware(
         Func<MiddlewareContext<TState>, Func<Task>, Task>? beforeHandler,
         Func<MiddlewareContext<TState>, Func<Task>, Task>? afterHandler,

@@ -142,6 +142,37 @@ public sealed class DebounceManager : IDebounceManager
     }
 
     /// <summary>
+    /// Cancels a pending debounced action for a specific key.
+    /// </summary>
+    /// <param name="key">The key identifying the debounced action to cancel.</param>
+    public async Task CancelAsync(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        CancellationTokenSource? cts = null;
+
+        await _lock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_pendingActions.TryGetValue(key, out cts))
+            {
+                _pendingActions.Remove(key);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        // Cancel and dispose outside lock
+        if (cts != null)
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Cancels all pending debounced actions.
     /// </summary>
     public async Task CancelAllAsync()

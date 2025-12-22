@@ -19,7 +19,10 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
     private IStore<TState>? _store;
     private int _currentIndex = -1;
-    private volatile bool _isUndoRedo;
+    // Use AsyncLocal to properly scope undo/redo flag to current execution context
+    // This prevents race conditions where concurrent updates could see the flag incorrectly
+    private static readonly AsyncLocal<bool> _isUndoRedo = new();
+    private bool _isInitialized;
     private DateTime _lastEntryTime = DateTime.MinValue;
     private long _estimatedMemoryUsage = 0;
 
@@ -35,19 +38,29 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
     /// <summary>
     /// Initializes the history with the store reference.
     /// Called automatically when the middleware is added to the store.
+    /// This method is idempotent - calling it multiple times has no effect after first initialization.
     /// </summary>
     /// <param name="store">The store to track.</param>
     internal void Initialize(IStore<TState> store)
     {
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        ArgumentNullException.ThrowIfNull(store);
 
-        // Add initial state
         lock (_lock)
         {
+            // Make initialization idempotent - skip if already initialized
+            if (_isInitialized)
+                return;
+
+            _store = store;
+
+            // Add initial state
             var initialState = store.GetState();
-            _history.Add(new HistoryEntry<TState>(initialState, "INITIAL", DateTime.UtcNow));
+            var entrySize = EstimateStateSize(initialState);
+            _history.Add(new HistoryEntry<TState>(initialState, "INITIAL", DateTime.UtcNow, entrySize));
             _currentIndex = 0;
             _lastEntryTime = DateTime.UtcNow;
+            _estimatedMemoryUsage = entrySize;
+            _isInitialized = true;
         }
     }
 
@@ -135,14 +148,14 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
 
             if (targetState != null)
             {
-                _isUndoRedo = true;
+                _isUndoRedo.Value = true;
                 try
                 {
                     await _store.UpdateAsync(_ => targetState, "UNDO").ConfigureAwait(false);
                 }
                 finally
                 {
-                    _isUndoRedo = false;
+                    _isUndoRedo.Value = false;
                 }
 
                 OnHistoryChanged?.Invoke();
@@ -175,14 +188,14 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
 
             if (targetState != null)
             {
-                _isUndoRedo = true;
+                _isUndoRedo.Value = true;
                 try
                 {
                     await _store.UpdateAsync(_ => targetState, "REDO").ConfigureAwait(false);
                 }
                 finally
                 {
-                    _isUndoRedo = false;
+                    _isUndoRedo.Value = false;
                 }
 
                 OnHistoryChanged?.Invoke();
@@ -219,14 +232,14 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
 
             if (targetState != null)
             {
-                _isUndoRedo = true;
+                _isUndoRedo.Value = true;
                 try
                 {
                     await _store.UpdateAsync(_ => targetState, $"GOTO_{index}").ConfigureAwait(false);
                 }
                 finally
                 {
-                    _isUndoRedo = false;
+                    _isUndoRedo.Value = false;
                 }
 
                 OnHistoryChanged?.Invoke();
@@ -248,9 +261,13 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
             // Keep only the current state
             var currentState = _history[_currentIndex].State;
             _history.Clear();
-            _history.Add(new HistoryEntry<TState>(currentState, "CLEAR", DateTime.UtcNow));
+
+            // Reset memory accounting and add entry with proper size tracking
+            var entrySize = EstimateStateSize(currentState);
+            _history.Add(new HistoryEntry<TState>(currentState, "CLEAR", DateTime.UtcNow, entrySize));
             _currentIndex = 0;
             _lastEntryTime = DateTime.UtcNow;
+            _estimatedMemoryUsage = entrySize; // Reset to just the current entry size
         }
 
         OnHistoryChanged?.Invoke();
@@ -270,8 +287,8 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
     /// </summary>
     Task IMiddleware<TState>.OnAfterUpdateAsync(TState previousState, TState currentState, string? action)
     {
-        // Don't track undo/redo operations
-        if (_isUndoRedo) return Task.CompletedTask;
+        // Don't track undo/redo operations (AsyncLocal ensures this check is scoped to current execution context)
+        if (_isUndoRedo.Value) return Task.CompletedTask;
 
         // Check if action should be tracked
         if (!_options.ShouldTrackAction(action)) return Task.CompletedTask;
@@ -280,12 +297,14 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
         if (EqualityComparer<TState>.Default.Equals(previousState, currentState))
             return Task.CompletedTask;
 
-        // Estimate size OUTSIDE the lock to avoid blocking (JSON serialization can be slow)
-        var newEntrySize = EstimateStateSize(currentState);
         var now = DateTime.UtcNow;
+        bool shouldNotify;
 
         lock (_lock)
         {
+            // Estimate size INSIDE the lock to ensure consistent state
+            var newEntrySize = EstimateStateSize(currentState);
+
             // Check if we should group with the previous entry
             if (_options.GroupWindow > TimeSpan.Zero &&
                 _currentIndex >= 0 &&
@@ -294,56 +313,66 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
                 // Use cached size from entry if available, otherwise estimate
                 var oldEntry = _history[_currentIndex];
                 var oldEntrySize = oldEntry.EstimatedSize > 0 ? oldEntry.EstimatedSize : EstimateStateSize(oldEntry.State);
-                _estimatedMemoryUsage = _estimatedMemoryUsage - oldEntrySize + newEntrySize;
+                _estimatedMemoryUsage = Math.Max(0, _estimatedMemoryUsage - oldEntrySize) + newEntrySize;
 
                 // Replace the current entry instead of adding a new one
                 _history[_currentIndex] = new HistoryEntry<TState>(currentState, action, now, newEntrySize);
                 _lastEntryTime = now;
-                OnHistoryChanged?.Invoke();
-                return Task.CompletedTask;
+                shouldNotify = true;
             }
-
-            // Truncate forward history if we're not at the end
-            if (_currentIndex < _history.Count - 1)
+            else
             {
-                // Update memory estimate for removed entries using cached sizes
-                for (var i = _currentIndex + 1; i < _history.Count; i++)
+                // Truncate forward history if we're not at the end
+                if (_currentIndex < _history.Count - 1)
                 {
-                    var entry = _history[i];
-                    _estimatedMemoryUsage -= entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
+                    // Update memory estimate for removed entries using cached sizes
+                    for (var i = _currentIndex + 1; i < _history.Count; i++)
+                    {
+                        var entry = _history[i];
+                        var entrySize = entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
+                        _estimatedMemoryUsage = Math.Max(0, _estimatedMemoryUsage - entrySize);
+                    }
+                    _history.RemoveRange(_currentIndex + 1, _history.Count - _currentIndex - 1);
                 }
-                _history.RemoveRange(_currentIndex + 1, _history.Count - _currentIndex - 1);
-            }
 
-            // Add new entry with cached size
-            _history.Add(new HistoryEntry<TState>(currentState, action, now, newEntrySize));
-            _currentIndex = _history.Count - 1;
-            _lastEntryTime = now;
-            _estimatedMemoryUsage += newEntrySize;
+                // Add new entry with cached size
+                _history.Add(new HistoryEntry<TState>(currentState, action, now, newEntrySize));
+                _currentIndex = _history.Count - 1;
+                _lastEntryTime = now;
+                _estimatedMemoryUsage += newEntrySize;
 
-            // Enforce max count
-            while (_history.Count > _options.MaxSize)
-            {
-                var entry = _history[0];
-                _estimatedMemoryUsage -= entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
-                _history.RemoveAt(0);
-                _currentIndex--;
-            }
-
-            // Enforce max memory (if configured)
-            if (_options.MaxMemoryBytes > 0)
-            {
-                while (_history.Count > 1 && _estimatedMemoryUsage > _options.MaxMemoryBytes)
+                // Enforce max count
+                while (_history.Count > _options.MaxSize)
                 {
                     var entry = _history[0];
-                    _estimatedMemoryUsage -= entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
+                    var entrySize = entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
+                    _estimatedMemoryUsage = Math.Max(0, _estimatedMemoryUsage - entrySize);
                     _history.RemoveAt(0);
-                    _currentIndex--;
+                    _currentIndex = Math.Max(0, _currentIndex - 1);
                 }
+
+                // Enforce max memory (if configured)
+                if (_options.MaxMemoryBytes > 0)
+                {
+                    while (_history.Count > 1 && _estimatedMemoryUsage > _options.MaxMemoryBytes)
+                    {
+                        var entry = _history[0];
+                        var entrySize = entry.EstimatedSize > 0 ? entry.EstimatedSize : EstimateStateSize(entry.State);
+                        _estimatedMemoryUsage = Math.Max(0, _estimatedMemoryUsage - entrySize);
+                        _history.RemoveAt(0);
+                        _currentIndex = Math.Max(0, _currentIndex - 1);
+                    }
+                }
+
+                shouldNotify = true;
             }
         }
 
-        OnHistoryChanged?.Invoke();
+        // Always invoke OnHistoryChanged OUTSIDE the lock for consistency
+        if (shouldNotify)
+        {
+            OnHistoryChanged?.Invoke();
+        }
         return Task.CompletedTask;
     }
 

@@ -1,6 +1,45 @@
 namespace EasyAppDev.Blazor.Store.Core;
 
 /// <summary>
+/// Exception thrown when a rollback cannot be safely performed due to concurrent state modifications.
+/// </summary>
+/// <remarks>
+/// This exception indicates that the state was modified by another operation during an optimistic
+/// update's server action. Rolling back would lose those concurrent changes. Callers should either
+/// provide a custom rollback function that handles merging, or handle this exception appropriately.
+/// </remarks>
+public sealed class ConcurrentModificationException : InvalidOperationException
+{
+    /// <summary>
+    /// Creates a new concurrent modification exception with a default message.
+    /// </summary>
+    public ConcurrentModificationException()
+        : base("Cannot rollback optimistic update: state was modified by concurrent operations. " +
+               "Provide a custom rollback function to handle this scenario.")
+    {
+    }
+
+    /// <summary>
+    /// Creates a new concurrent modification exception with a custom message.
+    /// </summary>
+    /// <param name="message">The exception message.</param>
+    public ConcurrentModificationException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new concurrent modification exception with a custom message and inner exception.
+    /// </summary>
+    /// <param name="message">The exception message.</param>
+    /// <param name="innerException">The inner exception.</param>
+    public ConcurrentModificationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
 /// Extension methods for optimistic updates with automatic rollback on failure.
 /// </summary>
 /// <remarks>
@@ -63,63 +102,139 @@ public static class OptimisticUpdateExtensions
 
         var baseActionName = actionName ?? "OPTIMISTIC";
         TState? previousState = default;
+        TState? optimisticState = default;
 
-        // Apply optimistic update and capture previous state atomically
+        // Apply optimistic update and capture both previous and optimistic state atomically
         await store.UpdateAsync(s =>
         {
             previousState = s;
-            return optimistic(s);
+            optimisticState = optimistic(s);
+            return optimisticState;
         }, baseActionName).ConfigureAwait(false);
 
+        Exception? serverException = null;
         try
         {
             var result = await action().ConfigureAwait(false);
 
+            // onSuccess is wrapped in separate try-catch to prevent rollback on handler failure
+            // since the server action already succeeded
             if (onSuccess != null)
             {
-                await store.UpdateAsync(
-                    s => onSuccess(s, result),
-                    $"{baseActionName}_SUCCESS"
-                ).ConfigureAwait(false);
+                try
+                {
+                    await store.UpdateAsync(
+                        s => onSuccess(s, result),
+                        $"{baseActionName}_SUCCESS"
+                    ).ConfigureAwait(false);
+                }
+                catch (Exception successEx)
+                {
+                    // Server succeeded but onSuccess handler failed. Don't rollback since
+                    // server state is already committed. Call onError if provided, otherwise rethrow.
+                    if (onError != null)
+                    {
+                        try
+                        {
+                            await store.UpdateAsync(
+                                s => onError(s, successEx),
+                                $"{baseActionName}_SUCCESS_HANDLER_ERROR"
+                            ).ConfigureAwait(false);
+                        }
+                        catch
+                        {
+                            // onError handler threw - rethrow original success handler exception
+                            throw successEx;
+                        }
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
             }
+            return; // Success - no rollback needed
         }
         catch (Exception ex)
         {
-            // Rollback on failure
+            serverException = ex;
+        }
+
+        // Rollback only on server action failure
+        var rollbackException = await TryRollbackAsync(
+            store, previousState!, optimisticState!, rollback, baseActionName
+        ).ConfigureAwait(false);
+
+        // Handle error with onError or rethrow
+        if (onError != null)
+        {
+            try
+            {
+                await store.UpdateAsync(
+                    s => onError(s, serverException!),
+                    $"{baseActionName}_ERROR"
+                ).ConfigureAwait(false);
+            }
+            catch
+            {
+                // onError handler threw - rethrow original server exception
+                throw serverException!;
+            }
+        }
+        else
+        {
+            // Throw rollback exception if it occurred, otherwise the original server exception
+            if (rollbackException != null)
+            {
+                throw new AggregateException(
+                    "Server action failed and rollback also failed",
+                    serverException!, rollbackException);
+            }
+            throw serverException!;
+        }
+    }
+
+    /// <summary>
+    /// Attempts rollback and returns any exception that occurred during rollback.
+    /// </summary>
+    /// <exception cref="ConcurrentModificationException">
+    /// Thrown when state was modified by concurrent operations during the server action.
+    /// </exception>
+    private static async Task<Exception?> TryRollbackAsync<TState>(
+        IStore<TState> store,
+        TState previousState,
+        TState optimisticState,
+        Func<TState, TState>? rollback,
+        string baseActionName)
+        where TState : notnull
+    {
+        try
+        {
             if (rollback != null)
             {
                 await store.UpdateAsync(rollback, $"{baseActionName}_ROLLBACK").ConfigureAwait(false);
             }
             else
             {
-                // Rollback to state before optimistic update, preserving any concurrent changes
-                // by applying the inverse transformation
+                // Default rollback: detect concurrent updates and throw if detected
                 await store.UpdateAsync(currentState =>
                 {
-                    // If state hasn't changed from optimistic update, restore previous
-                    // Otherwise, use custom rollback or keep current (caller should provide rollback)
-                    var optimisticState = optimistic(previousState!);
                     if (EqualityComparer<TState>.Default.Equals(currentState, optimisticState))
                     {
-                        return previousState!;
+                        // No concurrent updates - safe to restore previous state
+                        return previousState;
                     }
-                    // State changed by concurrent update - best effort: return previous
-                    // Note: For complex scenarios, callers should provide explicit rollback function
-                    return previousState!;
+                    // Concurrent update detected - throw to prevent silent data loss
+                    throw new ConcurrentModificationException(
+                        "Cannot rollback optimistic update: state was modified by concurrent operations " +
+                        "during the server action. Provide a custom rollback function to handle merging.");
                 }, $"{baseActionName}_ROLLBACK").ConfigureAwait(false);
             }
-
-            if (onError != null)
-            {
-                await store.UpdateAsync(
-                    s => onError(s, ex),
-                    $"{baseActionName}_ERROR"
-                ).ConfigureAwait(false);
-            }
-            else
-            {
-                throw;
-            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex;
         }
     }
 
@@ -266,31 +381,71 @@ public static class OptimisticUpdateExtensions
 
         var baseActionName = actionName ?? "OPTIMISTIC";
         TState? previousState = default;
+        TState? optimisticState = default;
 
-        // Apply optimistic update and capture previous state atomically
+        // Apply optimistic update and capture both previous and optimistic state
         await store.UpdateAsync(s =>
         {
             previousState = s;
-            return optimistic(s);
+            optimisticState = optimistic(s);
+            return optimisticState;
         }, baseActionName).ConfigureAwait(false);
 
+        TResult result;
         try
         {
-            var result = await action().ConfigureAwait(false);
+            result = await action().ConfigureAwait(false);
+        }
+        catch
+        {
+            // Server action failed - rollback is appropriate
+            await RollbackWithConfirmAsync(store, previousState!, optimisticState!, baseActionName)
+                .ConfigureAwait(false);
+            throw;
+        }
 
-            // Confirm with server result
+        // Server succeeded - confirm handler failure should NOT trigger rollback
+        try
+        {
             await store.UpdateAsync(
                 s => confirm(s, result),
                 $"{baseActionName}_CONFIRM"
             ).ConfigureAwait(false);
-
-            return result;
         }
         catch
         {
-            // Rollback to previous state
-            await store.UpdateAsync(_ => previousState!, $"{baseActionName}_ROLLBACK").ConfigureAwait(false);
+            // Confirm handler failed but server already committed - do NOT rollback
+            // Rethrow so caller knows something went wrong, but server state is committed
             throw;
         }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Performs rollback for UpdateOptimisticWithConfirm with concurrent update detection.
+    /// </summary>
+    /// <exception cref="ConcurrentModificationException">
+    /// Thrown when state was modified by concurrent operations during the server action.
+    /// </exception>
+    private static async Task RollbackWithConfirmAsync<TState>(
+        IStore<TState> store,
+        TState previousState,
+        TState optimisticState,
+        string baseActionName)
+        where TState : notnull
+    {
+        await store.UpdateAsync(currentState =>
+        {
+            // If no concurrent updates occurred, safely restore previous state
+            if (EqualityComparer<TState>.Default.Equals(currentState, optimisticState))
+            {
+                return previousState;
+            }
+            // Concurrent update detected - throw to prevent silent data loss
+            throw new ConcurrentModificationException(
+                "Cannot rollback optimistic update: state was modified by concurrent operations " +
+                "during the server action. The server action failed but rollback cannot proceed safely.");
+        }, $"{baseActionName}_ROLLBACK").ConfigureAwait(false);
     }
 }

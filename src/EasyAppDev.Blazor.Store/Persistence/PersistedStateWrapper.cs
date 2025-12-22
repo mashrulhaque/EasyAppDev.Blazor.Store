@@ -119,3 +119,36 @@ public sealed class StateSizeExceededException : InvalidOperationException
         MaxSize = maxSize;
     }
 }
+
+/// <summary>
+/// Exception thrown when storage quota is exceeded during persistence.
+/// </summary>
+public sealed class StorageQuotaExceededException : InvalidOperationException
+{
+    /// <summary>
+    /// Creates a new storage quota exceeded exception.
+    /// </summary>
+    public StorageQuotaExceededException()
+        : base("Storage quota exceeded. The browser storage is full.")
+    {
+    }
+
+    /// <summary>
+    /// Creates a new storage quota exceeded exception with a custom message.
+    /// </summary>
+    /// <param name="message">The exception message.</param>
+    public StorageQuotaExceededException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new storage quota exceeded exception with a custom message and inner exception.
+    /// </summary>
+    /// <param name="message">The exception message.</param>
+    /// <param name="innerException">The inner exception.</param>
+    public StorageQuotaExceededException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

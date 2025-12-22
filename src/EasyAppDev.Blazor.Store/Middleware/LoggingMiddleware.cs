@@ -252,9 +252,14 @@ Current State:  {SerializeState(currentState)}
         {
             return JsonSerializer.Serialize(state, _jsonOptions);
         }
-        catch
+        catch (JsonException)
         {
             return "[Serialization failed]";
+        }
+        catch (NotSupportedException)
+        {
+            // Type is not supported for serialization
+            return "[Serialization not supported]";
         }
     }
 

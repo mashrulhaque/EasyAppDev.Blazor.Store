@@ -40,6 +40,13 @@ public interface ISubscriptionManager<TState> : IDisposable where TState : notnu
     void NotifyAll();
 
     /// <summary>
+    /// Notifies all subscribers of a state change with a captured state snapshot.
+    /// This ensures subscribers see a consistent state even if concurrent updates occur.
+    /// </summary>
+    /// <param name="capturedState">The state snapshot captured before releasing the store lock.</param>
+    void NotifyAll(TState capturedState);
+
+    /// <summary>
     /// Clears all active subscriptions. Typically called during store disposal.
     /// </summary>
     void Clear();

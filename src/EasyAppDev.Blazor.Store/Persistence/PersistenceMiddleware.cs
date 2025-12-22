@@ -21,6 +21,7 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
     private readonly ILogger<PersistenceMiddleware<TState>>? _logger;
     private readonly PersistenceOptions<TState>? _options;
     private CancellationTokenSource? _debounceCts;
+    private readonly object _debounceLock = new();
     private readonly MessageSigner? _messageSigner;
     private readonly JsonSerializerOptions? _filteredJsonOptions;
 
@@ -127,12 +128,22 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
 
     private async Task DebouncedSaveAsync(TState state)
     {
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
+        CancellationToken token;
+
+        lock (_debounceLock)
+        {
+            // Cancel and dispose old CTS to prevent memory leak
+            var oldCts = _debounceCts;
+            _debounceCts = new CancellationTokenSource();
+            token = _debounceCts.Token;
+
+            oldCts?.Cancel();
+            oldCts?.Dispose();
+        }
 
         try
         {
-            await Task.Delay(_debounceMs, _debounceCts.Token).ConfigureAwait(false);
+            await Task.Delay(_debounceMs, token).ConfigureAwait(false);
             await SaveStateAsync(state).ConfigureAwait(false);
         }
         catch (TaskCanceledException)
@@ -175,20 +186,70 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
 
             // Serialize and save wrapper
             var wrapperJson = JsonSerializer.Serialize(wrapper, _jsonOptions);
+
+            // Check final serialized size including wrapper overhead (signature, timestamp)
+            var totalBytes = Encoding.UTF8.GetByteCount(wrapperJson);
+            if (_options != null && totalBytes > _options.MaxStateSize)
+            {
+                var ex = new StateSizeExceededException(totalBytes, _options.MaxStateSize);
+                _logger?.LogError(ex, "Total payload size exceeds limit for key: {Key}. Size: {Size:N0} bytes (inner: {InnerSize:N0}), Limit: {Limit:N0} bytes",
+                    _key, totalBytes, stateBytes, _options.MaxStateSize);
+                throw ex;
+            }
+
             await _provider.SaveAsync(_key, wrapperJson).ConfigureAwait(false);
 
-            _logger?.LogDebug("Persisted state to key: {Key}. Size: {Size:N0} bytes, Signed: {Signed}",
-                _key, stateBytes, wrapper.Signature != null);
+            _logger?.LogDebug("Persisted state to key: {Key}. Size: {Size:N0} bytes (total: {TotalSize:N0}), Signed: {Signed}",
+                _key, stateBytes, totalBytes, wrapper.Signature != null);
         }
         catch (StateSizeExceededException)
         {
             // Re-throw size exceptions
             throw;
         }
+        catch (Exception ex) when (IsStorageQuotaException(ex))
+        {
+            // Storage quota exceeded - this is a critical error that callers should know about
+            var quotaEx = new StorageQuotaExceededException(
+                $"Storage quota exceeded while saving state to key '{_key}'. Consider clearing old data or using a larger storage provider.",
+                ex);
+            _logger?.LogError(quotaEx, "Storage quota exceeded for key: {Key}", _key);
+            _options?.OnPersistenceError?.Invoke(quotaEx);
+            throw quotaEx;
+        }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error persisting state to key: {Key}", _key);
+            _options?.OnPersistenceError?.Invoke(ex);
+
+            // Re-throw if configured to do so - allows callers to handle persistence failures
+            if (_options?.ThrowOnPersistenceError == true)
+            {
+                throw;
+            }
         }
+    }
+
+    /// <summary>
+    /// Checks if an exception is related to storage quota exceeded.
+    /// </summary>
+    private static bool IsStorageQuotaException(Exception ex)
+    {
+        // Check for common quota-related exception messages
+        var message = ex.Message?.ToLowerInvariant() ?? "";
+
+        // Check exception type name first (most reliable)
+        if (ex.GetType().Name.Contains("Quota"))
+            return true;
+
+        // Check for specific quota-related phrases (avoid overly broad patterns)
+        return message.Contains("quota") ||
+               message.Contains("storage full") ||
+               message.Contains("quota exceeded") ||
+               message.Contains("storage exceeded") ||
+               message.Contains("localstorage") && message.Contains("full") ||
+               message.Contains("dom exception 22") ||  // Safari quota error
+               message.Contains("quotaexceedederror");  // Standard DOM exception name
     }
 
     /// <summary>
@@ -242,8 +303,21 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
                 }
                 else if (_messageSigner != null && string.IsNullOrEmpty(wrapper.Signature))
                 {
-                    // Wrapper exists but no signature - this is migration from old secured format
-                    _logger?.LogWarning("State loaded without signature for key: {Key}. This may be a legacy state.", _key);
+                    // Wrapper exists but no signature - security bypass attempt or legacy migration
+                    _logger?.LogWarning(
+                        "State loaded without signature for key: {Key}. RequireSignature: {Required}",
+                        _key,
+                        _options?.RequireSignature ?? false);
+
+                    // If RequireSignature is set, reject unsigned state
+                    if (_options?.RequireSignature == true)
+                    {
+                        var integrityEx = new StateIntegrityException(
+                            $"Unsigned state rejected for key '{_key}'. Integrity signing is required but no signature found.");
+                        _logger?.LogError(integrityEx, "Unsigned state rejected for key: {Key}", _key);
+                        _options.OnHydrationFailure?.Invoke(integrityEx);
+                        return default;
+                    }
                 }
 
                 _logger?.LogDebug("Loaded state from key: {Key}. Size: {Size:N0} bytes, Age: {Age}",

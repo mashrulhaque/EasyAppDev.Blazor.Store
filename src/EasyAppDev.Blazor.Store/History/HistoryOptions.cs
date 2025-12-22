@@ -5,12 +5,24 @@ namespace EasyAppDev.Blazor.Store.History;
 /// </summary>
 public sealed class HistoryOptions
 {
+    private int _maxSize = 50;
+
     /// <summary>
     /// Maximum number of history entries to keep.
     /// Older entries are automatically removed when this limit is exceeded.
-    /// Default is 50.
+    /// Default is 50. Must be a positive value.
     /// </summary>
-    public int MaxSize { get; set; } = 50;
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when value is less than 1.</exception>
+    public int MaxSize
+    {
+        get => _maxSize;
+        set
+        {
+            if (value < 1)
+                throw new ArgumentOutOfRangeException(nameof(value), "MaxSize must be at least 1.");
+            _maxSize = value;
+        }
+    }
 
     /// <summary>
     /// Maximum total estimated memory size for history entries in bytes.
@@ -64,13 +76,12 @@ public sealed class HistoryOptions
     /// <summary>
     /// Sets the maximum history size.
     /// </summary>
-    /// <param name="maxSize">Maximum number of entries.</param>
+    /// <param name="maxSize">Maximum number of entries. Must be at least 1.</param>
     /// <returns>This options instance for chaining.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when maxSize is less than 1.</exception>
     public HistoryOptions WithMaxSize(int maxSize)
     {
-        if (maxSize <= 0)
-            throw new ArgumentOutOfRangeException(nameof(maxSize), "Max size must be positive.");
-        MaxSize = maxSize;
+        MaxSize = maxSize; // Property setter validates
         return this;
     }
 

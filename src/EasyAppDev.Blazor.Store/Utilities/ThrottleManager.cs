@@ -164,6 +164,9 @@ public sealed class ThrottleManager : IThrottleManager
                         state.HasTrailingExecution = false;
                         state.TrailingCts?.Dispose();
                         state.TrailingCts = null;
+                        // Note: State is intentionally kept in dictionary to maintain
+                        // LastExecutionTime for proper throttling of subsequent calls.
+                        // States are cleaned up via CancelAsync() or CancelAllAsync().
                     }
                 }
                 finally
@@ -177,6 +180,39 @@ public sealed class ThrottleManager : IThrottleManager
         catch (OperationCanceledException)
         {
             // Expected when throttle is cancelled - ignore
+        }
+    }
+
+    /// <summary>
+    /// Cancels a pending throttled action for a specific key.
+    /// </summary>
+    /// <param name="key">The key identifying the throttled action to cancel.</param>
+    public async Task CancelAsync(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        CancellationTokenSource? cts = null;
+
+        await _lock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_throttles.TryGetValue(key, out var state))
+            {
+                cts = state.TrailingCts;
+                state.TrailingCts = null;
+                _throttles.Remove(key);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        // Cancel and dispose outside lock
+        if (cts != null)
+        {
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 

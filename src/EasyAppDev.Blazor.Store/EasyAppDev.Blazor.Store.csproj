@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.2</Version>
+    <Version>2.0.3</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,21 +31,18 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.3 - Documentation &amp; CI/CD
+
+Documentation:
+- Added explanation of state management concepts in README
+- Improved Quick Start guide with clearer examples
+
+Infrastructure:
+- Added GitHub Actions workflow for automated sample app deployment
+- Enhanced CI/CD pipeline for package releases
+
 v2.0.2 - Security Enhancements
-
-Security:
-- Enhanced security configuration with AddSecureStore() profiles (Development, Production, Strict)
-- State validation framework with IStateValidator&lt;T&gt; for persistence, TabSync, and ServerSync
-- Message signing and timestamp validation for TabSync cross-tab communication
-- Comprehensive security tests for TabSync and persistence
-
-Improvements:
-- Enhanced error handling across components
-- Performance optimizations in state synchronization
-- Updated sample application with real API integration
-
-v2.0.0 - Phase 5: Killer Features
-(See previous release notes for full v2.0.0 feature list)
+(See previous release notes for full v2.0.2 feature list)
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

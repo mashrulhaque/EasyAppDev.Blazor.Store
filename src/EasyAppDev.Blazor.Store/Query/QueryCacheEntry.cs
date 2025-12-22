@@ -4,10 +4,22 @@
 namespace EasyAppDev.Blazor.Store.Query;
 
 /// <summary>
+/// Non-generic interface for cache entry expiration checking.
+/// Enables efficient expiration checks without reflection.
+/// </summary>
+internal interface IQueryCacheEntry
+{
+    /// <summary>
+    /// Gets when the cache entry expires.
+    /// </summary>
+    DateTime ExpiresAt { get; }
+}
+
+/// <summary>
 /// Represents a cached query result.
 /// </summary>
 /// <typeparam name="T">The type of cached data.</typeparam>
-internal sealed class QueryCacheEntry<T>
+internal sealed class QueryCacheEntry<T> : IQueryCacheEntry
 {
     /// <summary>
     /// Gets or sets the cached data.
