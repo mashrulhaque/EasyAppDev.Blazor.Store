@@ -11,13 +11,14 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
     <!-- NU1510: Package pruning warnings during multi-targeting (false positive for conditional references) -->
-    <NoWarn>$(NoWarn);NU1510</NoWarn>
+    <!-- NU5104: Allow prerelease dependencies for .NET 10 preview support -->
+    <NoWarn>$(NoWarn);NU1510;NU5104</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -30,37 +31,21 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.2 - Security Enhancements
+
+Security:
+- Enhanced security configuration with AddSecureStore() profiles (Development, Production, Strict)
+- State validation framework with IStateValidator&lt;T&gt; for persistence, TabSync, and ServerSync
+- Message signing and timestamp validation for TabSync cross-tab communication
+- Comprehensive security tests for TabSync and persistence
+
+Improvements:
+- Enhanced error handling across components
+- Performance optimizations in state synchronization
+- Updated sample application with real API integration
+
 v2.0.0 - Phase 5: Killer Features
-
-New Features:
-- TanStack Query-style data fetching: UseQuery(), UseMutation(), QueryClient with caching, retries, and stale-while-revalidate
-- Immer-style mutable syntax: Produce() method for declarative state updates with Draft pattern
-- Enhanced DevTools: Full time-travel debugging with action replay, state editing, and performance tracing
-- Plugin ecosystem: IStorePlugin interface for extending store functionality with built-in Analytics and Validation plugins
-- Server-side sync: SignalR-based real-time state synchronization with conflict resolution and presence tracking
-
-Query System:
-- UseQuery(key, queryFn) with caching, stale time, retry logic
-- UseMutation(mutationFn) with optimistic updates support
-- QueryClient for cache invalidation and management
-
-Immer-Style Updates:
-- draft.Set(s =&gt; s.Property, value) for simple updates
-- draft.Increment/Decrement/Toggle for common operations
-- draft.Append/Remove/RemoveAll for collections
-
-Plugin System:
-- StorePluginBase&lt;T&gt; for custom plugins
-- ConfigurablePlugin&lt;T,TOptions&gt; for plugins with options
-- PluginHost for lifecycle management
-
-Server Sync:
-- WithServerSync(hubUrl) for real-time collaboration
-- Presence tracking for connected users
-- Multiple conflict resolution strategies
-
-v2.1.0 - Phase 4: Advanced Features
-(See previous release notes)
+(See previous release notes for full v2.0.0 feature list)
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
