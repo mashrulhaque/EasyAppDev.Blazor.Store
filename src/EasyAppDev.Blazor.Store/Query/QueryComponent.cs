@@ -12,6 +12,7 @@ public abstract class QueryComponent : ComponentBase, IDisposable
 {
     private readonly List<IDisposable> _disposables = new();
     private bool _disposed;
+    private bool _initialized;
 
     /// <summary>
     /// Gets the query client for cache operations.
@@ -29,7 +30,22 @@ public abstract class QueryComponent : ComponentBase, IDisposable
     {
         var query = new Query<T>(options, QueryClient, () => InvokeAsync(StateHasChanged));
         _disposables.Add(query);
+
+        // If component is already initialized, initialize the query immediately
+        if (_initialized)
+        {
+            _ = InitializeQueryAsync(query);
+        }
+
         return query;
+    }
+
+    private async Task InitializeQueryAsync(IDisposable query)
+    {
+        if (query is IQueryInitializable initializable)
+        {
+            await initializable.InitializeAsync();
+        }
     }
 
     /// <summary>
@@ -127,6 +143,8 @@ public abstract class QueryComponent : ComponentBase, IDisposable
                 await initializable.InitializeAsync();
             }
         }
+
+        _initialized = true;
     }
 
     /// <summary>

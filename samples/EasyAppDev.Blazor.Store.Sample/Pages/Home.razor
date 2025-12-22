@@ -14,8 +14,9 @@
             <div class="alert alert-primary">
                 <h4>Welcome to the Interactive Demo!</h4>
                 <p class="mb-0">
-                    This sample application demonstrates all features of EasyAppDev.Blazor.Store.
-                    Each page shows a different aspect of the library with live examples and code samples.
+                    This sample application demonstrates all features of EasyAppDev.Blazor.Store with
+                    <strong>real API integration</strong>. Each page shows a different aspect of the library
+                    with live examples, real data from public APIs, and code samples.
                 </p>
             </div>
         </div>
@@ -105,6 +106,19 @@ builder.Services.AddStore(
         </div>
 
         <div class="col-md-6">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <h5 class="card-title">User Profile (Real API)</h5>
+                    <span class="badge bg-success mb-2">Uses JSONPlaceholder API</span>
+                    <p class="card-text small">
+                        Async state management with real API calls to JSONPlaceholder. Loading states, error handling, and data fetching.
+                    </p>
+                    <a href="/profile" class="btn btn-success btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-body">
                     <h5 class="card-title">Shopping Cart (Persistence)</h5>
@@ -115,38 +129,28 @@ builder.Services.AddStore(
                 </div>
             </div>
         </div>
-
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Theme Settings (Selectors)</h5>
-                    <p class="card-text small">
-                        Performance optimization with SelectorStoreComponent. Only re-render when selected state changes.
-                    </p>
-                    <a href="/theme" class="btn btn-outline-primary btn-sm">View Demo</a>
-                </div>
-            </div>
-        </div>
     </div>
 
     <h2 class="mb-4">Async Helpers</h2>
 
     <div class="row g-4 mb-5">
         <div class="col-md-3">
-            <div class="card h-100">
+            <div class="card h-100 border-success">
                 <div class="card-body">
                     <h6 class="card-title">AsyncData&lt;T&gt;</h6>
-                    <p class="card-text small">Loading states made simple</p>
-                    <a href="/async-data-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                    <span class="badge bg-success mb-2">Real API</span>
+                    <p class="card-text small">Loading states made simple with JSONPlaceholder API</p>
+                    <a href="/async-data-demo" class="btn btn-success btn-sm">Demo</a>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card h-100">
+            <div class="card h-100 border-success">
                 <div class="card-body">
                     <h6 class="card-title">ExecuteAsync</h6>
-                    <p class="card-text small">Automatic error handling</p>
-                    <a href="/execute-async-demo" class="btn btn-outline-secondary btn-sm">Demo</a>
+                    <span class="badge bg-success mb-2">Real API</span>
+                    <p class="card-text small">Automatic error handling with JSONPlaceholder API</p>
+                    <a href="/execute-async-demo" class="btn btn-success btn-sm">Demo</a>
                 </div>
             </div>
         </div>
@@ -198,13 +202,14 @@ builder.Services.AddStore(
         </div>
 
         <div class="col-md-4">
-            <div class="card h-100 border-primary">
+            <div class="card h-100 border-success">
                 <div class="card-body">
                     <h5 class="card-title">Query System</h5>
+                    <span class="badge bg-success mb-2">Uses JSONPlaceholder API</span>
                     <p class="card-text small">
-                        TanStack Query-inspired data fetching with caching, background refresh, and mutations.
+                        TanStack Query-inspired data fetching with real API, caching, background refresh, and mutations.
                     </p>
-                    <a href="/query-demo" class="btn btn-primary btn-sm">View Demo</a>
+                    <a href="/query-demo" class="btn btn-success btn-sm">View Demo</a>
                 </div>
             </div>
         </div>
@@ -245,7 +250,19 @@ builder.Services.AddStore(
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
+            <div class="card h-100 border-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Middleware System</h5>
+                    <p class="card-text small">
+                        Intercept state updates for logging, validation, analytics, and cross-cutting concerns.
+                    </p>
+                    <a href="/middleware-demo" class="btn btn-warning btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
             <div class="card h-100 border-success">
                 <div class="card-body">
                     <h5 class="card-title">Plugin System</h5>
@@ -257,7 +274,7 @@ builder.Services.AddStore(
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card h-100 border-danger">
                 <div class="card-body">
                     <h5 class="card-title">Security Features</h5>
@@ -265,6 +282,51 @@ builder.Services.AddStore(
                         Sensitive data filtering, state validation, and message signing for secure state management.
                     </p>
                     <a href="/security-demo" class="btn btn-danger btn-sm">View Demo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mb-4">Real API Demos</h2>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-6">
+            <div class="card h-100 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Real API Demo</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Showcases integration with <strong>5 different public APIs</strong>:
+                    </p>
+                    <ul class="small">
+                        <li><strong>Dog CEO</strong> - Random dog images</li>
+                        <li><strong>Cat Facts</strong> - Random cat facts</li>
+                        <li><strong>Chuck Norris</strong> - Random jokes</li>
+                        <li><strong>Open Trivia DB</strong> - Interactive trivia</li>
+                        <li><strong>Quotable</strong> - Inspirational quotes</li>
+                    </ul>
+                    <a href="/real-api-demo" class="btn btn-success">View Demo</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">All Features Demo</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        A comprehensive demo combining <strong>all async helpers</strong>:
+                    </p>
+                    <ul class="small">
+                        <li>Debounce search</li>
+                        <li>Throttle scroll events</li>
+                        <li>Lazy load with caching</li>
+                        <li>AsyncData pattern</li>
+                        <li>ExecuteAsync helper</li>
+                    </ul>
+                    <a href="/comprehensive-demo" class="btn btn-outline-primary">View Demo</a>
                 </div>
             </div>
         </div>
@@ -281,13 +343,13 @@ builder.Services.AddStore(
                     <ol>
                         <li><strong>Counter</strong> - Basics: state, updates, DevTools</li>
                         <li><strong>Todo List</strong> - Immutable collections</li>
+                        <li><strong>User Profile</strong> - Real API integration (JSONPlaceholder)</li>
                         <li><strong>Async Helpers</strong> - AsyncData, ExecuteAsync, Debounce, LazyLoad</li>
                         <li><strong>Shopping Cart</strong> - Persistence with LocalStorage</li>
                         <li><strong>Theme Settings</strong> - Selectors for performance</li>
-                        <li><strong>Optimistic Updates</strong> - Instant UI with rollback</li>
-                        <li><strong>History</strong> - Undo/redo functionality</li>
-                        <li><strong>Query System</strong> - Data fetching with caching</li>
-                        <li><strong>Advanced</strong> - Tab Sync, Immer, Actions, Plugins, Security</li>
+                        <li><strong>Query System</strong> - Data fetching with JSONPlaceholder</li>
+                        <li><strong>Real API Demo</strong> - Multiple public APIs</li>
+                        <li><strong>Advanced</strong> - Optimistic, History, Tab Sync, Middleware, Plugins, Security</li>
                     </ol>
                 </div>
             </div>
@@ -301,9 +363,13 @@ builder.Services.AddStore(
                     <h5>Ready to build something awesome?</h5>
                     <p class="mb-3">
                         Start with the Counter example and work your way through each demo.
+                        All demos use <strong>real APIs</strong> where applicable.
                     </p>
-                    <a href="/counter" class="btn btn-lg btn-primary">
+                    <a href="/counter" class="btn btn-lg btn-primary me-2">
                         Start Learning
+                    </a>
+                    <a href="/real-api-demo" class="btn btn-lg btn-success">
+                        Try Real APIs
                     </a>
                 </div>
             </div>

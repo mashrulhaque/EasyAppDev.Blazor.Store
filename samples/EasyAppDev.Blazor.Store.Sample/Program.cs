@@ -10,6 +10,7 @@ using EasyAppDev.Blazor.Store.History;
 using EasyAppDev.Blazor.Store.Query;
 using EasyAppDev.Blazor.Store.TabSync;
 using EasyAppDev.Blazor.Store.Plugins;
+using EasyAppDev.Blazor.Store.Middleware;
 using Microsoft.JSInterop;
 #if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
@@ -22,6 +23,11 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+
+// Register API services for demos using real REST APIs
+builder.Services.AddScoped<JsonPlaceholderApi>();
+builder.Services.AddScoped<ReqResApi>();
+builder.Services.AddScoped<PublicApiService>();
 
 // ============================================================================
 // SECURITY NOTE: Diagnostics are DEBUG-only and expose full state snapshots
@@ -215,6 +221,22 @@ builder.Services.AddStore(
                         .WithPlugin<PluginDemoState, LoggingPlugin>(sp)
                         .WithPlugin<PluginDemoState, ValidationPlugin>(sp)
                         .WithPlugin(sp.GetRequiredService<AnalyticsDemoPlugin>(), sp));
+
+// ============================================================================
+// Middleware Demo Store - Demonstrates custom middleware creation
+// Shows logging, performance tracking, and functional middleware
+// ============================================================================
+builder.Services.AddStore(
+    MiddlewareDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "Middleware Demo Store"));
+
+// ============================================================================
+// Real API Demo Store - Showcases multiple free public REST APIs
+// Dog CEO, Cat Fact, Chuck Norris, Open Trivia, Quotable
+// ============================================================================
+builder.Services.AddStore(
+    RealApiDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "Real API Demo Store"));
 
 // ============================================================================
 // Security Demo Store - Demonstrates sensitive data filtering

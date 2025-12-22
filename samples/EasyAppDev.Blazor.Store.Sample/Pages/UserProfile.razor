@@ -1,19 +1,25 @@
 @page "/profile"
 @using EasyAppDev.Blazor.Store.Sample.State
+@inject ReqResApi Api
 @inherits StoreComponent<UserProfileState>
 
 <PageTitle>User Profile</PageTitle>
 
 <div class="container mt-4">
-    <h1>👤 User Profile</h1>
+    <h1>User Profile</h1>
     <p class="lead">Demonstrates <strong>async actions</strong> and <strong>loading states</strong></p>
 
+    <div class="alert alert-success mb-4">
+        <strong>Real API!</strong> This demo uses <a href="https://jsonplaceholder.typicode.com" target="_blank" class="alert-link">JSONPlaceholder</a> -
+        a free REST API that provides real user data. Try loading different users (1-10).
+    </div>
+
     <div class="alert alert-info">
-        <h5>💡 What This Demo Shows:</h5>
+        <h5>What This Demo Shows:</h5>
         <ul class="mb-0">
             <li>Async state updates with <code>UpdateAsync</code></li>
             <li>Loading states (IsLoading, Error handling)</li>
-            <li>Simulated API calls with delays</li>
+            <li>Real API calls to JSONPlaceholder</li>
             <li>UI feedback during async operations</li>
         </ul>
     </div>
@@ -26,14 +32,14 @@
                     <span class="visually-hidden">Loading...</span>
                 </div>
                 <h5>Loading user profile...</h5>
-                <p class="text-muted">This simulates a 1.5 second API call</p>
+                <p class="text-muted">Fetching from JSONPlaceholder API...</p>
             </div>
         </div>
     }
     else if (State.Error != null)
     {
         <div class="alert alert-danger">
-            <h5>❌ Error Loading Profile</h5>
+            <h5>Error Loading Profile</h5>
             <p class="mb-0">@State.Error</p>
             <button class="btn btn-danger btn-sm mt-2" @onclick="@(() => Update(s => s.Clear()))">
                 Clear Error
@@ -45,18 +51,20 @@
         <div class="card">
             <div class="card-body text-center py-5">
                 <h4>No profile loaded</h4>
-                <p class="text-muted">Load a user profile to get started</p>
+                <p class="text-muted">Load a user profile to get started (users 1-12 are available)</p>
                 <div class="mt-3">
-                    <h5>Try loading a user:</h5>
+                    <h5>Select a user:</h5>
                     <div class="d-flex gap-2 justify-content-center flex-wrap">
-                        @for (int i = 1; i <= 6; i++)
+                        @for (int i = 1; i <= 12; i++)
                         {
                             var userId = i;
                             <button class="btn btn-outline-primary" @onclick="@(() => LoadUser(userId))">
                                 User @userId
                             </button>
                         }
-                        <button class="btn btn-outline-danger" @onclick="@(() => LoadUser(-1))">
+                    </div>
+                    <div class="mt-3">
+                        <button class="btn btn-outline-danger" @onclick="@(() => LoadUser(999))">
                             Invalid User (Error Demo)
                         </button>
                     </div>
@@ -70,8 +78,8 @@
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body text-center">
-                        <div style="font-size: 100px;">@State.User.AvatarUrl</div>
-                        <h5 class="card-title mt-3">@State.User.Name</h5>
+                        <img src="@State.User.AvatarUrl" alt="@State.User.Name" class="rounded-circle mb-3" width="150" height="150" />
+                        <h5 class="card-title">@State.User.Name</h5>
                         <p class="text-muted">@State.User.Email</p>
                         @if (State.LastUpdated.HasValue)
                         {
@@ -81,11 +89,31 @@
                         }
                     </div>
                 </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">Quick Load</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex gap-1 flex-wrap">
+                            @for (int i = 1; i <= 12; i++)
+                            {
+                                var userId = i;
+                                <button class="btn btn-sm @(State.User.Id == userId ? "btn-primary" : "btn-outline-secondary")"
+                                        @onclick="@(() => LoadUser(userId))"
+                                        disabled="@State.IsLoading">
+                                    @userId
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="col-md-8">
                 <div class="card">
                     <div class="card-header">
                         <h5>Edit Profile</h5>
+                        <small class="text-muted">Changes are stored in local state (not sent to server)</small>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -114,8 +142,11 @@
         </div>
 
         <div class="mt-3 d-flex gap-2">
-            <button class="btn btn-primary" @onclick="@(() => LoadUser(State.User.Id + 1))">
-                Load Next User
+            @{
+                var nextUserId = State.User.Id < 12 ? State.User.Id + 1 : 1;
+            }
+            <button class="btn btn-primary" @onclick="@(() => LoadUser(nextUserId))" disabled="@State.IsLoading">
+                Load Next User (@nextUserId)
             </button>
             <button class="btn btn-secondary" @onclick="@(() => Update(s => s.Clear()))">
                 Clear Profile
@@ -125,7 +156,7 @@
 
     <div class="card mt-4">
         <div class="card-header">
-            <h5>📖 Code Example</h5>
+            <h5>Code Example</h5>
         </div>
         <div class="card-body">
             <h6>State Definition with Loading States:</h6>
@@ -145,7 +176,6 @@
     {
         User = user,
         IsLoading = false,
-        Error = null,
         LastUpdated = DateTime.Now
     };
 
@@ -156,45 +186,38 @@
     };
 }</code></pre>
 
-            <h6 class="mt-3">Component with Async Updates:</h6>
-            <pre class="bg-light p-3"><code>private async Task LoadUser(int userId)
+            <h6 class="mt-3">Component with Real API Calls:</h6>
+            <pre class="bg-light p-3"><code>@@inject ReqResApi Api
+@@inherits StoreComponent&lt;UserProfileState&gt;
+
+private async Task LoadUser(int userId)
 {
     // Set loading state
     Update(s => s.StartLoading());
 
     try
     {
-        // Simulate API call
-        var user = await UserProfileState.SimulateApiLoad(userId);
+        // Call real API
+        var user = await Api.GetUserAsync(userId);
 
-        // Update with success
-        Update(s => s.LoadSuccess(user));
+        if (user == null)
+            Update(s => s.LoadFailure("User not found"));
+        else
+            Update(s => s.LoadSuccess(user));
     }
     catch (Exception ex)
     {
-        // Update with error
         Update(s => s.LoadFailure(ex.Message));
     }
 }</code></pre>
 
-            <h6 class="mt-3">Alternative: Async State Method</h6>
-            <pre class="bg-light p-3"><code>// In state class:
-public async Task&lt;UserProfileState&gt; LoadUser(int id, IUserService service)
-{
-    var user = await service.GetUserAsync(id);
-    return this with { User = user, Loading = false };
-}
-
-// In component:
-await UpdateAsync(async s => await s.LoadUser(userId, UserService));</code></pre>
-
             <h6 class="mt-3">Key Principles:</h6>
             <ul>
-                <li>✅ Use dedicated loading/error state properties</li>
-                <li>✅ Handle loading state → API call → success/error pattern</li>
-                <li>✅ Keep async logic in components, state methods pure</li>
-                <li>✅ Alternative: async state methods with injected dependencies</li>
-                <li>✅ Always handle errors gracefully</li>
+                <li>Use dedicated loading/error state properties</li>
+                <li>Handle loading state -> API call -> success/error pattern</li>
+                <li>Keep async logic in components, state methods pure</li>
+                <li>Inject API services for real data fetching</li>
+                <li>Always handle errors gracefully</li>
             </ul>
         </div>
     </div>
@@ -203,20 +226,23 @@ await UpdateAsync(async s => await s.LoadUser(userId, UserService));</code></pre
 @code {
     private async Task LoadUser(int userId)
     {
-        // Set loading state
         Update(s => s.StartLoading());
 
         try
         {
-            // Simulate API call (1.5 second delay)
-            var user = await UserProfileState.SimulateApiLoad(userId);
+            var user = await Api.GetUserAsync(userId);
 
-            // Update with loaded user
-            Update(s => s.LoadSuccess(user));
+            if (user == null)
+            {
+                Update(s => s.LoadFailure($"User {userId} not found. Try a number between 1-12."));
+            }
+            else
+            {
+                Update(s => s.LoadSuccess(user));
+            }
         }
         catch (Exception ex)
         {
-            // Update with error
             Update(s => s.LoadFailure(ex.Message));
         }
     }

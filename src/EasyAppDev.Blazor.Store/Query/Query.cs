@@ -14,6 +14,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     private readonly IQueryClient _queryClient;
     private readonly Action _onStateChange;
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly Func<Task> _refetchDelegate;
     private CancellationTokenSource? _fetchCts;
     private Timer? _refetchTimer;
     private bool _disposed;
@@ -31,6 +32,12 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _queryClient = queryClient ?? throw new ArgumentNullException(nameof(queryClient));
         _onStateChange = onStateChange ?? throw new ArgumentNullException(nameof(onStateChange));
+
+        // Create refetch delegate for registration
+        _refetchDelegate = () => RefetchAsync();
+
+        // Register with QueryClient for invalidation support
+        _queryClient.RegisterQuery(_options.Key, _refetchDelegate);
 
         // Initialize with initial data or placeholder
         if (_options.InitialData is not null)
@@ -291,6 +298,9 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Unregister from QueryClient
+        _queryClient.UnregisterQuery(_options.Key, _refetchDelegate);
 
         _refetchTimer?.Dispose();
         _fetchCts?.Cancel();

@@ -1,0 +1,403 @@
+@page "/real-api-demo"
+@using EasyAppDev.Blazor.Store.Sample.State
+@using EasyAppDev.Blazor.Store.AsyncActions
+@using System.Web
+@inject PublicApiService ApiService
+@inherits StoreComponent<RealApiDemoState>
+
+<PageTitle>Real API Demo</PageTitle>
+
+<div class="container mt-4">
+    <h1>Real API Demo</h1>
+    <p class="lead">
+        Showcasing state management with multiple free public REST APIs.
+    </p>
+
+    <div class="alert alert-success mb-4">
+        <strong>100% Real APIs!</strong> This demo fetches live data from multiple free public APIs.
+        No mocks, no simulations - just real HTTP requests managed by the store.
+        <span class="badge bg-dark ms-2">API Calls: @State.ApiCallCount</span>
+    </div>
+
+    <div class="row g-4">
+        <!-- Dog Image API -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Random Dog Image</h5>
+                    <a href="https://dog.ceo/dog-api/" target="_blank" class="badge bg-info text-decoration-none">dog.ceo</a>
+                </div>
+                <div class="card-body">
+                    @if (State.DogImage.IsNotAsked)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-muted">Click button to fetch a random dog image</p>
+                        </div>
+                    }
+                    else if (State.DogImage.IsLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    }
+                    else if (State.DogImage.HasError)
+                    {
+                        <div class="alert alert-danger">@State.DogImage.Error</div>
+                    }
+                    else if (State.DogImage.HasData)
+                    {
+                        <img src="@State.DogImage.Data" alt="Random dog" class="img-fluid rounded" style="max-height: 250px; width: 100%; object-fit: cover;" />
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary w-100" @onclick="FetchDogImage" disabled="@State.DogImage.IsLoading">
+                        @if (State.DogImage.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Fetch Random Dog
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cat Fact API -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Random Cat Fact</h5>
+                    <a href="https://catfact.ninja/" target="_blank" class="badge bg-info text-decoration-none">catfact.ninja</a>
+                </div>
+                <div class="card-body">
+                    @if (State.CatFact.IsNotAsked)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-muted">Click button to fetch a random cat fact</p>
+                        </div>
+                    }
+                    else if (State.CatFact.IsLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    }
+                    else if (State.CatFact.HasError)
+                    {
+                        <div class="alert alert-danger">@State.CatFact.Error</div>
+                    }
+                    else if (State.CatFact.HasData)
+                    {
+                        <blockquote class="blockquote">
+                            <p>@State.CatFact.Data!.Fact</p>
+                        </blockquote>
+                        <p class="text-muted small">Length: @State.CatFact.Data.Length characters</p>
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-warning w-100" @onclick="FetchCatFact" disabled="@State.CatFact.IsLoading">
+                        @if (State.CatFact.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Fetch Cat Fact
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chuck Norris Jokes API -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Chuck Norris Joke</h5>
+                    <a href="https://api.chucknorris.io/" target="_blank" class="badge bg-info text-decoration-none">chucknorris.io</a>
+                </div>
+                <div class="card-body">
+                    @if (State.ChuckJoke.IsNotAsked)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-muted">Click button to fetch a random Chuck Norris joke</p>
+                        </div>
+                    }
+                    else if (State.ChuckJoke.IsLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    }
+                    else if (State.ChuckJoke.HasError)
+                    {
+                        <div class="alert alert-danger">@State.ChuckJoke.Error</div>
+                    }
+                    else if (State.ChuckJoke.HasData)
+                    {
+                        <div class="d-flex">
+                            <img src="@State.ChuckJoke.Data!.IconUrl" alt="Chuck Norris" class="me-3" width="64" height="64" />
+                            <p class="mb-0">@State.ChuckJoke.Data.Value</p>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-danger w-100" @onclick="FetchChuckJoke" disabled="@State.ChuckJoke.IsLoading">
+                        @if (State.ChuckJoke.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Fetch Chuck Norris Joke
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advice Slip API -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Random Advice</h5>
+                    <a href="https://api.adviceslip.com/" target="_blank" class="badge bg-info text-decoration-none">adviceslip.com</a>
+                </div>
+                <div class="card-body">
+                    @if (State.Advice.IsNotAsked)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-muted">Click button to fetch random advice</p>
+                        </div>
+                    }
+                    else if (State.Advice.IsLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    }
+                    else if (State.Advice.HasError)
+                    {
+                        <div class="alert alert-danger">@State.Advice.Error</div>
+                    }
+                    else if (State.Advice.HasData)
+                    {
+                        <blockquote class="blockquote">
+                            <p>"@State.Advice.Data!.Advice"</p>
+                            <footer class="blockquote-footer">Advice #@State.Advice.Data.Id</footer>
+                        </blockquote>
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-success w-100" @onclick="FetchAdvice" disabled="@State.Advice.IsLoading">
+                        @if (State.Advice.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Fetch Advice
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trivia API -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Trivia Question</h5>
+                    <a href="https://opentdb.com/" target="_blank" class="badge bg-info text-decoration-none">opentdb.com</a>
+                </div>
+                <div class="card-body">
+                    @if (State.Trivia.IsNotAsked)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-muted">Click button to fetch a trivia question</p>
+                        </div>
+                    }
+                    else if (State.Trivia.IsLoading)
+                    {
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                    }
+                    else if (State.Trivia.HasError)
+                    {
+                        <div class="alert alert-danger">@State.Trivia.Error</div>
+                    }
+                    else if (State.Trivia.HasData)
+                    {
+                        var question = State.Trivia.Data!;
+                        var allAnswers = question.IncorrectAnswers.Append(question.CorrectAnswer).OrderBy(a => a).ToList();
+
+                        <div class="mb-3">
+                            <span class="badge bg-secondary me-2">@question.Category</span>
+                            <span class="badge @(question.Difficulty == "easy" ? "bg-success" : question.Difficulty == "medium" ? "bg-warning" : "bg-danger")">
+                                @question.Difficulty
+                            </span>
+                        </div>
+
+                        <h5>@((MarkupString)HttpUtility.HtmlDecode(question.Question))</h5>
+
+                        <div class="row g-2 mt-3">
+                            @foreach (var answer in allAnswers)
+                            {
+                                var decodedAnswer = HttpUtility.HtmlDecode(answer);
+                                var isCorrect = answer == question.CorrectAnswer;
+                                var isSelected = State.SelectedTriviaAnswer == answer;
+                                var showResult = State.SelectedTriviaAnswer != null;
+
+                                string btnClass = "btn-outline-primary";
+                                if (showResult)
+                                {
+                                    if (isCorrect)
+                                        btnClass = "btn-success";
+                                    else if (isSelected)
+                                        btnClass = "btn-danger";
+                                    else
+                                        btnClass = "btn-outline-secondary";
+                                }
+
+                                <div class="col-md-6">
+                                    <button class="btn @btnClass w-100"
+                                            @onclick="() => AnswerTrivia(answer)"
+                                            disabled="@(State.SelectedTriviaAnswer != null)">
+                                        @decodedAnswer
+                                        @if (showResult && isCorrect)
+                                        {
+                                            <span class="ms-2">&#10004;</span>
+                                        }
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        @if (State.TriviaAnswerCorrect.HasValue)
+                        {
+                            <div class="alert @(State.TriviaAnswerCorrect.Value ? "alert-success" : "alert-danger") mt-3">
+                                @if (State.TriviaAnswerCorrect.Value)
+                                {
+                                    <strong>Correct!</strong>
+                                }
+                                else
+                                {
+                                    <strong>Wrong!</strong>
+                                    <span>The correct answer was: @HttpUtility.HtmlDecode(question.CorrectAnswer)</span>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-info" @onclick="FetchTrivia" disabled="@State.Trivia.IsLoading">
+                        @if (State.Trivia.IsLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @(State.Trivia.HasData ? "Next Question" : "Fetch Trivia")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">APIs Used in This Demo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><a href="https://dog.ceo/dog-api/" target="_blank">Dog CEO API</a> - Random dog images</li>
+                                <li><a href="https://catfact.ninja/" target="_blank">Cat Fact API</a> - Random cat facts</li>
+                                <li><a href="https://api.chucknorris.io/" target="_blank">Chuck Norris API</a> - Random jokes</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li><a href="https://opentdb.com/" target="_blank">Open Trivia DB</a> - Trivia questions</li>
+                                <li><a href="https://api.adviceslip.com/" target="_blank">Advice Slip</a> - Random advice</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    async Task FetchDogImage()
+    {
+        Update(s => s with { DogImage = s.DogImage.ToLoading() });
+        try
+        {
+            var imageUrl = await ApiService.GetRandomDogImageAsync();
+            Update(s => s with { DogImage = AsyncData<string>.Success(imageUrl), ApiCallCount = s.ApiCallCount + 1 });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { DogImage = AsyncData<string>.Failure(ex.Message) });
+        }
+    }
+
+    async Task FetchCatFact()
+    {
+        Update(s => s with { CatFact = s.CatFact.ToLoading() });
+        try
+        {
+            var fact = await ApiService.GetRandomCatFactAsync();
+            Update(s => s with { CatFact = AsyncData<CatFact>.Success(fact), ApiCallCount = s.ApiCallCount + 1 });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { CatFact = AsyncData<CatFact>.Failure(ex.Message) });
+        }
+    }
+
+    async Task FetchChuckJoke()
+    {
+        Update(s => s with { ChuckJoke = s.ChuckJoke.ToLoading() });
+        try
+        {
+            var joke = await ApiService.GetRandomChuckNorrisJokeAsync();
+            Update(s => s with { ChuckJoke = AsyncData<ChuckNorrisJoke>.Success(joke), ApiCallCount = s.ApiCallCount + 1 });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { ChuckJoke = AsyncData<ChuckNorrisJoke>.Failure(ex.Message) });
+        }
+    }
+
+    async Task FetchAdvice()
+    {
+        Update(s => s with { Advice = s.Advice.ToLoading() });
+        try
+        {
+            var advice = await ApiService.GetRandomAdviceAsync();
+            Update(s => s with { Advice = AsyncData<AdviceSlip>.Success(advice), ApiCallCount = s.ApiCallCount + 1 });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { Advice = AsyncData<AdviceSlip>.Failure(ex.Message) });
+        }
+    }
+
+    async Task FetchTrivia()
+    {
+        Update(s => s with { Trivia = s.Trivia.ToLoading(), SelectedTriviaAnswer = null, TriviaAnswerCorrect = null });
+        try
+        {
+            var trivia = await ApiService.GetRandomTriviaAsync();
+            Update(s => s with { Trivia = AsyncData<TriviaQuestion>.Success(trivia), ApiCallCount = s.ApiCallCount + 1 });
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { Trivia = AsyncData<TriviaQuestion>.Failure(ex.Message) });
+        }
+    }
+
+    void AnswerTrivia(string answer)
+    {
+        if (State.Trivia.HasData)
+        {
+            var isCorrect = answer == State.Trivia.Data!.CorrectAnswer;
+            Update(s => s.SetTriviaAnswer(answer, isCorrect));
+        }
+    }
+}

@@ -2,20 +2,37 @@
 @inherits StoreComponent<AsyncDataDemoState>
 @using EasyAppDev.Blazor.Store.Sample.State
 @using EasyAppDev.Blazor.Store.AsyncActions
+@inject ReqResApi Api
 
 <PageTitle>AsyncData Demo</PageTitle>
 
 <div class="container mt-4">
-    <h3>AsyncData&lt;T&gt; Demo</h3>
+    <h1>AsyncData&lt;T&gt; Demo</h1>
     <p class="lead">
         Simplified async state management - reduce 20+ lines of boilerplate to a single property!
     </p>
 
+    <div class="alert alert-success mb-4">
+        <strong>Real API!</strong> This demo uses <a href="https://jsonplaceholder.typicode.com" target="_blank" class="alert-link">JSONPlaceholder</a> -
+        a free REST API with real user data. Click buttons to load different users.
+    </div>
+
     <div class="row">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
-                    <h5>User Profile</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">User Profile</h5>
+                    <div class="btn-group btn-group-sm">
+                        @for (int i = 1; i <= 6; i++)
+                        {
+                            var userId = i;
+                            <button class="btn @(State.CurrentUserId == userId ? "btn-primary" : "btn-outline-primary")"
+                                    @onclick="() => LoadUser(userId)"
+                                    disabled="@State.User.IsLoading">
+                                @userId
+                            </button>
+                        }
+                    </div>
                 </div>
                 <div class="card-body">
                     @if (State.User.IsNotAsked)
@@ -24,7 +41,7 @@
                             <svg class="mb-3" width="64" height="64" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
                             </svg>
-                            <p class="text-muted">Click "Load User" to fetch profile</p>
+                            <p class="text-muted">Click a number above or "Load User" to fetch a profile from JSONPlaceholder API</p>
                         </div>
                     }
                     else if (State.User.IsLoading)
@@ -33,24 +50,15 @@
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3">Loading user profile...</p>
+                            <p class="mt-3">Loading user profile from JSONPlaceholder API...</p>
                         </div>
                     }
                     else if (State.User.HasError)
                     {
                         <div class="alert alert-danger" role="alert">
-                            <h5 class="alert-heading">
-                                <svg width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                                </svg>
-                                Error Loading Profile
-                            </h5>
+                            <h5 class="alert-heading">Error Loading Profile</h5>
                             <p class="mb-3">@State.User.Error</p>
-                            <button class="btn btn-danger btn-sm" @onclick="LoadUser">
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                </svg>
+                            <button class="btn btn-danger btn-sm" @onclick="() => LoadUser(State.CurrentUserId)">
                                 Retry
                             </button>
                         </div>
@@ -58,71 +66,90 @@
                     else if (State.User.HasData)
                     {
                         <div class="user-profile">
-                            <div class="mb-4">
-                                <svg class="mb-3" width="64" height="64" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                                    <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
-                                </svg>
+                            <div class="text-center mb-4">
+                                <img src="@State.User.Data!.Avatar" alt="@State.User.Data.Name"
+                                     class="rounded-circle" width="128" height="128" />
                             </div>
 
-                            <h4>@State.User.Data!.Name</h4>
+                            <h4 class="text-center">@State.User.Data!.Name</h4>
 
                             <div class="mb-3">
-                                <strong>
-                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
-                                    </svg>
-                                    Email:
-                                </strong>
-                                @State.User.Data.Email
+                                <strong>Email:</strong> @State.User.Data.Email
                             </div>
 
                             <div class="mb-3">
-                                <strong>
-                                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M14 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
-                                        <path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5zM3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5z"/>
-                                    </svg>
-                                    Bio:
-                                </strong>
+                                <strong>Bio:</strong>
                                 <p class="mb-0">@State.User.Data.Bio</p>
                             </div>
 
-                            <p class="text-muted">
-                                <small>
-                                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
-                                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
-                                    </svg>
-                                    Loaded at @State.User.Data.LoadedAt.ToShortTimeString()
-                                </small>
+                            <p class="text-muted text-center">
+                                <small>Loaded at @State.User.Data.LoadedAt.ToString("h:mm:ss tt")</small>
                             </p>
                         </div>
                     }
                 </div>
             </div>
 
-            <div class="mt-3">
-                <button class="btn btn-primary" @onclick="LoadUser" disabled="@State.User.IsLoading">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-                        <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/>
-                    </svg>
-                    Load User
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="() => LoadUser(State.CurrentUserId)" disabled="@State.User.IsLoading">
+                    Load User @State.CurrentUserId
                 </button>
-                <button class="btn btn-warning ms-2" @onclick="SimulateError" disabled="@State.User.IsLoading">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
-                    </svg>
-                    Simulate Error
+                <button class="btn btn-warning" @onclick="SimulateError" disabled="@State.User.IsLoading">
+                    Simulate Error (User 999)
                 </button>
-                <button class="btn btn-secondary ms-2" @onclick="Reset">
-                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
-                        <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
-                    </svg>
+                <button class="btn btn-secondary" @onclick="Reset">
                     Reset
                 </button>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5>Code Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-danger">Traditional Approach (20+ lines):</h6>
+                            <pre class="bg-light p-2 small"><code>public record UserState(
+    User? User = null,
+    bool IsLoading = false,
+    string? Error = null)
+{
+    public UserState StartLoading() =>
+        this with { IsLoading = true };
+
+    public UserState LoadSuccess(User u) =>
+        this with {
+            User = u,
+            IsLoading = false
+        };
+
+    public UserState LoadFailure(string e) =>
+        this with {
+            IsLoading = false,
+            Error = e
+        };
+}</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success">AsyncData Approach (1 property!):</h6>
+                            <pre class="bg-light p-2 small"><code>public record UserState(
+    AsyncData&lt;User&gt; User)
+{
+    public static UserState Initial =>
+        new(AsyncData&lt;User&gt;.NotAsked());
+}
+
+// Usage:
+State.User.IsNotAsked
+State.User.IsLoading
+State.User.HasData
+State.User.HasError
+State.User.Data
+State.User.Error</code></pre>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -160,6 +187,11 @@
                                 @State.User.HasError
                             </span>
                         </dd>
+
+                        <dt>Current User ID</dt>
+                        <dd>
+                            <span class="badge bg-dark">@State.CurrentUserId</span>
+                        </dd>
                     </dl>
                 </div>
             </div>
@@ -170,7 +202,7 @@
                 </div>
                 <div class="card-body">
                     <ul class="mb-0">
-                        <li><strong>-95% code</strong> (20+ lines → 1 property)</li>
+                        <li><strong>-95% code</strong> (20+ lines to 1 property)</li>
                         <li><strong>Type-safe</strong> state checking</li>
                         <li><strong>No impossible states</strong></li>
                         <li><strong>Consistent pattern</strong> across app</li>
@@ -178,54 +210,95 @@
                     </ul>
                 </div>
             </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">State Transitions</h5>
+                </div>
+                <div class="card-body small">
+                    <pre class="bg-light p-2 mb-0"><code>// Start loading
+Update(s => s with {
+    User = s.User.ToLoading()
+});
+
+// Success
+Update(s => s with {
+    User = AsyncData&lt;T&gt;.Success(data)
+});
+
+// Failure
+Update(s => s with {
+    User = AsyncData&lt;T&gt;.Failure(error)
+});
+
+// Reset
+Update(s => s with {
+    User = AsyncData&lt;T&gt;.NotAsked()
+});</code></pre>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    protected override void OnInitialized()
+    async Task LoadUser(int userId)
     {
-        base.OnInitialized();
-    }
-
-    async Task LoadUser()
-    {
-        // Transition to Loading state
-        Update(s => s with { User = s.User.ToLoading() });
+        // Update current user ID and transition to Loading state
+        Update(s => s with { CurrentUserId = userId, User = s.User.ToLoading() });
 
         try
         {
-            // Simulate API call
-            var user = await AsyncDataDemoState.SimulateApiLoad(1);
+            // Call real API
+            var user = await Api.GetUserAsync(userId);
 
-            // Transition to Success state
-            Update(s => s with { User = AsyncData<UserProfileData>.Success(user) });
+            if (user == null)
+            {
+                Update(s => s with { User = AsyncData<UserProfileData>.Failure($"User {userId} not found") });
+            }
+            else
+            {
+                var profileData = new UserProfileData(
+                    Id: user.Id,
+                    Name: user.Name,
+                    Email: user.Email,
+                    Avatar: user.AvatarUrl,
+                    Bio: user.Bio,
+                    LoadedAt: DateTime.Now
+                );
+                Update(s => s with { User = AsyncData<UserProfileData>.Success(profileData) });
+            }
         }
         catch (Exception ex)
         {
-            // Transition to Failure state
             Update(s => s with { User = AsyncData<UserProfileData>.Failure(ex.Message) });
         }
     }
 
     async Task SimulateError()
     {
-        // Transition to Loading state
-        Update(s => s with { User = s.User.ToLoading() });
+        // Try to load invalid user (will return null from API)
+        Update(s => s with { CurrentUserId = 999, User = s.User.ToLoading() });
 
-        // Simulate network delay
-        await Task.Delay(1000);
-
-        // Transition to Failure state
-        Update(s => s with
+        try
         {
-            User = AsyncData<UserProfileData>.Failure("Failed to load user profile. Server returned 500 Internal Server Error.")
-        });
+            var user = await Api.GetUserAsync(999);
+
+            if (user == null)
+            {
+                Update(s => s with {
+                    User = AsyncData<UserProfileData>.Failure("User 999 not found. Server returned 404 Not Found.")
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { User = AsyncData<UserProfileData>.Failure(ex.Message) });
+        }
     }
 
     void Reset()
     {
-        // Transition to NotAsked state
-        Update(s => s with { User = AsyncData<UserProfileData>.NotAsked() });
+        Update(s => s with { CurrentUserId = 1, User = AsyncData<UserProfileData>.NotAsked() });
     }
 }

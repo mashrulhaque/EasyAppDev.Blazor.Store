@@ -1,0 +1,225 @@
+@page "/middleware-demo"
+@using EasyAppDev.Blazor.Store.Sample.State
+@using EasyAppDev.Blazor.Store.Middleware
+@inherits StoreComponent<MiddlewareDemoState>
+
+<PageTitle>Middleware Demo</PageTitle>
+
+<div class="container mt-4">
+    <h1>Middleware System</h1>
+    <p class="lead">
+        Intercept state updates for cross-cutting concerns: logging, validation, analytics, and more.
+    </p>
+
+    <div class="alert alert-info mb-4">
+        <strong>What is Middleware?</strong> Middleware intercepts every state update, allowing you to add
+        logging, validation, analytics, performance tracking, and other cross-cutting concerns without
+        modifying your state logic.
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Counter with Middleware</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h1 class="display-1 mb-4">@State.Counter</h1>
+
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <button class="btn btn-danger btn-lg" @onclick="Decrement">
+                            -
+                        </button>
+                        <button class="btn btn-success btn-lg" @onclick="Increment">
+                            +
+                        </button>
+                    </div>
+
+                    <div class="d-flex justify-content-center gap-2 mb-3">
+                        <button class="btn btn-outline-primary" @onclick="Add10">
+                            +10
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="Sub10">
+                            -10
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="ResetCounter">
+                            Reset
+                        </button>
+                    </div>
+
+                    <div class="text-muted small">
+                        <p class="mb-0">Total Actions: @State.TotalActions</p>
+                        @if (State.LastAction.HasValue)
+                        {
+                            <p class="mb-0">Last Action: @State.LastAction.Value.ToString("HH:mm:ss")</p>
+                        }
+                        @if (State.LastActionDuration.HasValue)
+                        {
+                            <p class="mb-0">Duration: @State.LastActionDuration.Value.TotalMilliseconds.ToString("F2")ms</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Action Log (Last 20)</h5>
+                </div>
+                <div class="card-body p-0">
+                    @if (State.ActionLog.Count == 0)
+                    {
+                        <p class="text-muted text-center py-3">No actions yet. Click buttons above to see middleware in action.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                            @foreach (var log in State.ActionLog.Reverse())
+                            {
+                                <div class="list-group-item py-2 small">
+                                    <code>@log</code>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Middleware Interface</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 mb-0"><code>public interface IMiddleware&lt;TState&gt;
+{
+    Task OnBeforeUpdateAsync(
+        TState currentState,
+        string action);
+
+    Task OnAfterUpdateAsync(
+        TState previousState,
+        TState newState,
+        string action);
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Example: Logging Middleware</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 mb-0 small"><code>public class LoggingMiddleware : IMiddleware&lt;AppState&gt;
+{
+    private readonly ILogger _logger;
+
+    public LoggingMiddleware(ILogger logger)
+    {
+        _logger = logger;
+    }
+
+    public Task OnBeforeUpdateAsync(AppState state, string action)
+    {
+        _logger.LogInformation("Action: {Action}", action);
+        return Task.CompletedTask;
+    }
+
+    public Task OnAfterUpdateAsync(
+        AppState prev,
+        AppState next,
+        string action)
+    {
+        _logger.LogInformation(
+            "State changed: {Prev} -> {Next}",
+            prev, next);
+        return Task.CompletedTask;
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Registration</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 mb-0 small"><code>// Register middleware in Program.cs
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store
+        .WithMiddleware(new LoggingMiddleware(logger))
+        .WithMiddleware(new ValidationMiddleware())
+        .WithMiddleware(new AnalyticsMiddleware())
+);
+
+// Or use functional middleware
+store.WithMiddleware(FunctionalMiddleware.Create&lt;AppState&gt;(
+    onBefore: (state, action) =>
+        Console.WriteLine($"Before: {action}"),
+    onAfter: (prev, next, action) =>
+        Console.WriteLine($"After: {action}")
+));</code></pre>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Built-in Middleware</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>DevToolsMiddleware</strong> - Redux DevTools integration</li>
+                        <li><strong>LoggingMiddleware</strong> - Console/ILogger logging</li>
+                        <li><strong>PersistenceMiddleware</strong> - LocalStorage auto-save</li>
+                        <li><strong>HistoryMiddleware</strong> - Undo/redo tracking</li>
+                        <li><strong>TabSyncMiddleware</strong> - Cross-tab sync</li>
+                        <li><strong>ServerSyncMiddleware</strong> - SignalR sync</li>
+                        <li><strong>PluginMiddleware</strong> - Plugin lifecycle</li>
+                        <li><strong>DiagnosticsMiddleware</strong> - Performance (DEBUG)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Middleware Execution Order</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Before Update (in registration order):</h6>
+                            <ol>
+                                <li>DevToolsMiddleware.OnBeforeUpdateAsync()</li>
+                                <li>LoggingMiddleware.OnBeforeUpdateAsync()</li>
+                                <li>ValidationMiddleware.OnBeforeUpdateAsync()</li>
+                                <li class="text-primary fw-bold">State Update Happens</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>After Update (in registration order):</h6>
+                            <ol start="5">
+                                <li>DevToolsMiddleware.OnAfterUpdateAsync()</li>
+                                <li>LoggingMiddleware.OnAfterUpdateAsync()</li>
+                                <li>ValidationMiddleware.OnAfterUpdateAsync()</li>
+                                <li class="text-success fw-bold">Subscribers Notified</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    void Increment() => Update(s => s.Increment(), "INCREMENT");
+    void Decrement() => Update(s => s.Decrement(), "DECREMENT");
+    void Add10() => Update(s => s.SetCounter(s.Counter + 10), "ADD_10");
+    void Sub10() => Update(s => s.SetCounter(s.Counter - 10), "SUB_10");
+    void ResetCounter() => Update(s => s.Reset(), "RESET");
+}
