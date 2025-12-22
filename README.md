@@ -1,8 +1,8 @@
-# EasyAppDev.Blazor.Store
+# EasyAppDev.Blazor.Store - Blazor State Management Library
 
-**Type-safe state management for Blazor using C# records.**
+**Zustand-inspired state management for Blazor** - Type-safe, immutable, zero-boilerplate state management using C# records. The simplest way to manage state in Blazor Server, WebAssembly, and Auto modes.
 
-*Inspired by Zustand • Built for C# developers*
+*Built for C# developers who want Redux-like power without the complexity*
 
 [![NuGet](https://img.shields.io/nuget/v/EasyAppDev.Blazor.Store.svg)](https://www.nuget.org/packages/EasyAppDev.Blazor.Store/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -28,25 +28,43 @@
 
 ---
 
-## What is State Management?
+## Features at a Glance
+
+| Feature | Description |
+|---------|-------------|
+| **Immutable State** | C# records with `with` expressions for predictable state updates |
+| **Zero Boilerplate** | No actions, reducers, or dispatchers required |
+| **Redux DevTools** | Time-travel debugging with full state inspection |
+| **Persistence** | Automatic LocalStorage/SessionStorage state saving |
+| **Cross-Tab Sync** | Real-time state synchronization across browser tabs |
+| **Server Sync** | SignalR-based real-time collaboration with presence |
+| **Undo/Redo** | Full history stack with memory management |
+| **Type-Safe** | Complete IntelliSense and compile-time checking |
+| **Async Support** | Built-in debounce, throttle, and lazy loading |
+| **Optimistic Updates** | Instant UI feedback with automatic rollback |
+
+---
+
+## What is State Management in Blazor?
 
 In Blazor applications, "state" is any data your app needs to remember—user input, fetched data, UI flags like "is loading" or "is sidebar open." Without a state management library, you end up passing data through component parameters, juggling `EventCallback` chains, or scattering state across services. This quickly becomes hard to track and debug. A state management library gives you a single source of truth: one place where state lives, one way to update it, and automatic notifications to any component that cares. Think of it as a central database for your UI that keeps everything in sync.
 
 ---
 
-## Why This Library?
+## Why Choose This Blazor State Management Library?
 
 No actions. No reducers. No dispatchers. Just C# records with pure methods.
 
 ```csharp
-// Define state as a record with transformation methods
+// Define Blazor state as an immutable C# record
 public record CounterState(int Count)
 {
+    // Pure state transformation - returns new immutable state
     public CounterState Increment() => this with { Count = Count + 1 };
     public CounterState Decrement() => this with { Count = Count - 1 };
 }
 
-// Use in components
+// Use in Blazor components with automatic state subscription
 @inherits StoreComponent<CounterState>
 
 <h1>@State.Count</h1>
@@ -63,7 +81,7 @@ public record CounterState(int Count)
 
 ---
 
-## Quick Start
+## Quick Start - Blazor State Management Setup
 
 ### 1. Install
 
@@ -74,7 +92,7 @@ dotnet add package EasyAppDev.Blazor.Store
 ### 2. Register
 
 ```csharp
-// Program.cs
+// Program.cs - Register Blazor state store with dependency injection
 builder.Services.AddStoreWithUtilities(
     new CounterState(0),
     (store, sp) => store.WithDefaults(sp, "Counter"));
@@ -84,6 +102,7 @@ builder.Services.AddStoreWithUtilities(
 
 ```razor
 @page "/counter"
+@* Inherit from StoreComponent for automatic state subscription *@
 @inherits StoreComponent<CounterState>
 
 <h1>@State.Count</h1>
@@ -91,34 +110,37 @@ builder.Services.AddStoreWithUtilities(
 <button @onclick="@(() => UpdateAsync(s => s.Decrement()))">-</button>
 ```
 
-That's it. State updates automatically propagate to all subscribed components.
+That's it. State updates automatically propagate to all subscribed Blazor components.
 
 ---
 
 ## Table of Contents
 
-1. [Core Concepts](#core-concepts)
-2. [Registration Options](#registration-options)
-3. [Async Helpers](#async-helpers)
-4. [Optimistic Updates](#optimistic-updates)
-5. [Undo/Redo History](#undoredo-history)
-6. [Query System](#query-system)
-7. [Cross-Tab Sync](#cross-tab-sync)
-8. [Server Sync (SignalR)](#server-sync-signalr)
-9. [Immer-Style Updates](#immer-style-updates)
-10. [Redux-Style Actions](#redux-style-actions)
-11. [Plugin System](#plugin-system)
-12. [Security](#security)
-13. [Selectors & Performance](#selectors--performance)
-14. [Persistence & DevTools](#persistence--devtools)
-15. [Middleware](#middleware)
-16. [Blazor Render Modes](#blazor-render-modes)
-17. [API Reference](#api-reference)
-18. [Breaking Changes in v2.0.0](#breaking-changes-in-v200)
+1. [Features at a Glance](#features-at-a-glance)
+2. [Core Concepts](#core-concepts---immutable-state-with-c-records)
+3. [Registration Options](#registration-options)
+4. [Async Helpers](#async-helpers)
+5. [Optimistic Updates](#optimistic-updates)
+6. [Undo/Redo History](#undoredo-history)
+7. [Query System](#query-system)
+8. [Cross-Tab Sync](#cross-tab-sync)
+9. [Server Sync (SignalR)](#server-sync-signalr)
+10. [Immer-Style Updates](#immer-style-updates)
+11. [Redux-Style Actions](#redux-style-actions)
+12. [Plugin System](#plugin-system)
+13. [Security](#security)
+14. [Selectors & Performance](#selectors--performance-optimization)
+15. [Persistence & DevTools](#state-persistence--redux-devtools-integration)
+16. [Middleware](#middleware)
+17. [Blazor Render Modes](#blazor-render-modes)
+18. [API Reference](#api-reference)
+19. [Breaking Changes in v2.0.0](#breaking-changes-in-v200)
+20. [Comparison with Alternatives](#comparison-with-other-blazor-state-management-libraries)
+21. [FAQ](#frequently-asked-questions-faq)
 
 ---
 
-## Core Concepts
+## Core Concepts - Immutable State with C# Records
 
 ### State = Immutable Record
 
@@ -879,7 +901,7 @@ Use `TransformOnSave` to exclude sensitive fields from localStorage:
 
 ---
 
-## Selectors & Performance
+## Selectors & Performance Optimization
 
 ### The Problem
 
@@ -926,7 +948,7 @@ protected override ImmutableList<Todo> SelectState(TodoState s) =>
 
 ---
 
-## Persistence & DevTools
+## State Persistence & Redux DevTools Integration
 
 ### LocalStorage Persistence
 
@@ -1169,6 +1191,82 @@ public override Task OnAfterUpdateAsync(AppState previousState, AppState newStat
 
 ---
 
+## Comparison with Other Blazor State Management Libraries
+
+| Feature | EasyAppDev.Blazor.Store | Fluxor | Blazor-State | Morris.Moxy |
+|---------|------------------------|--------|--------------|-------------|
+| **Learning Curve** | Minimal - just C# records | Steep - Redux patterns | Moderate - MediatR patterns | Moderate |
+| **Boilerplate** | Zero - no actions/reducers | High - actions, reducers, effects | Medium - handlers required | Low |
+| **DevTools** | Redux DevTools | Redux DevTools | None | None |
+| **Persistence** | Built-in | Manual | Manual | Manual |
+| **Cross-Tab Sync** | Built-in | Manual | None | None |
+| **Server Sync** | Built-in SignalR | Manual | None | None |
+| **Undo/Redo** | Built-in | Manual | None | None |
+| **Type Safety** | Full | Full | Full | Full |
+| **Bundle Size** | ~50KB | ~100KB | ~30KB | ~20KB |
+
+### When to Choose This Library
+
+- **Choose EasyAppDev.Blazor.Store** if you want minimal boilerplate, built-in features (persistence, sync, undo/redo), and a Zustand-like developer experience
+- **Choose Fluxor** if your team is familiar with Redux/Flux patterns and needs strict unidirectional data flow
+- **Choose Blazor-State** if you prefer MediatR-style request/handler patterns
+
+---
+
+## Frequently Asked Questions (FAQ)
+
+### How does this compare to Fluxor?
+
+Fluxor follows traditional Redux patterns with actions, reducers, and effects. EasyAppDev.Blazor.Store takes a simpler approach inspired by Zustand - your state is just a C# record with methods. No boilerplate, no ceremony. Both support Redux DevTools.
+
+### Can I use this with Blazor Server?
+
+Yes. Use `AddScopedStore` for full feature support (DevTools, persistence, cross-tab sync) in Blazor Server. Singleton stores work but cannot use JavaScript-dependent features.
+
+### How do I persist state to localStorage?
+
+```csharp
+builder.Services.AddStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "App")
+        .WithPersistence(sp, "app-state"));  // Auto-saves to localStorage
+```
+
+### Does this work with .NET MAUI Blazor?
+
+Yes. The core store functionality works in MAUI Blazor Hybrid apps. Browser-specific features (DevTools, localStorage, cross-tab sync) require a browser context.
+
+### How do I handle async operations like API calls?
+
+Use the built-in `ExecuteAsync` helper or async state methods:
+
+```csharp
+await ExecuteAsync(
+    () => api.LoadUsersAsync(),
+    loading: s => s with { IsLoading = true },
+    success: (s, users) => s with { Users = users, IsLoading = false },
+    error: (s, ex) => s with { Error = ex.Message, IsLoading = false });
+```
+
+### Is state shared across browser tabs?
+
+Not by default. Enable cross-tab synchronization with `WithTabSync`:
+
+```csharp
+.WithTabSync(sp, opts => opts.Channel("my-app").EnableMessageSigning())
+```
+
+### How do I debug state changes?
+
+Install the [Redux DevTools browser extension](https://github.com/reduxjs/redux-devtools). State changes are automatically logged in DEBUG builds when using `WithDefaults()` or `WithDevTools()`.
+
+### Can multiple components share the same state?
+
+Yes. All components inheriting `StoreComponent<T>` for the same state type automatically share state and receive updates.
+
+---
+
 ## Common Gotchas
 
 1. **Always use `with`**: `state with { X = 1 }` not `state.X = 1`
@@ -1198,5 +1296,13 @@ MIT © EasyAppDev
 <div align="center">
 
 **[GitHub](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store)** • **[Issues](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store/issues)** • **[Discussions](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store/discussions)**
+
+---
+
+### Found this library helpful?
+
+If EasyAppDev.Blazor.Store has made state management easier in your Blazor projects, consider giving it a ⭐ on GitHub. It helps others discover the library and motivates continued development.
+
+[![GitHub stars](https://img.shields.io/github/stars/mashrulhaque/EasyAppDev.Blazor.Store?style=social)](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store)
 
 </div>
