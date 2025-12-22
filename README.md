@@ -11,6 +11,9 @@
   <a href="https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/">
     <img src="https://img.shields.io/badge/📚_Full_Documentation-4A90E2?style=for-the-badge" alt="Documentation" />
   </a>
+  <a href="http://blazorstore.easyappdev.com/">
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-28A745?style=for-the-badge" alt="Live Demo" />
+  </a>
 </div>
 
 > **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v200) for migration guide.
