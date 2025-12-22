@@ -335,7 +335,29 @@ protected override object SelectState(TodoState s) => new TodoStats(
               <p>Methods to register stores in your dependency injection container.</p>
 
               <div class="api-section">
-                <h4><code>AddStoreWithUtilities</code> (Recommended)</h4>
+                <h4><code>AddSecureStore</code> (Recommended for Production)</h4>
+                <p>Automatic security configuration based on environment with all features enabled:</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddSecureStore(
+    new AppState(),
+    "App",
+    opts =>
+    {
+        opts.PersistenceKey = "app-state";   // LocalStorage
+        opts.EnableTabSync = true;            // Cross-tab sync
+        opts.EnableHistory = true;            // Undo/redo
+    });</code></pre>
+                </div>
+                <p>Security profiles applied automatically:</p>
+                <ul>
+                  <li><code>Development</code>: DevTools enabled, permissive validation</li>
+                  <li><code>Production</code>: No DevTools, message signing enabled, validation warnings</li>
+                  <li><code>Strict</code>: All Production features + throws on any security warning</li>
+                </ul>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddStoreWithUtilities</code></h4>
                 <p>Registers a store with all utility services (debounce, throttle, cache, async executor) in one call.</p>
                 <div class="code-block">
                   <pre><code class="language-csharp">builder.Services.AddStoreWithUtilities(
@@ -374,6 +396,37 @@ builder.Services.AddStore(
                   <pre><code class="language-csharp">builder.Services.AddTransientStoreWithUtilities(
     () => new TempState(),
     (store, sp) => store.WithDefaults(sp, "Temp"));</code></pre>
+                </div>
+              </div>
+
+              <h3>Security Registration Methods</h3>
+
+              <div class="api-section">
+                <h4><code>AddStateValidator&lt;TState, TValidator&gt;</code></h4>
+                <p>Registers a state validator class for validation during persistence and sync operations.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStateValidator&lt;AppState, AppStateValidator&gt;();</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddStateValidator&lt;TState&gt;</code> (Functional)</h4>
+                <p>Registers a state validator using an inline function.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStateValidator&lt;AppState&gt;(state =>
+{
+    var errors = new List&lt;string&gt;();
+    if (state.Count &lt; 0) errors.Add("Count cannot be negative");
+    return errors;
+});</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>AddStateValidatorsFromAssembly</code></h4>
+                <p>Auto-discovers and registers all <code>IStateValidator&lt;T&gt;</code> implementations from an assembly.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">builder.Services.AddStateValidatorsFromAssembly(typeof(Program).Assembly);</code></pre>
                 </div>
               </div>
             </section>
@@ -804,6 +857,10 @@ builder.Services.AddStoreWithUtilities(
                   </tr>
                 </thead>
                 <tbody>
+                  <tr>
+                    <td><code>AddSecureStore()</code></td>
+                    <td>Secure store registration with auto-config</td>
+                  </tr>
                   <tr>
                     <td><code>StoreComponent&lt;T&gt;</code></td>
                     <td>Base component with auto-subscription</td>

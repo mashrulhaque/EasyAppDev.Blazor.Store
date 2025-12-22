@@ -150,8 +150,8 @@
     // Called BEFORE state is updated
     Task OnBeforeUpdateAsync(TState currentState, string? action);
 
-    // Called AFTER state has been updated
-    Task OnAfterUpdateAsync(TState newState, string? action);
+    // Called AFTER state has been updated (v2.0.0: now receives both previous and new state)
+    Task OnAfterUpdateAsync(TState previousState, TState newState, string? action);
 }</code></pre>
               </div>
 
@@ -274,11 +274,12 @@
         return Task.CompletedTask;
     }
 
-    public Task OnAfterUpdateAsync(TState newState, string? action)
+    public Task OnAfterUpdateAsync(TState previousState, TState newState, string? action)
     {
         _logger.LogInformation(
-            "After update - Action: {Action}, New State: {@State}",
+            "After update - Action: {Action}, Previous: {@Previous}, New: {@New}",
             action ?? "Unknown",
+            previousState,
             newState);
         return Task.CompletedTask;
     }
@@ -333,7 +334,7 @@ builder.Services.AddStore(
         return Task.CompletedTask;
     }
 
-    public Task OnAfterUpdateAsync(TState newState, string? action)
+    public Task OnAfterUpdateAsync(TState previousState, TState newState, string? action)
         => Task.CompletedTask;
 }</code></pre>
                   </div>
@@ -358,7 +359,7 @@ builder.Services.AddStore(
     public Task OnBeforeUpdateAsync(TState currentState, string? action)
         => Task.CompletedTask;
 
-    public async Task OnAfterUpdateAsync(TState newState, string? action)
+    public async Task OnAfterUpdateAsync(TState previousState, TState newState, string? action)
     {
         if (!string.IsNullOrEmpty(action))
         {
@@ -392,7 +393,7 @@ builder.Services.AddStore(
     public Task OnBeforeUpdateAsync(TState currentState, string? action)
         => Task.CompletedTask;
 
-    public async Task OnAfterUpdateAsync(TState newState, string? action)
+    public async Task OnAfterUpdateAsync(TState previousState, TState newState, string? action)
     {
         if (action == "ORDER_COMPLETED")
         {
@@ -603,9 +604,75 @@ builder.Services.AddStore(
             <section class="section" id="security">
               <h2>Security</h2>
               <p>
-                The library includes security features to protect sensitive data and validate
-                state integrity.
+                The library includes comprehensive security features to protect sensitive data and validate
+                state integrity across persistence, tab sync, and server sync.
               </p>
+
+              <h3>Security Profiles</h3>
+              <p>Use <code>AddSecureStore</code> for automatic security configuration based on environment:</p>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Profile</th>
+                    <th>DevTools</th>
+                    <th>Validation</th>
+                    <th>Message Signing</th>
+                    <th>Use Case</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Development</strong></td>
+                    <td>Enabled (DEBUG)</td>
+                    <td>Optional</td>
+                    <td>Optional</td>
+                    <td>Local development</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Production</strong></td>
+                    <td>Disabled</td>
+                    <td>Warnings</td>
+                    <td>Required</td>
+                    <td>Deployed apps</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Strict</strong></td>
+                    <td>Disabled</td>
+                    <td>Required</td>
+                    <td>Required</td>
+                    <td>High-security apps</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Custom</strong></td>
+                    <td>Manual</td>
+                    <td>Manual</td>
+                    <td>Manual</td>
+                    <td>Fine-grained control</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>AddSecureStore (Recommended)</h3>
+              <p>The simplest way to configure secure stores:</p>
+              <div class="code-block">
+                <div class="code-block-title">Program.cs</div>
+                <pre><code class="language-csharp">builder.Services.AddSecureStore(
+    new AppState(),
+    "App",
+    opts =>
+    {
+        opts.Profile = SecurityProfile.Production;    // Security profile
+        opts.PersistenceKey = "app-state";            // LocalStorage key
+        opts.EnableTabSync = true;                    // Cross-tab sync
+        opts.EnableHistory = true;                    // Undo/redo
+        opts.MaxHistoryEntries = 50;                  // History limit
+        opts.MaxHistoryMemoryMB = 10;                 // Memory limit
+        opts.UseScoped = true;                        // Scoped registration
+        opts.RequireValidator = true;                 // Require state validator
+        opts.ThrowOnSecurityWarnings = true;          // Fail-fast on warnings
+        opts.FilterSensitiveData = true;              // Filter [SensitiveData]
+    });</code></pre>
+              </div>
 
               <h3>Sensitive Data Filtering</h3>
               <p>
@@ -616,11 +683,12 @@ builder.Services.AddStore(
                 <div class="code-block-title">State with Sensitive Fields</div>
                 <pre><code class="language-csharp">public record UserState(
     string Username,
-    string Email,
     [property: SensitiveData] string Password,
-    [property: SensitiveData] string ApiToken,
-    [property: SensitiveData] string CreditCardNumber
-);</code></pre>
+    [property: SensitiveData] string AuthToken,
+    [property: SensitiveData(Reason = "PII")] string SocialSecurityNumber
+);
+
+// In DevTools: { Username: "John", Password: "[REDACTED]", ... }</code></pre>
               </div>
 
               <p>Configure global sensitive field detection:</p>
@@ -643,31 +711,36 @@ builder.Services.AddStore(
                 <div class="code-block-title">StateValidator.cs</div>
                 <pre><code class="language-csharp">public class AppStateValidator : IStateValidator&lt;AppState&gt;
 {
-    public bool Validate(AppState state, out string? error)
+    public StateValidationResult Validate(AppState state)
     {
-        if (state.Count &lt; 0)
-        {
-            error = "Count cannot be negative";
-            return false;
-        }
+        var errors = new List&lt;string&gt;();
 
-        if (string.IsNullOrWhiteSpace(state.Username))
-        {
-            error = "Username is required";
-            return false;
-        }
+        if (state.UserId &lt; 0)
+            errors.Add("UserId cannot be negative");
 
-        error = null;
-        return true;
+        if (state.Items?.Count > 1000)
+            errors.Add("Items exceeds maximum size");
+
+        return errors.Count > 0
+            ? StateValidationResult.Failure(errors)
+            : StateValidationResult.Success();
     }
 }</code></pre>
               </div>
 
-              <p>Use validators with synchronization features:</p>
+              <p>Register and use validators:</p>
               <div class="code-block">
                 <div class="code-block-title">Program.cs</div>
-                <pre><code class="language-csharp">// Register the validator
-builder.Services.AddSingleton&lt;IStateValidator&lt;AppState&gt;, AppStateValidator&gt;();
+                <pre><code class="language-csharp">// Register using helper method
+builder.Services.AddStateValidator&lt;AppState, AppStateValidator&gt;();
+
+// Or inline with a function
+builder.Services.AddStateValidator&lt;AppState&gt;(state =>
+{
+    var errors = new List&lt;string&gt;();
+    if (state.Count &lt; 0) errors.Add("Count cannot be negative");
+    return errors;
+});
 
 // Use with server sync
 builder.Services.AddStore(
@@ -676,20 +749,117 @@ builder.Services.AddStore(
         .WithServerSync(sp, opts => opts
             .HubUrl("/hubs/state")
             .WithValidator(sp.GetService&lt;IStateValidator&lt;AppState&gt;&gt;())
-            .RejectInvalidState()));  // Reject invalid incoming state</code></pre>
+            .RejectInvalidState()));</code></pre>
               </div>
 
-              <h3>Message Signing</h3>
+              <h3>Never Persist Secrets</h3>
+              <p>Use <code>TransformOnSave</code> to exclude sensitive fields from localStorage:</p>
+              <div class="code-block">
+                <pre><code class="language-csharp">.WithPersistence(sp, new PersistenceOptions&lt;UserState&gt;
+{
+    Key = "user-state",
+    TransformOnSave = state => state with
+    {
+        Password = null,
+        AuthToken = null,
+        ApiKey = null
+    }
+})</code></pre>
+              </div>
+
+              <h3>Cross-Tab Sync Security</h3>
               <p>
-                Enable HMAC-SHA256 message signing for cross-tab synchronization to prevent
-                malicious state injection:
+                Enable HMAC-SHA256 message signing for cross-tab synchronization:
               </p>
               <div class="code-block">
                 <pre><code class="language-csharp">.WithTabSync(sp, opts => opts
-    .Channel("my-app")
-    .EnableMessageSigning()      // Auto-generates signing key
-    .WithSigningKey(myKey))      // Or use custom key</code></pre>
+    .Channel("shopping-cart")
+    .EnableMessageSigning()              // HMAC security
+    .DeriveKeyFromOrigin()               // Same-origin key derivation
+    .RequireValidSignature(true)         // Reject unsigned messages
+    .MaxMessageAgeSeconds(30)            // Replay attack prevention
+    .ExcludeActions("HOVER", "FOCUS"))   // Don't sync these</code></pre>
               </div>
+
+              <h4>TabSync Security Options</h4>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Option</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>EnableMessageSigning</code></td>
+                    <td>Enable HMAC-SHA256 message signing</td>
+                  </tr>
+                  <tr>
+                    <td><code>DeriveKeyFromOrigin</code></td>
+                    <td>Auto-derive key from window.location.origin</td>
+                  </tr>
+                  <tr>
+                    <td><code>SigningKey</code></td>
+                    <td>Explicit shared signing key</td>
+                  </tr>
+                  <tr>
+                    <td><code>RequireValidSignature</code></td>
+                    <td>Reject unsigned messages (default: true)</td>
+                  </tr>
+                  <tr>
+                    <td><code>MaxMessageAgeSeconds</code></td>
+                    <td>Prevent replay attacks (default: 30)</td>
+                  </tr>
+                  <tr>
+                    <td><code>MaxMessageSizeBytes</code></td>
+                    <td>Prevent DoS attacks (default: 1MB)</td>
+                  </tr>
+                  <tr>
+                    <td><code>MaxJsonDepth</code></td>
+                    <td>Prevent stack overflow (default: 32)</td>
+                  </tr>
+                  <tr>
+                    <td><code>FailFastOnInsecureConfiguration</code></td>
+                    <td>Throw on misconfiguration</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>Security Gotchas</h3>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Mistake</th>
+                    <th>Solution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>DevTools in production</td>
+                    <td>Use <code>#if DEBUG</code> or <code>AddSecureStore</code></td>
+                  </tr>
+                  <tr>
+                    <td>Secrets in localStorage</td>
+                    <td>Use <code>TransformOnSave</code> to exclude</td>
+                  </tr>
+                  <tr>
+                    <td>Missing state validation</td>
+                    <td>Register <code>IStateValidator&lt;T&gt;</code></td>
+                  </tr>
+                  <tr>
+                    <td>TabSync without signing</td>
+                    <td>Enable <code>EnableMessageSigning</code></td>
+                  </tr>
+                  <tr>
+                    <td>No history memory limit</td>
+                    <td>Set <code>WithMaxMemoryMB()</code></td>
+                  </tr>
+                  <tr>
+                    <td>Client-side trust</td>
+                    <td>Always validate on server</td>
+                  </tr>
+                </tbody>
+              </table>
 
               <div class="alert alert-warning">
                 <div class="alert-title">Security Recommendations</div>
@@ -698,6 +868,7 @@ builder.Services.AddStore(
                   <li>Enable message signing when syncing sensitive state across tabs</li>
                   <li>Use state validators for data from external sources (server sync, persistence)</li>
                   <li>Never store unencrypted secrets in browser storage</li>
+                  <li>Use <code>AddSecureStore</code> for automatic security configuration in production</li>
                   <li>Review DevTools output to ensure sensitive data is filtered</li>
                 </ul>
               </div>

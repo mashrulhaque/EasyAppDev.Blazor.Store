@@ -197,6 +197,22 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         }
         else
         {
+            // Fail fast if configured - prevents silent security failures
+            if (_options.FailFastOnInsecureConfiguration)
+            {
+                throw new SecurityConfigurationException(
+                    "TabSync",
+                    "Message signing is enabled but no shared signing key is configured. " +
+                    "Cross-tab message verification will always fail with a random key.",
+                    SecurityProfile.Custom,
+                    new[]
+                    {
+                        "Set TabSyncOptions.SigningKey to a shared key",
+                        "Or set TabSyncOptions.DeriveKeyFromOrigin = true",
+                        "Or disable message signing if not required"
+                    });
+            }
+
             _messageSigner = new MessageSigner();
             _logger?.LogWarning(
                 "[TabSync] Using random signing key. Message verification will fail across tabs. " +

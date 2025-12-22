@@ -168,6 +168,18 @@ public sealed class TabSyncOptions
     public int MaxJsonDepth { get; set; } = 32;
 
     /// <summary>
+    /// Gets or sets whether to throw an exception on insecure configurations.
+    /// When true, throws <see cref="Security.SecurityConfigurationException"/> if:
+    /// - Message signing is enabled without a shared key (SigningKey or DeriveKeyFromOrigin)
+    /// Default is false for backward compatibility.
+    /// </summary>
+    /// <remarks>
+    /// Set to true in production to catch misconfigurations early during application startup.
+    /// This prevents silent security failures where verification always fails.
+    /// </remarks>
+    public bool FailFastOnInsecureConfiguration { get; set; }
+
+    /// <summary>
     /// Sets the channel name.
     /// </summary>
     /// <param name="channelName">The channel name.</param>

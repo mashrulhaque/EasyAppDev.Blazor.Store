@@ -216,6 +216,54 @@ builder.Services.AddStore(
                 <div class="alert-title">Note</div>
                 <p>Your existing v1.x registration will still work, but you won't have access to async helpers without registering utilities.</p>
               </div>
+
+              <h3>Middleware Interface</h3>
+              <p>The <code>IMiddleware&lt;TState&gt;</code> interface now receives both previous and new state:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Before (v1.x)</div>
+                <pre><code class="language-csharp">Task OnAfterUpdateAsync(TState newState, string? action);</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">After (v2.0.0)</div>
+                <pre><code class="language-csharp">Task OnAfterUpdateAsync(TState previousState, TState newState, string? action);</code></pre>
+              </div>
+
+              <p><strong>Migration:</strong> Update your middleware implementations to accept the additional <code>previousState</code> parameter.</p>
+
+              <h3>Optimistic Updates</h3>
+              <p>Optimistic updates now use dedicated extension methods instead of manual rollback patterns:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Before (v1.x) - Manual rollback pattern</div>
+                <pre><code class="language-csharp">var original = store.GetState();
+await store.UpdateAsync(s => s.RemoveItem(id));
+try { await api.DeleteAsync(id); }
+catch { await store.UpdateAsync(_ => original); throw; }</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">After (v2.0.0) - Built-in support</div>
+                <pre><code class="language-csharp">await store.UpdateOptimistic(
+    s => s.RemoveItem(id),
+    async _ => await api.DeleteAsync(id),
+    (s, error) => s.RestoreItem(id)
+);</code></pre>
+              </div>
+
+              <h3>Plugin System</h3>
+              <p>Plugin hooks now receive both previous and new state:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Before (v1.x)</div>
+                <pre><code class="language-csharp">public override Task OnAfterUpdateAsync(AppState newState, string action);</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">After (v2.0.0)</div>
+                <pre><code class="language-csharp">public override Task OnAfterUpdateAsync(AppState previousState, AppState newState, string action);</code></pre>
+              </div>
             </section>
 
             <!-- Migration Steps -->

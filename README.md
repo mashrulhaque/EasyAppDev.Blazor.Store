@@ -13,7 +13,7 @@
   </a>
 </div>
 
-> **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v300) for migration guide.
+> **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v200) for migration guide.
 
 ### Supported Platforms
 
@@ -48,7 +48,7 @@ public record CounterState(int Count)
 - Zero boilerplate state management
 - Immutable by default (C# records + `with` expressions)
 - Automatic component updates
-- Redux DevTools integration
+- Redux DevTools integration (DEBUG builds only)
 - Full async support with helpers
 - Works with Server, WebAssembly, and Auto modes
 
@@ -89,22 +89,23 @@ That's it. State updates automatically propagate to all subscribed components.
 ## Table of Contents
 
 1. [Core Concepts](#core-concepts)
-2. [Async Helpers](#async-helpers)
-3. [Optimistic Updates](#optimistic-updates)
-4. [Undo/Redo History](#undoredo-history)
-5. [Query System](#query-system)
-6. [Cross-Tab Sync](#cross-tab-sync)
-7. [Server Sync (SignalR)](#server-sync-signalr)
-8. [Immer-Style Updates](#immer-style-updates)
-9. [Redux-Style Actions](#redux-style-actions)
-10. [Plugin System](#plugin-system)
-11. [Security](#security)
-12. [Selectors & Performance](#selectors--performance)
-13. [Persistence & DevTools](#persistence--devtools)
-14. [Middleware](#middleware)
-15. [Blazor Render Modes](#blazor-render-modes)
-16. [API Reference](#api-reference)
-17. [Breaking Changes in v2.0.0](#breaking-changes-in-v300)
+2. [Registration Options](#registration-options)
+3. [Async Helpers](#async-helpers)
+4. [Optimistic Updates](#optimistic-updates)
+5. [Undo/Redo History](#undoredo-history)
+6. [Query System](#query-system)
+7. [Cross-Tab Sync](#cross-tab-sync)
+8. [Server Sync (SignalR)](#server-sync-signalr)
+9. [Immer-Style Updates](#immer-style-updates)
+10. [Redux-Style Actions](#redux-style-actions)
+11. [Plugin System](#plugin-system)
+12. [Security](#security)
+13. [Selectors & Performance](#selectors--performance)
+14. [Persistence & DevTools](#persistence--devtools)
+15. [Middleware](#middleware)
+16. [Blazor Render Modes](#blazor-render-modes)
+17. [API Reference](#api-reference)
+18. [Breaking Changes in v2.0.0](#breaking-changes-in-v200)
 
 ---
 
@@ -170,23 +171,120 @@ public record TodoState(ImmutableList<Todo> Todos)
 }
 ```
 
-### Registration Options
+### Interface Segregation
+
+The `IStore<T>` interface composes three focused interfaces:
 
 ```csharp
-// Standard registration with all utilities
+// Read-only state access
+public interface IStateReader<TState> where TState : notnull
+{
+    TState GetState();
+}
+
+// State update operations
+public interface IStateWriter<TState> where TState : notnull
+{
+    Task UpdateAsync(Func<TState, TState> updater, string? action = null);
+    Task UpdateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null);
+}
+
+// Subscription management
+public interface IStateObservable<TState> where TState : notnull
+{
+    IDisposable Subscribe(Action<TState> callback);
+    IDisposable Subscribe<TSelected>(Func<TState, TSelected> selector, Action<TSelected> callback);
+}
+
+// Full store interface
+public interface IStore<TState> :
+    IStateReader<TState>,
+    IStateWriter<TState>,
+    IStateObservable<TState>,
+    IDisposable
+    where TState : notnull
+{
+}
+```
+
+---
+
+## Registration Options
+
+### AddSecureStore (Recommended)
+
+Automatic security configuration based on environment:
+
+```csharp
+// Simplest secure registration
+builder.Services.AddSecureStore(
+    new AppState(),
+    "App",
+    opts =>
+    {
+        opts.PersistenceKey = "app-state";   // LocalStorage
+        opts.EnableTabSync = true;            // Cross-tab sync
+        opts.EnableHistory = true;            // Undo/redo
+    });
+```
+
+**Security profiles applied automatically:**
+- `Development`: DevTools enabled, permissive validation
+- `Production`: No DevTools, message signing enabled, validation warnings
+- `Strict`: All Production features + throws on any security warning
+
+### AddStoreWithUtilities
+
+Standard registration with all utilities:
+
+```csharp
 builder.Services.AddStoreWithUtilities(
     TodoState.Initial,
     (store, sp) => store
         .WithDefaults(sp, "Todos")           // DevTools + Logging
         .WithPersistence(sp, "todos"));      // LocalStorage
+```
 
-// Scoped store (Blazor Server per-user isolation)
+### AddScopedStoreWithUtilities
+
+Scoped store for Blazor Server per-user isolation:
+
+```csharp
 builder.Services.AddScopedStoreWithUtilities(
     new UserSessionState(),
     (store, sp) => store.WithDefaults(sp, "Session"));
+```
 
-// Minimal registration
+### AddStore / AddScopedStore
+
+Minimal registration without utilities:
+
+```csharp
+// Singleton
 builder.Services.AddStore(new CounterState(0));
+
+// Scoped
+builder.Services.AddScopedStore(new CounterState(0));
+
+// With factory
+builder.Services.AddStore(
+    sp => new AppState(sp.GetRequiredService<IConfiguration>()),
+    (store, sp) => store.WithLogging());
+```
+
+### AddStoreWithHistory
+
+Store with undo/redo support:
+
+```csharp
+builder.Services.AddStoreWithHistory(
+    new EditorState(),
+    opts => opts
+        .WithMaxSize(100)
+        .WithMaxMemoryMB(50)
+        .ExcludeActions("CURSOR_MOVE", "SELECTION"),
+    (store, sp) => store.WithDefaults(sp, "Editor")
+);
 ```
 
 ---
@@ -285,20 +383,14 @@ await store.UpdateOptimistic<AppState, ServerItem>(
 );
 ```
 
-### Component Example
+### Two-Phase with Confirmation
 
 ```csharp
-@inherits StoreComponent<TodoState>
-@inject ITodoApi Api
-
-async Task DeleteTodo(Guid id)
-{
-    await Store.UpdateOptimistic(
-        s => s.RemoveTodo(id),
-        async _ => await Api.DeleteAsync(id),
-        (s, _) => s.RestoreTodo(id).SetError("Delete failed")
-    );
-}
+await store.UpdateOptimisticWithConfirm(
+    s => s.SetPending(true),
+    async s => await api.Process(),
+    (s, result) => s.Confirm(result)
+);
 ```
 
 ---
@@ -320,8 +412,6 @@ builder.Services.AddStoreWithHistory(
         .GroupActions(TimeSpan.FromMilliseconds(300)), // Group rapid edits
     (store, sp) => store.WithDefaults(sp, "Editor")
 );
-
-builder.Services.AddStoreHistory<EditorState>();
 ```
 
 ### Usage
@@ -419,9 +509,11 @@ builder.Services.AddStore(
         .WithDefaults(sp, "Cart")
         .WithTabSync(sp, opts => opts
             .Channel("shopping-cart")
-            .EnableMessageSigning()                      // HMAC security
-            .WithDebounce(TimeSpan.FromMilliseconds(100))
-            .ExcludeActions("HOVER", "FOCUS"))           // Don't sync these
+            .EnableMessageSigning                       // HMAC security
+            .DeriveKeyFromOrigin                        // Same-origin key derivation
+            .RequireValidSignature = true
+            .MaxMessageAgeSeconds = 30                  // Replay attack prevention
+            .ExcludeActions("HOVER", "FOCUS"))          // Don't sync these
 );
 ```
 
@@ -438,6 +530,19 @@ Both tabs show same cart!
 ```
 
 No additional code needed in components. Sync happens automatically.
+
+### Security Options
+
+| Option | Description |
+|--------|-------------|
+| `EnableMessageSigning` | Enable HMAC-SHA256 message signing |
+| `DeriveKeyFromOrigin` | Auto-derive key from window.location.origin |
+| `SigningKey` | Explicit shared signing key |
+| `RequireValidSignature` | Reject unsigned messages (default: true) |
+| `MaxMessageAgeSeconds` | Prevent replay attacks (default: 30) |
+| `MaxMessageSizeBytes` | Prevent DoS attacks (default: 1MB) |
+| `MaxJsonDepth` | Prevent stack overflow (default: 32) |
+| `FailFastOnInsecureConfiguration` | Throw on misconfiguration |
 
 ---
 
@@ -659,78 +764,109 @@ public class MyPlugin : StorePluginBase<AppState>
 
 ## Security
 
-**IMPORTANT**: Review [`docs/SECURITY.md`](docs/SECURITY.md) before deploying to production.
+### Security Profiles
 
-### Critical Security Requirements
+| Profile | DevTools | Validation | Message Signing | Use Case |
+|---------|----------|------------|-----------------|----------|
+| `Development` | Enabled (DEBUG) | Optional | Optional | Local development |
+| `Production` | Disabled | Warnings | Required | Deployed apps |
+| `Strict` | Disabled | Required | Required | High-security apps |
+| `Custom` | Manual | Manual | Manual | Fine-grained control |
 
-Before production deployment:
-
-1. **Disable DevTools** - Use `#if DEBUG` to remove `.WithDevTools()`
-2. **Mark Sensitive Data** - Add `[SensitiveData]` to passwords, tokens, keys
-3. **Validate External State** - Implement `IStateValidator<T>` for persistence/sync
-4. **Never Persist Secrets** - Use `TransformOnSave` to exclude sensitive fields
-5. **Enable Message Signing** - Call `.EnableMessageSigning()` for TabSync
-
-### Sensitive Data Filtering
-
-Prevent passwords/tokens from appearing in DevTools:
+### AddSecureStore Configuration
 
 ```csharp
-public record UserState(
-    string Name,
-    [property: SensitiveData] string Password,
-    [property: SensitiveData] string ApiToken
-);
-
-// In DevTools: { Name: "John", Password: "[REDACTED]", ApiToken: "[REDACTED]" }
-```
-
-**WARNING**: DevTools should NEVER be shipped to production. Always use:
-
-```csharp
-#if DEBUG
-    .WithDefaults(sp, "MyStore")     // DevTools + Logging
-#else
-    .WithLogging()                   // Logging only
-#endif
+builder.Services.AddSecureStore(
+    new AppState(),
+    "App",
+    opts =>
+    {
+        opts.Profile = SecurityProfile.Production;    // Security profile
+        opts.PersistenceKey = "app-state";            // LocalStorage key
+        opts.EnableTabSync = true;                    // Cross-tab sync
+        opts.EnableHistory = true;                    // Undo/redo
+        opts.MaxHistoryEntries = 50;                  // History limit
+        opts.MaxHistoryMemoryMB = 10;                 // Memory limit
+        opts.UseScoped = true;                        // Scoped registration
+        opts.RequireValidator = true;                 // Require state validator
+        opts.ThrowOnSecurityWarnings = true;          // Fail-fast on warnings
+        opts.FilterSensitiveData = true;              // Filter [SensitiveData]
+    });
 ```
 
 ### State Validation
 
 ```csharp
-public class CartValidator : IStateValidator<CartState>
+// Register validator
+builder.Services.AddStateValidator<AppState>(state =>
 {
-    public bool Validate(CartState state, out string? error)
+    var errors = new List<string>();
+
+    if (state.UserId < 0)
+        errors.Add("UserId cannot be negative");
+
+    if (state.Items?.Count > 1000)
+        errors.Add("Items exceeds maximum size");
+
+    return errors;
+});
+
+// Or use a validator class
+public class AppStateValidator : IStateValidator<AppState>
+{
+    public StateValidationResult Validate(AppState state)
     {
-        if (state.Items.Any(i => i.Quantity < 0))
-        {
-            error = "Quantity cannot be negative";
-            return false;
-        }
-        error = null;
-        return true;
+        var errors = new List<string>();
+        // Validation logic...
+        return errors.Count > 0
+            ? StateValidationResult.Failure(errors)
+            : StateValidationResult.Success();
     }
 }
 
-// Register
-builder.Services.AddScoped<IStateValidator<CartState>, CartValidator>();
-
-// Use with server sync
-.WithServerSync(sp, opts => opts
-    .WithValidator(sp.GetService<IStateValidator<CartState>>())
-    .RejectInvalidState())
+builder.Services.AddStateValidator<AppState, AppStateValidator>();
 ```
 
-### Message Signing (Tab Sync)
+### Sensitive Data Filtering
 
 ```csharp
-.WithTabSync(sp, opts => opts
-    .WithOriginDerivedKey())       // Recommended: derives key from origin
+public record UserState(
+    string Username,
+    [property: SensitiveData] string Password,
+    [property: SensitiveData] string AuthToken,
+    [property: SensitiveData(Reason = "PII")] string SocialSecurityNumber
+);
 
-// Or with explicit key
-.WithTabSync(sp, opts => opts
-    .WithSharedSigningKey(MessageSigner.DeriveKeyFromSeed("MyApp")))
+// In DevTools: { Username: "John", Password: "[REDACTED]", ... }
 ```
+
+### Never Persist Secrets
+
+Use `TransformOnSave` to exclude sensitive fields from localStorage:
+
+```csharp
+.WithPersistence(sp, new PersistenceOptions<UserState>
+{
+    Key = "user-state",
+    TransformOnSave = state => state with
+    {
+        Password = null,
+        AuthToken = null,
+        ApiKey = null
+    }
+})
+```
+
+### Security Gotchas
+
+| Mistake | Solution |
+|---------|----------|
+| DevTools in production | Use `#if DEBUG` or `AddSecureStore` |
+| Secrets in localStorage | Use `TransformOnSave` to exclude |
+| Missing state validation | Register `IStateValidator<T>` |
+| TabSync without signing | Enable `EnableMessageSigning` |
+| No history memory limit | Set `WithMaxMemoryMB()` |
+| Client-side trust | Always validate on server |
 
 ---
 
@@ -749,7 +885,7 @@ builder.Services.AddScoped<IStateValidator<CartState>, CartValidator>();
 <h1>@State</h1>
 
 @code {
-    protected override int Selector(AppState state) => state.Count;
+    protected override int SelectState(AppState state) => state.Count;
 }
 ```
 
@@ -757,18 +893,18 @@ builder.Services.AddScoped<IStateValidator<CartState>, CartValidator>();
 
 ```csharp
 // Single value
-protected override int Selector(AppState s) => s.Count;
+protected override int SelectState(AppState s) => s.Count;
 
 // Multiple values (tuple)
-protected override (string, bool) Selector(AppState s) =>
+protected override (string, bool) SelectState(AppState s) =>
     (s.UserName, s.IsLoading);
 
 // Computed value
-protected override int Selector(TodoState s) =>
+protected override int SelectState(TodoState s) =>
     s.Todos.Count(t => t.Completed);
 
 // Filtered list
-protected override ImmutableList<Todo> Selector(TodoState s) =>
+protected override ImmutableList<Todo> SelectState(TodoState s) =>
     s.Todos.Where(t => !t.Completed).ToImmutableList();
 ```
 
@@ -786,7 +922,7 @@ protected override ImmutableList<Todo> Selector(TodoState s) =>
 ### LocalStorage Persistence
 
 ```csharp
-builder.Services.AddStore(
+builder.Services.AddScopedStore(
     new AppState(),
     (store, sp) => store
         .WithDefaults(sp, "App")
@@ -795,7 +931,7 @@ builder.Services.AddStore(
 
 ### Redux DevTools
 
-Included with `WithDefaults()`. Features:
+Included with `WithDefaults()` in DEBUG builds. Features:
 - Time-travel debugging
 - State inspection
 - Action replay
@@ -857,7 +993,7 @@ public class LoggingMiddleware<TState> : IMiddleware<TState> where TState : notn
 
 | Middleware | Purpose |
 |------------|---------|
-| DevToolsMiddleware | Redux DevTools |
+| DevToolsMiddleware | Redux DevTools (DEBUG only) |
 | PersistenceMiddleware | LocalStorage |
 | LoggingMiddleware | Console logging |
 | HistoryMiddleware | Undo/redo |
@@ -870,21 +1006,25 @@ public class LoggingMiddleware<TState> : IMiddleware<TState> where TState : notn
 
 ## Blazor Render Modes
 
-Works with all modes - no code changes needed:
+Works with all modes - registration method determines feature availability:
 
-| Feature | Server (Singleton) | Server (Scoped) | WebAssembly | Auto |
-|---------|-------------------|----------------|-------------|------|
+| Feature | WebAssembly | Server (Singleton) | Server (Scoped) | Auto |
+|---------|-------------|-------------------|-----------------|------|
 | Core Store | ✅ | ✅ | ✅ | ✅ |
 | Async Helpers | ✅ | ✅ | ✅ | ✅ |
-| DevTools | ⚠️ Skip | ✅ Works! | ✅ | ✅ |
-| Persistence | ❌ | ⚠️ Limited | ✅ | ✅ |
+| DevTools | ✅ | ❌ | ✅ | ✅ |
+| Persistence | ✅ | ❌ | ✅ | ✅ |
+| TabSync | ✅ | ❌ | ✅ | ✅ |
+| History | ✅ | ✅ | ✅ | ✅ |
+| Query | ✅ | ✅ | ✅ | ✅ |
+| Plugins | ✅ | ✅ | ✅ | ✅ |
 
-### Blazor Server with DevTools
+### Blazor Server with JS Features
 
-Use scoped stores for per-user isolation AND DevTools support:
+Use scoped stores for DevTools, persistence, and TabSync:
 
 ```csharp
-// Scoped = per-user + DevTools work!
+// Scoped = per-user + full JS features
 builder.Services.AddScopedStoreWithUtilities(
     new UserState(),
     (store, sp) => store.WithDefaults(sp, "User"));
@@ -902,7 +1042,7 @@ protected TState State { get; }
 // Updates
 protected Task UpdateAsync(Func<TState, TState> updater, string? action = null);
 
-// Async helpers
+// Async helpers (requires AddStoreWithUtilities)
 protected Task UpdateDebounced(Func<TState, TState> updater, int delayMs);
 protected Task UpdateThrottled(Func<TState, TState> updater, int intervalMs);
 protected Task ExecuteAsync<T>(Func<Task<T>> action, ...);
@@ -912,19 +1052,28 @@ protected Task<T> LazyLoad<T>(string key, Func<Task<T>> loader, TimeSpan? cacheF
 ### Registration
 
 ```csharp
-// With utilities (recommended)
-builder.Services.AddStoreWithUtilities(state, configure);
+// Secure (recommended)
+builder.Services.AddSecureStore(state, "Name", opts => ...);
 
-// Scoped (Blazor Server)
+// With utilities
+builder.Services.AddStoreWithUtilities(state, configure);
 builder.Services.AddScopedStoreWithUtilities(state, configure);
 
 // Basic
 builder.Services.AddStore(state, configure);
+builder.Services.AddScopedStore(state, configure);
+builder.Services.AddTransientStore(stateFactory, configure);
 
 // Special
 builder.Services.AddQueryClient();
 builder.Services.AddStoreWithHistory(state, historyOpts, configure);
-builder.Services.AddStoreHistory<TState>();
+builder.Services.AddStoreHistory<TState>(history);
+
+// Security
+builder.Services.AddStateValidator<TState, TValidator>();
+builder.Services.AddStateValidator<TState>(validateFunc);
+builder.Services.AddStateValidatorsFromAssembly(assembly);
+builder.Services.AddSecurityAuditLogger(opts => ...);
 ```
 
 ### StoreBuilder
@@ -932,9 +1081,12 @@ builder.Services.AddStoreHistory<TState>();
 ```csharp
 store
     // Core
-    .WithDefaults(sp, "Name")              // DevTools + Logging
+    .WithDefaults(sp, "Name")              // DevTools + Logging (DEBUG)
     .WithLogging()                         // Logging only
     .WithMiddleware(middleware)            // Custom middleware
+    .WithStateValidator(validator)         // State validation
+    .WithSecurityProfile(sp, profile)      // Security profile
+    .WithEnvironmentDefaults(sp)           // Auto-detect profile
 
     // Features
     .WithPersistence(sp, "key")            // LocalStorage
@@ -942,6 +1094,7 @@ store
     .WithTabSync(sp, opts => ...)          // Cross-tab
     .WithServerSync(sp, opts => ...)       // SignalR
     .WithPlugin<TState, TPlugin>(sp)       // Plugin
+    .WithPlugins(assembly, sp)             // Auto-discover plugins
     .WithDiagnostics(sp)                   // DEBUG only
 ```
 
@@ -949,11 +1102,9 @@ store
 
 ## Breaking Changes in v2.0.0
 
-This major release introduces powerful new features but includes breaking changes from v1.x:
-
 ### Middleware Interface
 
-The `IMiddleware<TState>` interface now receives both previous and new state in `OnAfterUpdateAsync`:
+The `IMiddleware<TState>` interface now receives both previous and new state:
 
 ```csharp
 // Before (v1.x)
@@ -967,7 +1118,7 @@ Task OnAfterUpdateAsync(TState previousState, TState newState, string? action);
 
 ### Optimistic Updates
 
-Optimistic updates now use dedicated extension methods instead of manual patterns:
+Optimistic updates now use dedicated extension methods:
 
 ```csharp
 // Before (v1.x) - Manual rollback pattern
@@ -984,8 +1135,6 @@ await store.UpdateOptimistic(
 );
 ```
 
-**Migration:** Replace manual try/catch rollback patterns with `UpdateOptimistic()`.
-
 ### Plugin System
 
 Plugin hooks now receive both previous and new state:
@@ -998,8 +1147,6 @@ public override Task OnAfterUpdateAsync(AppState newState, string action);
 public override Task OnAfterUpdateAsync(AppState previousState, AppState newState, string action);
 ```
 
-**Migration:** Update plugin `OnAfterUpdateAsync` overrides to include `previousState` parameter.
-
 ### New Features (Non-Breaking)
 
 - **Query System**: TanStack Query-inspired data fetching with `IQueryClient`
@@ -1007,7 +1154,9 @@ public override Task OnAfterUpdateAsync(AppState previousState, AppState newStat
 - **Undo/Redo History**: Full history stack with `IStoreHistory<T>`
 - **Cross-Tab Sync**: Real-time sync with `WithTabSync()`
 - **Server Sync**: SignalR collaboration with `WithServerSync()`
-- **Security**: `[SensitiveData]` attribute and `IStateValidator<T>`
+- **Security Profiles**: `AddSecureStore()` with automatic configuration
+- **State Validation**: `IStateValidator<T>` for external state
+- **Sensitive Data**: `[SensitiveData]` attribute for filtering
 
 ---
 
@@ -1018,7 +1167,10 @@ public override Task OnAfterUpdateAsync(AppState previousState, AppState newStat
 3. **State methods are pure**: No logging, no API calls
 4. **Use UpdateAsync**: Synchronous `Update()` is obsolete
 5. **Register utilities**: Call `AddStoreWithUtilities()` for async helpers
-6. **Blazor Server**: Use `AddScopedStore` for DevTools support
+6. **Blazor Server**: Use `AddScopedStore` for DevTools/Persistence/TabSync
+7. **Security**: Use `AddSecureStore` for production deployments
+8. **Validation**: Implement `IStateValidator<T>` for persistence/sync
+9. **History limits**: Set `WithMaxMemoryMB()` for large state objects
 
 ---
 
