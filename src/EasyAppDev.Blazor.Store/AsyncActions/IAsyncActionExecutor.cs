@@ -133,6 +133,18 @@ public interface IAsyncActionExecutor<TState> where TState : notnull
     /// same key wait for the result without triggering additional state updates. All callers
     /// receive the same result.
     /// </para>
+    /// <para>
+    /// <strong>Important Callback Behavior:</strong> Only the first caller's callbacks (loading, success, error)
+    /// are executed. Concurrent callers waiting for the same cache key receive the result but their callbacks
+    /// are NOT invoked. This is intentional to ensure exactly 2 state updates (loading + success/error)
+    /// regardless of the number of concurrent callers.
+    /// </para>
+    /// <para>
+    /// When using this method from multiple locations, ensure all concurrent callers provide consistent callbacks
+    /// or design your callbacks to be idempotent. If different callbacks are needed for different callers,
+    /// use <see cref="ExecuteAsync{TResult}(Func{Task{TResult}}, Func{TState, TState}, Func{TState, TResult, TState}, Func{TState, Exception, TState}?, string?)"/>
+    /// instead, or handle state updates separately after receiving the cached result.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -170,6 +182,14 @@ public interface IAsyncActionExecutor<TState> where TState : notnull
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
     /// <param name="action">Optional action name for debugging. Defaults to caller member name.</param>
     /// <returns>A task that completes when the operation finishes.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Important:</strong> Only the first caller's callbacks (loading, success, error) are executed.
+    /// Concurrent callers waiting for the same cache key do NOT have their callbacks invoked.
+    /// See <see cref="ExecuteCachedAsync{TResult}(string, Func{Task{TResult}}, Func{TState, TState}, Func{TState, TResult, TState}, Func{TState, Exception, TState}?, TimeSpan?, CancellationToken, string?)"/>
+    /// for detailed explanation of this behavior.
+    /// </para>
+    /// </remarks>
     Task ExecuteCachedAsync<TResult>(
         string cacheKey,
         Func<Task<TResult>> asyncAction,
@@ -179,4 +199,30 @@ public interface IAsyncActionExecutor<TState> where TState : notnull
         TimeSpan? cacheFor = null,
         CancellationToken cancellationToken = default,
         [CallerMemberName] string? action = null);
+
+    /// <summary>
+    /// Removes a specific cached result by key.
+    /// </summary>
+    /// <param name="cacheKey">The cache key to invalidate.</param>
+    /// <remarks>
+    /// This does not affect in-flight operations. Only cached results are removed.
+    /// </remarks>
+    void InvalidateCache(string cacheKey);
+
+    /// <summary>
+    /// Removes all cached results with keys starting with the specified prefix.
+    /// </summary>
+    /// <param name="prefix">The prefix to match cache keys against.</param>
+    /// <remarks>
+    /// Useful for invalidating related cache entries (e.g., "product-" invalidates "product-1", "product-2", etc.).
+    /// </remarks>
+    void InvalidateCacheByPrefix(string prefix);
+
+    /// <summary>
+    /// Clears all cached results.
+    /// </summary>
+    /// <remarks>
+    /// This does not affect in-flight operations. Only cached results are removed.
+    /// </remarks>
+    void ClearCache();
 }

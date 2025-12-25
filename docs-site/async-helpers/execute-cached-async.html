@@ -167,6 +167,11 @@ var product = await ExecuteCachedAsync(
                   <li>All callers receive the same result</li>
                 </ul>
               </div>
+
+              <div class="alert alert-warning">
+                <div class="alert-title">Important: First Caller's Callbacks Only</div>
+                <p>Only the first caller's <code>loading</code>, <code>success</code>, and <code>error</code> callbacks are executed. Concurrent callers waiting for the same cache key receive the result but their callbacks are NOT invoked. This ensures exactly 2 state updates regardless of concurrent caller count. Ensure all callers use consistent callbacks, or handle state updates separately after receiving the cached result.</p>
+              </div>
             </section>
 
             <!-- API Reference -->
@@ -230,6 +235,31 @@ var product = await ExecuteCachedAsync(
                     <td><code>cancellationToken</code></td>
                     <td><code>CancellationToken</code></td>
                     <td>Optional. Token to cancel the operation. Throws <code>OperationCanceledException</code> when cancelled.</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>Cache Invalidation Methods</h3>
+
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Method</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>InvalidateCache(string cacheKey)</code></td>
+                    <td>Removes a specific cache entry by key. Use after edit/delete operations to force fresh data on next call.</td>
+                  </tr>
+                  <tr>
+                    <td><code>InvalidateCacheByPrefix(string prefix)</code></td>
+                    <td>Removes all cache entries matching the prefix. Example: <code>InvalidateCacheByPrefix("product-")</code> clears all product caches.</td>
+                  </tr>
+                  <tr>
+                    <td><code>ClearCache()</code></td>
+                    <td>Removes all cache entries. Use on logout or when global state reset is needed.</td>
                   </tr>
                 </tbody>
               </table>
@@ -386,6 +416,76 @@ var product = await ExecuteCachedAsync(
               </div>
             </section>
 
+            <!-- Cache Invalidation -->
+            <section class="section">
+              <h2>Cache Invalidation</h2>
+              <p>Control when cached data should be refetched by manually invalidating cache entries:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Invalidate Specific Entry</div>
+                <pre><code class="language-csharp">// After editing a product
+await ProductApi.UpdateAsync(product);
+
+// Force fresh data on next ExecuteCachedAsync call
+InvalidateCache($"product-{product.Id}");
+
+// Next component that calls ExecuteCachedAsync will fetch fresh data
+await ExecuteCachedAsync(
+    $"product-{product.Id}",
+    async () => await ProductApi.GetAsync(product.Id),
+    loading: s => s with { Product = s.Product.ToLoading() },
+    success: (s, p) => s with { Product = AsyncData.Success(p) }
+);</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">Invalidate by Prefix</div>
+                <pre><code class="language-csharp">// After bulk operations or when category changes
+await ProductApi.BulkUpdateAsync(products);
+
+// Clear all product-related caches
+InvalidateCacheByPrefix("product-");
+
+// Or clear category-specific caches
+InvalidateCacheByPrefix($"category-{categoryId}-products");</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">Clear All Cache</div>
+                <pre><code class="language-csharp">// On logout - clear all cached data
+public async Task LogoutAsync()
+{
+    await AuthApi.LogoutAsync();
+
+    // Clear all cached data
+    ClearCache();
+
+    // Reset state
+    await UpdateAsync(_ => AppState.Initial);
+
+    NavigationManager.NavigateTo("/login");
+}
+
+// On global state reset
+public async Task ResetApplicationAsync()
+{
+    ClearCache();
+    await UpdateAsync(_ => AppState.Initial);
+}</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">When to Invalidate Cache</div>
+                <ul>
+                  <li><strong>After mutations</strong>: Invalidate specific entries after create/update/delete operations</li>
+                  <li><strong>Bulk operations</strong>: Use prefix invalidation for related entries (e.g., all products in a category)</li>
+                  <li><strong>Authentication changes</strong>: Clear all cache on login/logout to prevent data leakage</li>
+                  <li><strong>Stale data prevention</strong>: Invalidate when external events indicate cached data is outdated</li>
+                  <li><strong>User-triggered refresh</strong>: Provide manual refresh buttons that invalidate and refetch</li>
+                </ul>
+              </div>
+            </section>
+
             <!-- Key Behaviors -->
             <section class="section">
               <h2>Key Behaviors</h2>
@@ -423,8 +523,8 @@ var product = await ExecuteCachedAsync(
 
                 <div class="feature-card">
                   <div class="feature-icon">🗑️</div>
-                  <h3>Disposable</h3>
-                  <p><code>AsyncActionExecutor</code> implements <code>IDisposable</code> for proper resource cleanup.</p>
+                  <h3>Cache Invalidation</h3>
+                  <p>Manually invalidate cache entries by key, prefix, or clear all entries for precise cache control.</p>
                 </div>
               </div>
             </section>

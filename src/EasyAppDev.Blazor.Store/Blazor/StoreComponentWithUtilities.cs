@@ -287,9 +287,17 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     /// <param name="action">Optional action name for debugging (auto-filled with caller method name).</param>
     /// <returns>The result from the async action.</returns>
     /// <remarks>
+    /// <para>
     /// Unlike <see cref="ExecuteAsync{TResult}(Func{Task{TResult}}, Func{TState, TState}, Func{TState, TResult, TState}, Func{TState, Exception, TState}?, string?)"/>,
     /// this method deduplicates both the async fetch AND the state updates. If 5 components call
     /// this with the same cache key concurrently, only 2 state updates occur (one loading, one success/error).
+    /// </para>
+    /// <para>
+    /// <strong>Important Callback Behavior:</strong> Only the first caller's callbacks (loading, success, error)
+    /// are executed. Concurrent callers waiting for the same cache key receive the result but their callbacks
+    /// are NOT invoked. This ensures exactly 2 state updates regardless of the number of concurrent callers.
+    /// Ensure all concurrent callers provide consistent callbacks or design callbacks to be idempotent.
+    /// </para>
     /// </remarks>
     protected Task<TResult> ExecuteCachedAsync<TResult>(
         string cacheKey,
@@ -322,6 +330,13 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     /// <param name="cacheFor">Optional duration to cache the result.</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
     /// <param name="action">Optional action name for debugging (auto-filled with caller method name).</param>
+    /// <remarks>
+    /// <para>
+    /// <strong>Important:</strong> Only the first caller's callbacks (loading, success, error) are executed.
+    /// Concurrent callers waiting for the same cache key do NOT have their callbacks invoked.
+    /// See the overload with TResult success parameter for detailed explanation.
+    /// </para>
+    /// </remarks>
     protected Task ExecuteCachedAsync<TResult>(
         string cacheKey,
         Func<Task<TResult>> asyncAction,

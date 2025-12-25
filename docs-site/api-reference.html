@@ -876,6 +876,147 @@ await store.DispatchAsync(new IncrementBy(5), (state, action) => action switch
               </div>
             </section>
 
+            <!-- IAsyncActionExecutor -->
+            <section class="section">
+              <h2 id="async-action-executor">IAsyncActionExecutor&lt;TState&gt;</h2>
+              <p>Service interface for executing async actions with automatic loading, success, and error state management. Provides caching and deduplication capabilities for optimized data fetching.</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Registration</div>
+                <pre><code class="language-csharp">builder.Services.AddAsyncActionExecutor&lt;MyState&gt;();
+// Or use AddStoreWithUtilities which includes this
+builder.Services.AddStoreWithUtilities(...);</code></pre>
+              </div>
+
+              <div class="api-section">
+                <h4><code>ExecuteAsync&lt;TResult&gt;</code></h4>
+                <p>Executes an async action with automatic loading, success, and error state handling.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">await ExecuteAsync(
+    async () => await userService.GetUserAsync(userId),
+    loading: s => s with { IsLoading = true },
+    success: (s, user) => s with { User = user, IsLoading = false },
+    error: (s, ex) => s with { Error = ex.Message, IsLoading = false }
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>ExecuteCachedAsync&lt;TResult&gt;</code></h4>
+                <p>Executes an async action with full deduplication of both fetch and state updates. When multiple components call this with the same key, only 2 state updates occur instead of N×2.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">var product = await ExecuteCachedAsync(
+    $"product-{productId}",
+    async () => await productService.GetProductAsync(productId),
+    loading: s => s with { Product = s.Product.ToLoading() },
+    success: (s, p) => s with { Product = AsyncData.Success(p) },
+    error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+    cacheFor: TimeSpan.FromMinutes(5)
+);</code></pre>
+                </div>
+                <p><strong>Important:</strong> Only the first caller's callbacks (loading, success, error) are executed. Concurrent callers waiting for the same cache key receive the result but their callbacks are NOT invoked.</p>
+              </div>
+
+              <h3>Cache Management Methods</h3>
+
+              <div class="api-section">
+                <h4><code>InvalidateCache(string cacheKey)</code></h4>
+                <p>Removes a specific cached result by key. Use this when you know the exact cache key to invalidate.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// After updating a product, invalidate its cache
+await productService.UpdateProductAsync(product);
+asyncExecutor.InvalidateCache($"product-{productId}");</code></pre>
+                </div>
+                <p><strong>Behavior:</strong></p>
+                <ul>
+                  <li>Only removes cached results, does not affect in-flight operations</li>
+                  <li>Next call with this key will execute the async action again</li>
+                  <li>Safe to call even if the key doesn't exist</li>
+                </ul>
+              </div>
+
+              <div class="api-section">
+                <h4><code>InvalidateCacheByPrefix(string prefix)</code></h4>
+                <p>Removes all cached results with keys starting with the specified prefix. Useful for invalidating related cache entries.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// After adding a new product, invalidate all product caches
+await productService.CreateProductAsync(newProduct);
+asyncExecutor.InvalidateCacheByPrefix("product-");
+
+// Invalidates: "product-1", "product-2", "product-list", etc.</code></pre>
+                </div>
+                <p><strong>Common use cases:</strong></p>
+                <ul>
+                  <li>Invalidate all items in a category after bulk updates</li>
+                  <li>Clear user-specific caches after logout</li>
+                  <li>Reset related data after configuration changes</li>
+                </ul>
+                <p><strong>Example patterns:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Invalidate all product-related caches
+asyncExecutor.InvalidateCacheByPrefix("product-");
+
+// Invalidate all user data for a specific user
+asyncExecutor.InvalidateCacheByPrefix($"user-{userId}-");
+
+// Invalidate all caches for a specific tenant
+asyncExecutor.InvalidateCacheByPrefix($"tenant-{tenantId}-");</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>ClearCache()</code></h4>
+                <p>Clears all cached results. Use this sparingly, typically only for global state resets.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Clear all caches on logout
+await authService.LogoutAsync();
+asyncExecutor.ClearCache();</code></pre>
+                </div>
+                <p><strong>When to use:</strong></p>
+                <ul>
+                  <li>User logout - clear all cached user data</li>
+                  <li>Switching accounts or tenants</li>
+                  <li>Major configuration changes requiring full data refresh</li>
+                  <li>Testing scenarios requiring clean state</li>
+                </ul>
+                <p><strong>Warning:</strong> This is a broad operation. Consider using <code>InvalidateCacheByPrefix</code> for more targeted invalidation.</p>
+              </div>
+
+              <div class="api-section">
+                <h4>Cache Management Best Practices</h4>
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Scenario</th>
+                      <th>Recommended Method</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Single item updated</td>
+                      <td><code>InvalidateCache("item-{id}")</code></td>
+                    </tr>
+                    <tr>
+                      <td>Multiple related items changed</td>
+                      <td><code>InvalidateCacheByPrefix("category-")</code></td>
+                    </tr>
+                    <tr>
+                      <td>User logout</td>
+                      <td><code>ClearCache()</code></td>
+                    </tr>
+                    <tr>
+                      <td>List item added/removed</td>
+                      <td><code>InvalidateCacheByPrefix("list-")</code></td>
+                    </tr>
+                    <tr>
+                      <td>Settings changed</td>
+                      <td><code>InvalidateCacheByPrefix("settings-")</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
             <!-- Complete Configuration Example -->
             <section class="section">
               <h2 id="complete-example">Complete Configuration Example</h2>
@@ -982,6 +1123,18 @@ builder.Services.AddStoreWithUtilities(
                   <tr>
                     <td><code>IStateValidator&lt;T&gt;</code></td>
                     <td>Validate state integrity</td>
+                  </tr>
+                  <tr>
+                    <td><code>InvalidateCache()</code></td>
+                    <td>Remove specific cached result</td>
+                  </tr>
+                  <tr>
+                    <td><code>InvalidateCacheByPrefix()</code></td>
+                    <td>Remove cached results by prefix</td>
+                  </tr>
+                  <tr>
+                    <td><code>ClearCache()</code></td>
+                    <td>Clear all cached results</td>
                   </tr>
                 </tbody>
               </table>

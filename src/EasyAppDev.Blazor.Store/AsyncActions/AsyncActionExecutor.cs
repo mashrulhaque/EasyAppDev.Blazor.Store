@@ -14,6 +14,7 @@ namespace EasyAppDev.Blazor.Store.AsyncActions;
 /// <typeparam name="TState">The type of state being managed.</typeparam>
 public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, IDisposable where TState : notnull
 {
+    private const int MaxCacheSize = 1000;
     private readonly IStateWriter<TState> _stateWriter;
     private readonly ILogger<AsyncActionExecutor<TState>>? _logger;
     private readonly Dictionary<string, CachedOperation> _inFlightOperations = new();
@@ -36,6 +37,7 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     {
         public required object? Value { get; init; }
         public required DateTime ExpiresAt { get; init; }
+        public required DateTime CreatedAt { get; init; }
         public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
     }
 
@@ -168,19 +170,8 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
                 _cachedResults.Remove(cacheKey);
             }
 
-            // Opportunistic cleanup of expired entries (limit to avoid blocking)
-            if (_cachedResults.Count > 100)
-            {
-                var expiredKeys = _cachedResults
-                    .Where(kvp => kvp.Value.IsExpired)
-                    .Select(kvp => kvp.Key)
-                    .Take(10)
-                    .ToList();
-                foreach (var key in expiredKeys)
-                {
-                    _cachedResults.Remove(key);
-                }
-            }
+            // Aggressive cleanup when cache is large
+            PerformCacheCleanup();
 
             // Check for in-flight operation (deduplication)
             if (_inFlightOperations.TryGetValue(cacheKey, out var inFlight))
@@ -194,7 +185,7 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
                 }
                 finally
                 {
-                    await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
                 }
             }
 
@@ -272,10 +263,12 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
                 await _lock.WaitAsync().ConfigureAwait(false);
                 try
                 {
+                    var now = DateTime.UtcNow;
                     _cachedResults[cacheKey] = new CachedResult
                     {
                         Value = result,
-                        ExpiresAt = DateTime.UtcNow.Add(cacheFor.Value)
+                        ExpiresAt = now.Add(cacheFor.Value),
+                        CreatedAt = now
                     };
                 }
                 finally
@@ -298,6 +291,101 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
                 _logger?.LogError(ex, "Error in cached async action: {Action}", action);
             }
             throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public void InvalidateCache(string cacheKey)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(cacheKey);
+
+        _lock.Wait();
+        try
+        {
+            _cachedResults.Remove(cacheKey);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public void InvalidateCacheByPrefix(string prefix)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(prefix);
+
+        _lock.Wait();
+        try
+        {
+            var keysToRemove = _cachedResults.Keys
+                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
+                .ToList();
+
+            foreach (var key in keysToRemove)
+            {
+                _cachedResults.Remove(key);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public void ClearCache()
+    {
+        ThrowIfDisposed();
+
+        _lock.Wait();
+        try
+        {
+            _cachedResults.Clear();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Performs cache cleanup by removing expired entries and enforcing size limits.
+    /// Must be called while holding the lock.
+    /// </summary>
+    private void PerformCacheCleanup()
+    {
+        // Early exit if cache is small
+        if (_cachedResults.Count < 100)
+            return;
+
+        // First pass: remove all expired entries
+        var expiredKeys = _cachedResults
+            .Where(kvp => kvp.Value.IsExpired)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in expiredKeys)
+        {
+            _cachedResults.Remove(key);
+        }
+
+        // Second pass: if still at or over capacity, remove oldest entries (FIFO)
+        if (_cachedResults.Count >= MaxCacheSize)
+        {
+            var entriesToRemove = _cachedResults.Count - MaxCacheSize + 1;
+            var oldestKeys = _cachedResults
+                .OrderBy(kvp => kvp.Value.CreatedAt)
+                .Take(entriesToRemove)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var key in oldestKeys)
+            {
+                _cachedResults.Remove(key);
+            }
         }
     }
 

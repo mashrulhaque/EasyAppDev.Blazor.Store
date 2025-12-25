@@ -417,6 +417,23 @@ async Task LoadProduct(int productId, CancellationToken ct = default)
 | Single component, no deduplication needed | `ExecuteAsync` |
 | Need data without state updates | `LazyLoad` |
 
+#### Cache Invalidation
+
+Control cached entries when data changes:
+
+```csharp
+// Remove specific cached entry
+executor.InvalidateCache($"product-{productId}");
+
+// Remove all entries with prefix (e.g., after bulk operation)
+executor.InvalidateCacheByPrefix("product-");
+
+// Clear all cached results (e.g., on user logout)
+executor.ClearCache();
+```
+
+> **Note:** Only the first caller's callbacks (loading, success, error) are executed. Concurrent callers receive the same result but their callbacks are NOT invoked. This is intentional for deduplication.
+
 ---
 
 ## Optimistic Updates

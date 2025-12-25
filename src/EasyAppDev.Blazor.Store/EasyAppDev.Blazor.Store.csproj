@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.4</Version>
+    <Version>2.0.5</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,18 +31,17 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.5 - ExecuteCachedAsync
+
+New Features:
+- Added ExecuteCachedAsync for deduplicated async actions with caching
+- Combines caching with automatic state management (loading, success, error)
+- Deduplicates both the fetch AND state updates across concurrent callers
+- Added cache invalidation methods: InvalidateCache, InvalidateCacheByPrefix, ClearCache
+- Optional cancellation token support for async operations
+
 v2.0.4 - Bug Fixes &amp; Stability
-
-Bug Fixes:
-- Fixed persistence middleware silently swallowing errors (added ThrowOnPersistenceError option)
-- Fixed Query _isFetching flag not being reset on early returns causing stuck loading states
-- Fixed QueryClient memory leak where _invalidatedKeys were never cleaned up
-- Fixed SubscriptionBase double-dispose race condition using atomic operations
-- Fixed StoreHistory race condition with concurrent undo/redo operations using AsyncLocal
-- Fixed IsStorageQuotaException pattern matching being overly broad
-
-v2.0.3 - Documentation &amp; CI/CD
-(See previous release notes for full feature list)
+(See previous release notes for full changelog)
     </PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
