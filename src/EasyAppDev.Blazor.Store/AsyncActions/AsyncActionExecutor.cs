@@ -3,6 +3,7 @@
 
 using EasyAppDev.Blazor.Store.Core;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace EasyAppDev.Blazor.Store.AsyncActions;
@@ -11,10 +12,32 @@ namespace EasyAppDev.Blazor.Store.AsyncActions;
 /// Default implementation of <see cref="IAsyncActionExecutor{TState}"/>.
 /// </summary>
 /// <typeparam name="TState">The type of state being managed.</typeparam>
-public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState> where TState : notnull
+public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, IDisposable where TState : notnull
 {
     private readonly IStateWriter<TState> _stateWriter;
     private readonly ILogger<AsyncActionExecutor<TState>>? _logger;
+    private readonly Dictionary<string, CachedOperation> _inFlightOperations = new();
+    private readonly Dictionary<string, CachedResult> _cachedResults = new();
+    private readonly SemaphoreSlim _lock = new(1, 1);
+    private bool _disposed;
+
+    /// <summary>
+    /// Tracks an in-flight operation for deduplication.
+    /// </summary>
+    private sealed class CachedOperation
+    {
+        public required Task<object?> Task { get; init; }
+    }
+
+    /// <summary>
+    /// Stores a cached successful result with expiration.
+    /// </summary>
+    private sealed class CachedResult
+    {
+        public required object? Value { get; init; }
+        public required DateTime ExpiresAt { get; init; }
+        public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AsyncActionExecutor{TState}"/> class.
@@ -113,5 +136,185 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState> w
             (s, _) => success(s),  // Discard result
             error,
             action);
+    }
+
+    /// <inheritdoc />
+    public async Task<TResult> ExecuteCachedAsync<TResult>(
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TResult, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        TimeSpan? cacheFor = null,
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string? action = null)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(cacheKey);
+        ArgumentNullException.ThrowIfNull(asyncAction);
+        ArgumentNullException.ThrowIfNull(loading);
+        ArgumentNullException.ThrowIfNull(success);
+
+        await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // Check for cached result first
+            if (_cachedResults.TryGetValue(cacheKey, out var cached))
+            {
+                if (!cached.IsExpired)
+                {
+                    return (TResult)cached.Value!;
+                }
+                _cachedResults.Remove(cacheKey);
+            }
+
+            // Opportunistic cleanup of expired entries (limit to avoid blocking)
+            if (_cachedResults.Count > 100)
+            {
+                var expiredKeys = _cachedResults
+                    .Where(kvp => kvp.Value.IsExpired)
+                    .Select(kvp => kvp.Key)
+                    .Take(10)
+                    .ToList();
+                foreach (var key in expiredKeys)
+                {
+                    _cachedResults.Remove(key);
+                }
+            }
+
+            // Check for in-flight operation (deduplication)
+            if (_inFlightOperations.TryGetValue(cacheKey, out var inFlight))
+            {
+                // Release lock while waiting for in-flight operation
+                _lock.Release();
+                try
+                {
+                    var result = await inFlight.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    return (TResult)result!;
+                }
+                finally
+                {
+                    await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // First caller - set loading state and start the operation
+            await _stateWriter.UpdateAsync(loading, $"{action}_LOADING");
+
+            // Create the operation task (captures loading/success/error callbacks)
+            var operationTask = ExecuteCachedOperationAsync(
+                cacheKey, asyncAction, success, error, cacheFor, action);
+
+            _inFlightOperations[cacheKey] = new CachedOperation { Task = operationTask };
+
+            // Release lock before awaiting
+            _lock.Release();
+            try
+            {
+                var result = await operationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return (TResult)result!;
+            }
+            finally
+            {
+                // Re-acquire lock to clean up - don't use cancellation token here
+                // since cleanup must happen even if cancelled
+                await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                _inFlightOperations.Remove(cacheKey);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task ExecuteCachedAsync<TResult>(
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        TimeSpan? cacheFor = null,
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string? action = null)
+    {
+        await ExecuteCachedAsync(
+            cacheKey,
+            asyncAction,
+            loading,
+            (s, _) => success(s),  // Discard result
+            error,
+            cacheFor,
+            cancellationToken,
+            action);
+    }
+
+    private async Task<object?> ExecuteCachedOperationAsync<TResult>(
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TResult, TState> success,
+        Func<TState, Exception, TState>? error,
+        TimeSpan? cacheFor,
+        string? action)
+    {
+        try
+        {
+            // Execute the async action
+            var result = await asyncAction().ConfigureAwait(false);
+
+            // Set success state (only once for all waiting callers)
+            await _stateWriter.UpdateAsync(s => success(s, result), $"{action}_SUCCESS");
+
+            // Cache the result if cacheFor is specified
+            if (cacheFor.HasValue)
+            {
+                await _lock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    _cachedResults[cacheKey] = new CachedResult
+                    {
+                        Value = result,
+                        ExpiresAt = DateTime.UtcNow.Add(cacheFor.Value)
+                    };
+                }
+                finally
+                {
+                    _lock.Release();
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            // Set error state (only once for all waiting callers)
+            if (error != null)
+            {
+                await _stateWriter.UpdateAsync(s => error(s, ex), $"{action}_ERROR");
+            }
+            else
+            {
+                _logger?.LogError(ex, "Error in cached async action: {Action}", action);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Disposes the executor and releases resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _lock.Dispose();
+        _inFlightOperations.Clear();
+        _cachedResults.Clear();
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 }

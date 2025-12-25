@@ -274,6 +274,74 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     }
 
     /// <summary>
+    /// Executes an async action with caching and full deduplication of both fetch and state updates.
+    /// </summary>
+    /// <typeparam name="TResult">The type of result returned by the async action.</typeparam>
+    /// <param name="cacheKey">Unique key for deduplication. Concurrent calls with the same key share one execution.</param>
+    /// <param name="asyncAction">The async action to execute.</param>
+    /// <param name="loading">Function to transform state to loading state.</param>
+    /// <param name="success">Function to transform state with the result on success.</param>
+    /// <param name="error">Optional function to transform state on error.</param>
+    /// <param name="cacheFor">Optional duration to cache the result.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
+    /// <param name="action">Optional action name for debugging (auto-filled with caller method name).</param>
+    /// <returns>The result from the async action.</returns>
+    /// <remarks>
+    /// Unlike <see cref="ExecuteAsync{TResult}(Func{Task{TResult}}, Func{TState, TState}, Func{TState, TResult, TState}, Func{TState, Exception, TState}?, string?)"/>,
+    /// this method deduplicates both the async fetch AND the state updates. If 5 components call
+    /// this with the same cache key concurrently, only 2 state updates occur (one loading, one success/error).
+    /// </remarks>
+    protected Task<TResult> ExecuteCachedAsync<TResult>(
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TResult, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        TimeSpan? cacheFor = null,
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string? action = null)
+    {
+        if (AsyncExecutor == null)
+        {
+            throw new InvalidOperationException(
+                $"IAsyncActionExecutor<{typeof(TState).Name}> is not registered. " +
+                $"Call builder.Services.AddAsyncActionExecutor<{typeof(TState).Name}>() before using ExecuteCachedAsync.");
+        }
+        return AsyncExecutor.ExecuteCachedAsync(cacheKey, asyncAction, loading, success, error, cacheFor, cancellationToken, action);
+    }
+
+    /// <summary>
+    /// Executes an async action with caching and simplified success handler that ignores the result.
+    /// </summary>
+    /// <typeparam name="TResult">The type of result returned by the async action.</typeparam>
+    /// <param name="cacheKey">Unique key for deduplication.</param>
+    /// <param name="asyncAction">The async action to execute.</param>
+    /// <param name="loading">Function to transform state to loading state.</param>
+    /// <param name="success">Function to transform state on success (ignores result).</param>
+    /// <param name="error">Optional function to transform state on error.</param>
+    /// <param name="cacheFor">Optional duration to cache the result.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
+    /// <param name="action">Optional action name for debugging (auto-filled with caller method name).</param>
+    protected Task ExecuteCachedAsync<TResult>(
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TState> success,
+        Func<TState, Exception, TState>? error = null,
+        TimeSpan? cacheFor = null,
+        CancellationToken cancellationToken = default,
+        [CallerMemberName] string? action = null)
+    {
+        if (AsyncExecutor == null)
+        {
+            throw new InvalidOperationException(
+                $"IAsyncActionExecutor<{typeof(TState).Name}> is not registered. " +
+                $"Call builder.Services.AddAsyncActionExecutor<{typeof(TState).Name}>() before using ExecuteCachedAsync.");
+        }
+        return AsyncExecutor.ExecuteCachedAsync(cacheKey, asyncAction, loading, success, error, cacheFor, cancellationToken, action);
+    }
+
+    /// <summary>
     /// Loads data with automatic caching and request deduplication.
     /// </summary>
     /// <typeparam name="T">The type of data to load.</typeparam>

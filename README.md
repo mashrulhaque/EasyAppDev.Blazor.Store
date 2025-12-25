@@ -385,6 +385,38 @@ async Task LoadUserDetails(int userId)
 }
 ```
 
+### 6. ExecuteCachedAsync - Deduplicated State Updates
+
+Combines caching with automatic state management. Unlike `ExecuteAsync` + `LazyLoad`, this deduplicates **both** the fetch **and** the state updates:
+
+```csharp
+// Multiple components calling this concurrently:
+// - Only ONE loading state update
+// - Only ONE async fetch
+// - Only ONE success/error state update
+// Result: 2 state updates instead of 2×N
+async Task LoadProduct(int productId, CancellationToken ct = default)
+{
+    var product = await ExecuteCachedAsync(
+        $"product-{productId}",
+        async () => await ProductService.GetAsync(productId),
+        loading: s => s with { Product = s.Product.ToLoading() },
+        success: (s, product) => s with { Product = AsyncData.Success(product) },
+        error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+        cacheFor: TimeSpan.FromMinutes(5),
+        cancellationToken: ct  // Optional cancellation support
+    );
+}
+```
+
+**When to use which helper:**
+
+| Scenario | Method |
+|----------|--------|
+| Multiple components load same data | `ExecuteCachedAsync` |
+| Single component, no deduplication needed | `ExecuteAsync` |
+| Need data without state updates | `LazyLoad` |
+
 ---
 
 ## Optimistic Updates
@@ -1078,6 +1110,7 @@ protected Task UpdateDebounced(Func<TState, TState> updater, int delayMs);
 protected Task UpdateThrottled(Func<TState, TState> updater, int intervalMs);
 protected Task ExecuteAsync<T>(Func<Task<T>> action, ...);
 protected Task<T> LazyLoad<T>(string key, Func<Task<T>> loader, TimeSpan? cacheFor);
+protected Task<T> ExecuteCachedAsync<T>(string key, Func<Task<T>> action, ..., TimeSpan? cacheFor, CancellationToken ct = default);
 ```
 
 ### Registration

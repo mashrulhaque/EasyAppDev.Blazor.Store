@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExecuteCachedAsync - EasyAppDev.Blazor.Store</title>
+  <meta name="description" content="Execute async actions with full deduplication of both fetch and state updates">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <button class="mobile-menu-button" id="mobile-menu-button">
+          <span>☰</span>
+        </button>
+        <a href="../" class="logo">
+          <span class="logo-icon">⚡</span>
+          <span class="logo-text">EasyAppDev.Blazor.Store</span>
+        </a>
+        <div class="header-actions">
+          <span class="version-badge">v2.0.0</span>
+          <a href="https://github.com/mashrulhaque/EasyAppDev.Blazor.Store" target="_blank" rel="noopener noreferrer" class="github-link">
+            GitHub
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+          <!-- Getting Started -->
+          <div class="nav-section">
+            <div class="nav-section-title">Getting Started</div>
+            <ul class="nav-list">
+              <li><a href="../" class="nav-link"><span class="nav-icon">🏠</span><span>Introduction</span></a></li>
+              <li><a href="../getting-started.html" class="nav-link"><span class="nav-icon">⚡</span><span>Quick Start</span></a></li>
+              <li><a href="../core-concepts.html" class="nav-link"><span class="nav-icon">📚</span><span>Core Concepts</span></a></li>
+              <li><a href="../render-modes.html" class="nav-link"><span class="nav-icon">🎯</span><span>Render Modes</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Core Features -->
+          <div class="nav-section">
+            <div class="nav-section-title">Core Features</div>
+            <ul class="nav-list">
+              <li><a href="../state-management.html" class="nav-link"><span class="nav-icon">💾</span><span>State Management</span></a></li>
+              <li><a href="../components.html" class="nav-link"><span class="nav-icon">🧩</span><span>Components</span></a></li>
+              <li><a href="../performance.html" class="nav-link"><span class="nav-icon">📈</span><span>Performance</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Async Helpers -->
+          <div class="nav-section">
+            <div class="nav-section-title">Async Helpers <span class="nav-badge">v2.0.0</span></div>
+            <ul class="nav-list">
+              <li><a href="../async-helpers/index.html" class="nav-link"><span class="nav-icon">⚡</span><span>Overview</span></a></li>
+              <li><a href="../async-helpers/update-debounced.html" class="nav-link"><span class="nav-icon">⏱️</span><span>UpdateDebounced</span></a></li>
+              <li><a href="../async-helpers/async-data.html" class="nav-link"><span class="nav-icon">🔄</span><span>AsyncData&lt;T&gt;</span></a></li>
+              <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
+              <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
+              <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+              <li><a href="../async-helpers/execute-cached-async.html" class="nav-link active"><span class="nav-icon">🔗</span><span>ExecuteCachedAsync</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Advanced -->
+          <div class="nav-section">
+            <div class="nav-section-title">Advanced</div>
+            <ul class="nav-list">
+              <li><a href="../devtools.html" class="nav-link"><span class="nav-icon">🛠️</span><span>DevTools</span></a></li>
+              <li><a href="../persistence.html" class="nav-link"><span class="nav-icon">📦</span><span>Persistence</span></a></li>
+              <li><a href="../middleware.html" class="nav-link"><span class="nav-icon">⚙️</span><span>Middleware</span></a></li>
+            </ul>
+          </div>
+
+          <!-- Resources -->
+          <div class="nav-section">
+            <div class="nav-section-title">Resources</div>
+            <ul class="nav-list">
+              <li><a href="../best-practices.html" class="nav-link"><span class="nav-icon">📖</span><span>Best Practices</span></a></li>
+              <li><a href="../migration.html" class="nav-link"><span class="nav-icon">🔄</span><span>Migration Guide</span></a></li>
+              <li><a href="../examples.html" class="nav-link"><span class="nav-icon">💻</span><span>Examples</span></a></li>
+              <li><a href="../api-reference.html" class="nav-link"><span class="nav-icon">📚</span><span>API Reference</span></a></li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="content-wrapper">
+          <div>
+            <!-- Header -->
+            <div class="page-header">
+              <h1>ExecuteCachedAsync</h1>
+              <p class="page-description">
+                Deduplicate both the async fetch AND the state updates. When multiple components load the same data, only 2 state updates occur instead of N×2.
+              </p>
+            </div>
+
+            <div class="alert alert-success">
+              <div class="alert-title">New in v2.0.5</div>
+              <p>Combines the best of ExecuteAsync and LazyLoad - automatic state management with full deduplication across components.</p>
+            </div>
+
+            <!-- The Problem -->
+            <section class="section">
+              <h2>The Problem</h2>
+              <p>When using <code>ExecuteAsync</code> with <code>LazyLoad</code>, you get fetch deduplication but NOT state update deduplication:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">The Problem: N×2 State Updates</div>
+                <pre><code class="language-csharp">// Component 1 calls LoadProduct:
+await ExecuteAsync(
+    () => LazyLoad("product-123", () => api.GetProduct(123)),
+    loading: s => s with { Product = s.Product.ToLoading() },  // Update #1
+    success: (s, p) => s with { Product = AsyncData.Success(p) } // Update #2
+);
+
+// Component 2 calls LoadProduct:
+// LazyLoad deduplicates the fetch (good!)
+// BUT ExecuteAsync still runs its callbacks...
+await ExecuteAsync(
+    () => LazyLoad("product-123", () => api.GetProduct(123)),
+    loading: s => s with { Product = s.Product.ToLoading() },  // Update #3
+    success: (s, p) => s with { Product = AsyncData.Success(p) } // Update #4
+);
+
+// With 5 components: 10 state updates instead of 2!</code></pre>
+              </div>
+            </section>
+
+            <!-- The Solution -->
+            <section class="section">
+              <h2>The Solution: ExecuteCachedAsync</h2>
+              <p><code>ExecuteCachedAsync</code> deduplicates everything - the fetch AND the state updates:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">The Solution: Only 2 State Updates</div>
+                <pre><code class="language-csharp">// Component 1 calls LoadProduct:
+var product = await ExecuteCachedAsync(
+    "product-123",
+    async () => await api.GetProduct(123),
+    loading: s => s with { Product = s.Product.ToLoading() },  // Update #1
+    success: (s, p) => s with { Product = AsyncData.Success(p) }, // Update #2
+    cacheFor: TimeSpan.FromMinutes(5)
+);
+
+// Components 2-5 call LoadProduct:
+// They all wait for the same result
+// NO additional state updates!
+
+// Total: 2 state updates, not 10</code></pre>
+              </div>
+
+              <div class="alert alert-info">
+                <div class="alert-title">How It Works</div>
+                <ul>
+                  <li>First caller triggers loading state and starts the fetch</li>
+                  <li>Concurrent callers wait for the result without triggering state updates</li>
+                  <li>Single success/error state update when the fetch completes</li>
+                  <li>All callers receive the same result</li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- API Reference -->
+            <section class="section">
+              <h2>API Reference</h2>
+
+              <div class="code-block">
+                <div class="code-block-title">Method Signature</div>
+                <pre><code class="language-csharp">Task&lt;TResult&gt; ExecuteCachedAsync&lt;TResult&gt;(
+    string cacheKey,
+    Func&lt;Task&lt;TResult&gt;&gt; asyncAction,
+    Func&lt;TState, TState&gt; loading,
+    Func&lt;TState, TResult, TState&gt; success,
+    Func&lt;TState, Exception, TState&gt;? error = null,
+    TimeSpan? cacheFor = null,
+    CancellationToken cancellationToken = default,
+    [CallerMemberName] string? action = null
+);</code></pre>
+              </div>
+
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Parameter</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>cacheKey</code></td>
+                    <td><code>string</code></td>
+                    <td>Unique key for deduplication. Concurrent calls with the same key share one execution.</td>
+                  </tr>
+                  <tr>
+                    <td><code>asyncAction</code></td>
+                    <td><code>Func&lt;Task&lt;TResult&gt;&gt;</code></td>
+                    <td>The async operation to execute (e.g., API call).</td>
+                  </tr>
+                  <tr>
+                    <td><code>loading</code></td>
+                    <td><code>Func&lt;TState, TState&gt;</code></td>
+                    <td>Pure function to transform state when loading starts.</td>
+                  </tr>
+                  <tr>
+                    <td><code>success</code></td>
+                    <td><code>Func&lt;TState, TResult, TState&gt;</code></td>
+                    <td>Pure function to transform state with the result on success.</td>
+                  </tr>
+                  <tr>
+                    <td><code>error</code></td>
+                    <td><code>Func&lt;TState, Exception, TState&gt;?</code></td>
+                    <td>Optional. Pure function to transform state on error.</td>
+                  </tr>
+                  <tr>
+                    <td><code>cacheFor</code></td>
+                    <td><code>TimeSpan?</code></td>
+                    <td>Optional. Duration to cache the result. If null, only deduplicates concurrent requests.</td>
+                  </tr>
+                  <tr>
+                    <td><code>cancellationToken</code></td>
+                    <td><code>CancellationToken</code></td>
+                    <td>Optional. Token to cancel the operation. Throws <code>OperationCanceledException</code> when cancelled.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <!-- When to Use -->
+            <section class="section">
+              <h2>When to Use Which Helper</h2>
+
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Best Helper</th>
+                    <th>Why</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Multiple components load same data</td>
+                    <td><strong>ExecuteCachedAsync</strong></td>
+                    <td>Deduplicates both fetch and state updates</td>
+                  </tr>
+                  <tr>
+                    <td>Single component, unique data</td>
+                    <td><strong>ExecuteAsync</strong></td>
+                    <td>No deduplication needed</td>
+                  </tr>
+                  <tr>
+                    <td>Need data without state management</td>
+                    <td><strong>LazyLoad</strong></td>
+                    <td>Just returns cached data</td>
+                  </tr>
+                  <tr>
+                    <td>Need custom state update logic</td>
+                    <td><strong>LazyLoad + manual update</strong></td>
+                    <td>Full control over state updates</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <!-- Real-World Example -->
+            <section class="section">
+              <h2>Real-World Example</h2>
+              <p>Product detail page with multiple components that need product data:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">ProductState.cs</div>
+                <pre><code class="language-csharp">public record ProductState(
+    AsyncData&lt;Product&gt; Product,
+    AsyncData&lt;ImmutableList&lt;Review&gt;&gt; Reviews
+)
+{
+    public static ProductState Initial => new(
+        AsyncData&lt;Product&gt;.NotAsked(),
+        AsyncData&lt;ImmutableList&lt;Review&gt;&gt;.NotAsked()
+    );
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">ProductHeader.razor</div>
+                <pre><code class="language-csharp">@inherits StoreComponentWithUtilities&lt;ProductState&gt;
+
+@if (State.Product.IsLoading) { &lt;Skeleton /&gt; }
+@if (State.Product.HasData)
+{
+    &lt;h1&gt;@State.Product.Data.Name&lt;/h1&gt;
+    &lt;p&gt;@State.Product.Data.Description&lt;/p&gt;
+}
+
+@code {
+    [Parameter] public int ProductId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ExecuteCachedAsync(
+            $"product-{ProductId}",
+            async () => await ProductApi.GetAsync(ProductId),
+            loading: s => s with { Product = s.Product.ToLoading() },
+            success: (s, p) => s with { Product = AsyncData.Success(p) },
+            cacheFor: TimeSpan.FromMinutes(5)
+        );
+    }
+}</code></pre>
+              </div>
+
+              <div class="code-block">
+                <div class="code-block-title">ProductPrice.razor (same cache key!)</div>
+                <pre><code class="language-csharp">@inherits StoreComponentWithUtilities&lt;ProductState&gt;
+
+@if (State.Product.HasData)
+{
+    &lt;div class="price"&gt;$@State.Product.Data.Price&lt;/div&gt;
+}
+
+@code {
+    [Parameter] public int ProductId { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Same cache key = shares result with ProductHeader
+        // NO additional state updates!
+        await ExecuteCachedAsync(
+            $"product-{ProductId}",
+            async () => await ProductApi.GetAsync(ProductId),
+            loading: s => s with { Product = s.Product.ToLoading() },
+            success: (s, p) => s with { Product = AsyncData.Success(p) },
+            cacheFor: TimeSpan.FromMinutes(5)
+        );
+    }
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Cancellation -->
+            <section class="section">
+              <h2>Cancellation Support</h2>
+              <p>Pass a <code>CancellationToken</code> to cancel long-running operations:</p>
+
+              <div class="code-block">
+                <div class="code-block-title">Cancellation Example</div>
+                <pre><code class="language-csharp">@implements IDisposable
+
+@code {
+    private CancellationTokenSource _cts = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Cancel previous operation if parameters change
+        _cts.Cancel();
+        _cts.Dispose();
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            await ExecuteCachedAsync(
+                $"product-{ProductId}",
+                async () => await ProductApi.GetAsync(ProductId),
+                loading: s => s with { Product = s.Product.ToLoading() },
+                success: (s, p) => s with { Product = AsyncData.Success(p) },
+                cancellationToken: _cts.Token
+            );
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled - new operation is starting
+        }
+    }
+
+    public void Dispose() => _cts.Dispose();
+}</code></pre>
+              </div>
+            </section>
+
+            <!-- Key Behaviors -->
+            <section class="section">
+              <h2>Key Behaviors</h2>
+
+              <div class="features-grid">
+                <div class="feature-card">
+                  <div class="feature-icon">🔗</div>
+                  <h3>Full Deduplication</h3>
+                  <p>Both the async fetch and state updates are deduplicated across all callers with the same cache key.</p>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">⏱️</div>
+                  <h3>Optional Caching</h3>
+                  <p>Use <code>cacheFor</code> to cache results. Without it, only concurrent requests are deduplicated.</p>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🔄</div>
+                  <h3>Error Recovery</h3>
+                  <p>Errors are NOT cached, allowing retry on the next call.</p>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">📊</div>
+                  <h3>Returns Result</h3>
+                  <p>Unlike <code>ExecuteAsync</code>, this method returns the result for immediate use.</p>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🛑</div>
+                  <h3>Cancellation Support</h3>
+                  <p>Pass a <code>CancellationToken</code> to cancel in-flight operations gracefully.</p>
+                </div>
+
+                <div class="feature-card">
+                  <div class="feature-icon">🗑️</div>
+                  <h3>Disposable</h3>
+                  <p><code>AsyncActionExecutor</code> implements <code>IDisposable</code> for proper resource cleanup.</p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Navigation -->
+            <section class="section">
+              <h2>Related Helpers</h2>
+
+              <div class="next-steps-grid">
+                <a href="./execute-async.html" class="next-step-card">
+                  <div class="next-step-icon">⚡</div>
+                  <h3>ExecuteAsync</h3>
+                  <p>When you don't need deduplication.</p>
+                </a>
+
+                <a href="./lazy-load.html" class="next-step-card">
+                  <div class="next-step-icon">📥</div>
+                  <h3>LazyLoad</h3>
+                  <p>Cached data without state management.</p>
+                </a>
+
+                <a href="./async-data.html" class="next-step-card">
+                  <div class="next-step-icon">🔄</div>
+                  <h3>AsyncData&lt;T&gt;</h3>
+                  <p>The state type for async operations.</p>
+                </a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-csharp.min.js"></script>
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

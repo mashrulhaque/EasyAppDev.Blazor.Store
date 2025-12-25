@@ -64,6 +64,7 @@
               <li><a href="./async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
               <li><a href="./async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
               <li><a href="./async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+              <li><a href="./async-helpers/execute-cached-async.html" class="nav-link"><span class="nav-icon">🔗</span><span>ExecuteCachedAsync</span></a></li>
             </ul>
           </div>
 
@@ -145,6 +146,14 @@
         Func&lt;TState, T, TState&gt; success,
         Func&lt;TState, Exception, TState&gt;? error = null);
     protected Task&lt;T&gt; LazyLoad&lt;T&gt;(string key, Func&lt;Task&lt;T&gt;&gt; loader, TimeSpan? cacheFor = null);
+    protected Task&lt;T&gt; ExecuteCachedAsync&lt;T&gt;(
+        string key,
+        Func&lt;Task&lt;T&gt;&gt; action,
+        Func&lt;TState, TState&gt; loading,
+        Func&lt;TState, T, TState&gt; success,
+        Func&lt;TState, Exception, TState&gt;? error = null,
+        TimeSpan? cacheFor = null,
+        CancellationToken ct = default);
 }</code></pre>
               </div>
 
@@ -270,6 +279,43 @@
     $"user-{userId}",
     () => UserService.GetUserAsync(userId),
     TimeSpan.FromMinutes(5)
+);</code></pre>
+                </div>
+              </div>
+
+              <div class="api-section">
+                <h4><code>ExecuteCachedAsync</code></h4>
+                <p>Executes an async operation with full deduplication of both the fetch AND the state updates. When multiple components call this with the same key, only 2 state updates occur instead of N×2.</p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">protected Task&lt;T&gt; ExecuteCachedAsync&lt;T&gt;(
+    string key,
+    Func&lt;Task&lt;T&gt;&gt; action,
+    Func&lt;TState, TState&gt; loading,
+    Func&lt;TState, T, TState&gt; success,
+    Func&lt;TState, Exception, TState&gt;? error = null,
+    TimeSpan? cacheFor = null,
+    CancellationToken ct = default)</code></pre>
+                </div>
+                <p><strong>Parameters:</strong></p>
+                <ul>
+                  <li><code>key</code> - Unique cache key for deduplication</li>
+                  <li><code>action</code> - Async operation to execute</li>
+                  <li><code>loading</code> - State transformation for loading state</li>
+                  <li><code>success</code> - State transformation for success with result</li>
+                  <li><code>error</code> - Optional state transformation for error handling</li>
+                  <li><code>cacheFor</code> - Optional cache duration</li>
+                  <li><code>ct</code> - Optional cancellation token to cancel the operation</li>
+                </ul>
+                <p><strong>Example:</strong></p>
+                <div class="code-block">
+                  <pre><code class="language-csharp">// Multiple components calling this = only 2 state updates
+var product = await ExecuteCachedAsync(
+    $"product-{productId}",
+    async () => await ProductService.GetAsync(productId),
+    loading: s => s with { Product = s.Product.ToLoading() },
+    success: (s, p) => s with { Product = AsyncData.Success(p) },
+    error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+    cacheFor: TimeSpan.FromMinutes(5)
 );</code></pre>
                 </div>
               </div>
@@ -888,6 +934,10 @@ builder.Services.AddStoreWithUtilities(
                   <tr>
                     <td><code>LazyLoad()</code></td>
                     <td>Caching with request deduplication</td>
+                  </tr>
+                  <tr>
+                    <td><code>ExecuteCachedAsync()</code></td>
+                    <td>Full deduplication of fetch and state updates</td>
                   </tr>
                   <tr>
                     <td><code>AsyncData&lt;T&gt;</code></td>

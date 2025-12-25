@@ -64,6 +64,7 @@
               <li><a href="../async-helpers/execute-async.html" class="nav-link"><span class="nav-icon">⚡</span><span>ExecuteAsync</span></a></li>
               <li><a href="../async-helpers/update-throttled.html" class="nav-link"><span class="nav-icon">💧</span><span>UpdateThrottled</span></a></li>
               <li><a href="../async-helpers/lazy-load.html" class="nav-link"><span class="nav-icon">📥</span><span>LazyLoad</span></a></li>
+              <li><a href="../async-helpers/execute-cached-async.html" class="nav-link"><span class="nav-icon">🔗</span><span>ExecuteCachedAsync</span></a></li>
             </ul>
           </div>
 
@@ -154,6 +155,12 @@
                     <td><span class="badge badge-success">85%</span></td>
                     <td>Expensive operations, API caching</td>
                   </tr>
+                  <tr>
+                    <td><a href="./execute-cached-async.html"><strong>ExecuteCachedAsync</strong></a></td>
+                    <td>Fetch + state deduplication (N×2 → 2 updates)</td>
+                    <td><span class="badge badge-success">90%</span></td>
+                    <td>Multiple components, same data</td>
+                  </tr>
                 </tbody>
               </table>
             </section>
@@ -240,6 +247,29 @@ var user = await LazyLoad(
 // If 10 components call this simultaneously, only 1 API call is made!</code></pre>
                   </div>
                   <p><a href="./lazy-load.html">Learn more about LazyLoad →</a></p>
+                </div>
+              </div>
+
+              <div class="step">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                  <h3>ExecuteCachedAsync - Deduplicated State Updates</h3>
+                  <p>Combines ExecuteAsync and LazyLoad to deduplicate both the fetch AND the state updates. When 5 components call this with the same key, only 2 state updates occur instead of 10.</p>
+                  <div class="code-block">
+                    <pre><code class="language-csharp">// Multiple components calling this concurrently:
+// - Only ONE loading state update
+// - Only ONE async fetch
+// - Only ONE success/error state update
+var product = await ExecuteCachedAsync(
+    $"product-{productId}",
+    async () => await ProductService.GetAsync(productId),
+    loading: s => s with { Product = s.Product.ToLoading() },
+    success: (s, product) => s with { Product = AsyncData.Success(product) },
+    error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+    cacheFor: TimeSpan.FromMinutes(5)
+);</code></pre>
+                  </div>
+                  <p><a href="./execute-cached-async.html">Learn more about ExecuteCachedAsync →</a></p>
                 </div>
               </div>
             </section>
@@ -375,6 +405,12 @@ var user = await LazyLoad(
                   <div class="next-step-icon">📥</div>
                   <h3>LazyLoad</h3>
                   <p>Implement smart caching and request deduplication.</p>
+                </a>
+
+                <a href="./execute-cached-async.html" class="next-step-card">
+                  <div class="next-step-icon">🔗</div>
+                  <h3>ExecuteCachedAsync</h3>
+                  <p>Deduplicate both fetch and state updates across components.</p>
                 </a>
 
                 <a href="../getting-started.html" class="next-step-card">
