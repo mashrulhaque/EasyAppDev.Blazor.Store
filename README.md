@@ -1,108 +1,85 @@
-# EasyAppDev.Blazor.Store - Blazor State Management Library
+# EasyAppDev.Blazor.Store - State Management for Blazor
 
-**Zustand-inspired state management for Blazor** - Type-safe, immutable, zero-boilerplate state management using C# records. The simplest way to manage state in Blazor Server, WebAssembly, and Auto modes.
+**A Zustand-inspired state management library for Blazor WebAssembly, Blazor Server, and MAUI Hybrid.** Zero boilerplate. Built-in data fetching with caching. Cross-tab sync. Real-time collaboration via SignalR. Undo/redo history. Redux DevTools support. All type-safe with C# records.
 
-*Built for C# developers who want Redux-like power without the complexity*
-
-[![NuGet](https://img.shields.io/nuget/v/EasyAppDev.Blazor.Store.svg)](https://www.nuget.org/packages/EasyAppDev.Blazor.Store/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![NuGet version for EasyAppDev.Blazor.Store state management library](https://img.shields.io/nuget/v/EasyAppDev.Blazor.Store.svg)](https://www.nuget.org/packages/EasyAppDev.Blazor.Store/)
+[![License: MIT - Free to use for Blazor state management](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 <div align="center">
   <a href="https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/">
-    <img src="https://img.shields.io/badge/📚_Full_Documentation-4A90E2?style=for-the-badge" alt="Documentation" />
+    <img src="https://img.shields.io/badge/📚_Full_Documentation-4A90E2?style=for-the-badge" alt="Full documentation for EasyAppDev.Blazor.Store - Blazor state management library" />
   </a>
   <a href="http://blazorstore.easyappdev.com/">
-    <img src="https://img.shields.io/badge/🚀_Live_Demo-28A745?style=for-the-badge" alt="Live Demo" />
+    <img src="https://img.shields.io/badge/🚀_Live_Demo-28A745?style=for-the-badge" alt="Live demo of Blazor state management with cross-tab sync and undo-redo" />
   </a>
 </div>
 
-> **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v200) for migration guide.
-
-### Supported Platforms
-
-| .NET Version | Status |
-|--------------|--------|
-| .NET 8.0 | ✅ Fully Supported |
-| .NET 9.0 | ✅ Fully Supported |
-| .NET 10.0 | ✅ Fully Supported |
-
----
-
-## Features at a Glance
-
-| Feature | Description |
-|---------|-------------|
-| **Immutable State** | C# records with `with` expressions for predictable state updates |
-| **Zero Boilerplate** | No actions, reducers, or dispatchers required |
-| **Redux DevTools** | Time-travel debugging with full state inspection |
-| **Persistence** | Automatic LocalStorage/SessionStorage state saving |
-| **Cross-Tab Sync** | Real-time state synchronization across browser tabs |
-| **Server Sync** | SignalR-based real-time collaboration with presence |
-| **Undo/Redo** | Full history stack with memory management |
-| **Type-Safe** | Complete IntelliSense and compile-time checking |
-| **Async Support** | Built-in debounce, throttle, and lazy loading |
-| **Optimistic Updates** | Instant UI feedback with automatic rollback |
-
----
-
-## What is State Management in Blazor?
-
-In Blazor applications, "state" is any data your app needs to remember—user input, fetched data, UI flags like "is loading" or "is sidebar open." Without a state management library, you end up passing data through component parameters, juggling `EventCallback` chains, or scattering state across services. This quickly becomes hard to track and debug. A state management library gives you a single source of truth: one place where state lives, one way to update it, and automatic notifications to any component that cares. Think of it as a central database for your UI that keeps everything in sync.
-
----
-
-## Why Choose This Blazor State Management Library?
-
-No actions. No reducers. No dispatchers. Just C# records with pure methods.
-
 ```csharp
-// Define Blazor state as an immutable C# record
+// Define state as a C# record
 public record CounterState(int Count)
 {
-    // Pure state transformation - returns new immutable state
     public CounterState Increment() => this with { Count = Count + 1 };
-    public CounterState Decrement() => this with { Count = Count - 1 };
 }
+```
 
-// Use in Blazor components with automatic state subscription
+```razor
 @inherits StoreComponent<CounterState>
 
 <h1>@State.Count</h1>
 <button @onclick="@(() => UpdateAsync(s => s.Increment()))">+</button>
 ```
 
-**What you get:**
-- Zero boilerplate state management
-- Immutable by default (C# records + `with` expressions)
-- Automatic component updates
-- Redux DevTools integration (DEBUG builds only)
-- Full async support with helpers
-- Works with Server, WebAssembly, and Auto modes
+That's it. No actions, no reducers, no dispatchers. State updates propagate to all subscribers automatically.
+
+> **Upgrading from v1.x?** See [Breaking Changes in v2.0.0](#breaking-changes-in-v200) for migration guide.
 
 ---
 
-## Quick Start - Blazor State Management Setup
+## Why This Library?
 
-### 1. Install
+| Problem | Solution |
+|---------|----------|
+| Boilerplate everywhere (actions, reducers, dispatchers) | State = C# record with methods |
+| 10 components fetch same data = 10 API calls | Request deduplication - one fetch, shared result |
+| Tab 1 updates cart, Tab 2 shows stale data | Cross-tab sync via BroadcastChannel |
+| No undo for user mistakes | Built-in undo/redo with memory limits |
+| Loading/error state spaghetti | `AsyncData<T>` replaces boolean flags |
+| Optimistic UI rollback is painful | Built-in rollback on server error |
 
+**.NET 8, 9, 10** · Blazor Server, WebAssembly, Auto, MAUI Hybrid
+
+---
+
+## Quick Start
+
+### Installation
+
+**.NET CLI**
 ```bash
 dotnet add package EasyAppDev.Blazor.Store
 ```
 
-### 2. Register
+**Package Manager Console**
+```powershell
+Install-Package EasyAppDev.Blazor.Store
+```
+
+**PackageReference** (add to your .csproj)
+```xml
+<PackageReference Include="EasyAppDev.Blazor.Store" Version="2.0.*" />
+```
+
+### Setup
 
 ```csharp
-// Program.cs - Register Blazor state store with dependency injection
+// Program.cs
 builder.Services.AddStoreWithUtilities(
     new CounterState(0),
     (store, sp) => store.WithDefaults(sp, "Counter"));
 ```
 
-### 3. Use
-
 ```razor
 @page "/counter"
-@* Inherit from StoreComponent for automatic state subscription *@
 @inherits StoreComponent<CounterState>
 
 <h1>@State.Count</h1>
@@ -110,33 +87,26 @@ builder.Services.AddStoreWithUtilities(
 <button @onclick="@(() => UpdateAsync(s => s.Decrement()))">-</button>
 ```
 
-That's it. State updates automatically propagate to all subscribed Blazor components.
+That's it. All components subscribed to `CounterState` update automatically.
 
 ---
 
 ## Table of Contents
 
-1. [Features at a Glance](#features-at-a-glance)
-2. [Core Concepts](#core-concepts---immutable-state-with-c-records)
-3. [Registration Options](#registration-options)
-4. [Async Helpers](#async-helpers)
-5. [Optimistic Updates](#optimistic-updates)
-6. [Undo/Redo History](#undoredo-history)
-7. [Query System](#query-system)
-8. [Cross-Tab Sync](#cross-tab-sync)
-9. [Server Sync (SignalR)](#server-sync-signalr)
-10. [Immer-Style Updates](#immer-style-updates)
-11. [Redux-Style Actions](#redux-style-actions)
-12. [Plugin System](#plugin-system)
-13. [Security](#security)
-14. [Selectors & Performance](#selectors--performance-optimization)
-15. [Persistence & DevTools](#state-persistence--redux-devtools-integration)
-16. [Middleware](#middleware)
-17. [Blazor Render Modes](#blazor-render-modes)
-18. [API Reference](#api-reference)
-19. [Breaking Changes in v2.0.0](#breaking-changes-in-v200)
-20. [Comparison with Alternatives](#comparison-with-other-blazor-state-management-libraries)
-21. [FAQ](#frequently-asked-questions-faq)
+**Getting Started**
+- [Why This Library?](#why-this-library) | [Quick Start](#quick-start) | [Core Concepts](#core-concepts---immutable-state-with-c-records) | [Registration](#registration-options)
+
+**Data Fetching**
+- [Query System](#query-system) | [Async Helpers](#async-helpers) | [Optimistic Updates](#optimistic-updates)
+
+**Sync & Collaboration**
+- [Cross-Tab Sync](#cross-tab-sync) | [Server Sync](#server-sync-signalr) | [Persistence & DevTools](#state-persistence--redux-devtools-integration)
+
+**History & Advanced**
+- [Undo/Redo](#undoredo-history) | [Immer-Style Updates](#immer-style-updates) | [Redux-Style Actions](#redux-style-actions) | [Selectors](#selectors--performance-optimization)
+
+**Reference**
+- [Plugins](#plugin-system) | [Middleware](#middleware) | [Security](#security) | [Render Modes](#blazor-render-modes) | [API](#api-reference) | [v2.0 Changes](#breaking-changes-in-v200) | [Comparison](#comparison-with-other-blazor-state-management-libraries) | [FAQ](#frequently-asked-questions-faq)
 
 ---
 
@@ -322,16 +292,41 @@ builder.Services.AddStoreWithHistory(
 
 ## Async Helpers
 
-Five built-in helpers eliminate async boilerplate:
+Built-in utilities for common async patterns. No more writing the same loading/error handling.
 
-### 1. AsyncData\<T\> - Loading States
+### ExecuteCachedAsync - Request Deduplication
+
+**The problem:** 10 components load the same user. Result: 10 API calls, 20 state updates.
+
+**The solution:** `ExecuteCachedAsync` deduplicates both the fetch AND the state updates:
 
 ```csharp
-// State
-public record UserState(AsyncData<User> CurrentUser)
+// 10 components call this concurrently → 1 API call, 2 state updates
+async Task LoadProduct(int productId, CancellationToken ct = default)
 {
-    public static UserState Initial => new(AsyncData<User>.NotAsked());
+    await ExecuteCachedAsync(
+        $"product-{productId}",
+        async () => await ProductService.GetAsync(productId),
+        loading: s => s with { Product = s.Product.ToLoading() },
+        success: (s, product) => s with { Product = AsyncData.Success(product) },
+        error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+        cacheFor: TimeSpan.FromMinutes(5),
+        cancellationToken: ct
+    );
 }
+```
+
+| Scenario | Method |
+|----------|--------|
+| Multiple components load same data | `ExecuteCachedAsync` |
+| Single component, no deduplication | `ExecuteAsync` |
+| Just need cached data (no state updates) | `LazyLoad` |
+
+### AsyncData\<T\> - No More Boolean Flags
+
+```csharp
+// State - replaces IsLoading, HasError, ErrorMessage, Data properties
+public record UserState(AsyncData<User> CurrentUser);
 
 // Component
 @if (State.CurrentUser.IsLoading) { <Spinner /> }
@@ -339,10 +334,10 @@ public record UserState(AsyncData<User> CurrentUser)
 @if (State.CurrentUser.HasError) { <p class="error">@State.CurrentUser.Error</p> }
 ```
 
-### 2. ExecuteAsync - Automatic Error Handling
+### ExecuteAsync - Structured Async Flow
 
 ```csharp
-async Task LoadUser() => await ExecuteAsync(
+await ExecuteAsync(
     () => UserService.GetCurrentUserAsync(),
     loading: s => s with { CurrentUser = s.CurrentUser.ToLoading() },
     success: (s, user) => s with { CurrentUser = AsyncData<User>.Success(user) },
@@ -350,72 +345,21 @@ async Task LoadUser() => await ExecuteAsync(
 );
 ```
 
-### 3. UpdateDebounced - Debounced Updates
+### Debounce & Throttle
 
 ```csharp
-// Search input with 300ms debounce
-<input @oninput="@(e => UpdateDebounced(
-    s => s.SetSearchQuery(e.Value?.ToString() ?? ""),
-    300))" />
+// Search with 300ms debounce
+<input @oninput="@(e => UpdateDebounced(s => s.SetSearchQuery(e.Value?.ToString()), 300))" />
+
+// Mouse tracking throttled to 100ms
+<div @onmousemove="@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))">
 ```
 
-### 4. UpdateThrottled - Throttled Updates
+### LazyLoad - Simple Caching
 
 ```csharp
-// Mouse tracking throttled to 100ms intervals
-<div @onmousemove="@(e => UpdateThrottled(
-    s => s.SetPosition(e.ClientX, e.ClientY),
-    100))">
-    Track mouse here
-</div>
+var user = await LazyLoad($"user-{userId}", () => UserService.GetUserAsync(userId), cacheFor: TimeSpan.FromMinutes(5));
 ```
-
-### 5. LazyLoad - Cached Data Loading
-
-```csharp
-// Automatic caching with deduplication
-async Task LoadUserDetails(int userId)
-{
-    var user = await LazyLoad(
-        $"user-{userId}",
-        () => UserService.GetUserAsync(userId),
-        cacheFor: TimeSpan.FromMinutes(5));
-
-    await UpdateAsync(s => s.SetSelectedUser(user));
-}
-```
-
-### 6. ExecuteCachedAsync - Deduplicated State Updates
-
-Combines caching with automatic state management. Unlike `ExecuteAsync` + `LazyLoad`, this deduplicates **both** the fetch **and** the state updates:
-
-```csharp
-// Multiple components calling this concurrently:
-// - Only ONE loading state update
-// - Only ONE async fetch
-// - Only ONE success/error state update
-// Result: 2 state updates instead of 2×N
-async Task LoadProduct(int productId, CancellationToken ct = default)
-{
-    var product = await ExecuteCachedAsync(
-        $"product-{productId}",
-        async () => await ProductService.GetAsync(productId),
-        loading: s => s with { Product = s.Product.ToLoading() },
-        success: (s, product) => s with { Product = AsyncData.Success(product) },
-        error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
-        cacheFor: TimeSpan.FromMinutes(5),
-        cancellationToken: ct  // Optional cancellation support
-    );
-}
-```
-
-**When to use which helper:**
-
-| Scenario | Method |
-|----------|--------|
-| Multiple components load same data | `ExecuteCachedAsync` |
-| Single component, no deduplication needed | `ExecuteAsync` |
-| Need data without state updates | `LazyLoad` |
 
 #### Cache Invalidation
 
@@ -438,38 +382,26 @@ executor.ClearCache();
 
 ## Optimistic Updates
 
-Update UI immediately, rollback on server error:
-
-### Basic Usage
+**Instant feedback.** Update UI immediately, rollback automatically if the server fails.
 
 ```csharp
-// Instant UI update with automatic rollback on failure
+// User clicks delete → item disappears instantly → server confirms (or rollback)
 await store.UpdateOptimistic(
-    s => s.RemoveItem(itemId),                    // Optimistic: remove immediately
-    async s => await api.DeleteItemAsync(itemId), // Server: actual delete
-    (s, error) => s.RestoreItem(itemId)           // Error: rollback
+    s => s.RemoveItem(itemId),                     // Step 1: Update UI now
+    async s => await api.DeleteItemAsync(itemId),  // Step 2: Server call
+    (s, error) => s.RestoreItem(itemId)            // Step 3: Rollback if failed
 );
 ```
 
 ### With Server Response
 
 ```csharp
-// Use server response to update state
+// Create with pending state, confirm with server-generated ID
 await store.UpdateOptimistic<AppState, ServerItem>(
-    s => s.AddPendingItem(item),                  // Show pending state
-    async s => await api.CreateItemAsync(item),   // Server creates with ID
-    (s, result) => s.ConfirmItem(result),         // Update with server data
-    (s, error) => s.RemovePendingItem(item)       // Remove on failure
-);
-```
-
-### Two-Phase with Confirmation
-
-```csharp
-await store.UpdateOptimisticWithConfirm(
-    s => s.SetPending(true),
-    async s => await api.Process(),
-    (s, result) => s.Confirm(result)
+    s => s.AddPendingItem(item),                   // Show "saving..."
+    async s => await api.CreateItemAsync(item),    // Server returns ID
+    (s, result) => s.ConfirmItem(result),          // Update with real data
+    (s, error) => s.RemovePendingItem(item)        // Remove on failure
 );
 ```
 
@@ -477,54 +409,55 @@ await store.UpdateOptimisticWithConfirm(
 
 ## Undo/Redo History
 
-Full history stack for editor-like experiences:
-
-### Setup
+**Ctrl+Z for your app state.** Full history stack with memory limits and action grouping.
 
 ```csharp
-// Program.cs
 builder.Services.AddStoreWithHistory(
     new EditorState(),
     opts => opts
-        .WithMaxSize(100)                              // Max entries
-        .WithMaxMemoryMB(50)                           // Memory limit
-        .ExcludeActions("CURSOR_MOVE", "SELECTION")    // Don't track these
-        .GroupActions(TimeSpan.FromMilliseconds(300)), // Group rapid edits
+        .WithMaxSize(100)                              // Keep last 100 states
+        .WithMaxMemoryMB(50)                           // Cap memory usage
+        .ExcludeActions("CURSOR_MOVE", "SELECTION")    // Don't track noise
+        .GroupActions(TimeSpan.FromMilliseconds(300)), // Group rapid typing
     (store, sp) => store.WithDefaults(sp, "Editor")
 );
 ```
 
-### Usage
-
 ```razor
-@inherits StoreComponent<EditorState>
 @inject IStoreHistory<EditorState> History
 
-<button @onclick="@(() => History.UndoAsync())" disabled="@(!History.CanUndo)">
-    Undo
-</button>
-<button @onclick="@(() => History.RedoAsync())" disabled="@(!History.CanRedo)">
-    Redo
-</button>
+<button @onclick="@(() => History.UndoAsync())" disabled="@(!History.CanUndo)">Undo</button>
+<button @onclick="@(() => History.RedoAsync())" disabled="@(!History.CanRedo)">Redo</button>
 <span>@History.CurrentIndex / @History.Count</span>
-
-@code {
-    // Jump to specific point
-    async Task GoTo(int index) => await History.GoToAsync(index);
-}
 ```
+
+**Key features:**
+- Memory limits prevent runaway growth
+- Action grouping collapses rapid changes (typing "hello" = 1 undo step, not 5)
+- Exclude transient actions (cursor moves, hover states)
+- Jump to any point with `GoToAsync(index)`
 
 ---
 
 ## Query System
 
-TanStack Query-inspired data fetching with caching:
-
-### Setup
+**TanStack Query for Blazor.** Declarative data fetching with automatic caching, background refresh, and smart invalidation.
 
 ```csharp
 builder.Services.AddQueryClient();
 ```
+
+### Why This Matters
+
+Without a query system, every component manages its own loading states, error handling, and caching. With it:
+
+| Problem | Query System Solution |
+|---------|----------------------|
+| Duplicate API calls | Automatic request deduplication |
+| Stale data after mutations | `InvalidateQueries("user-*")` |
+| Loading spinners everywhere | Centralized loading/error states |
+| Manual retry logic | Built-in with exponential backoff |
+| Cache invalidation headaches | Configurable stale/cache times |
 
 ### Queries
 
@@ -552,7 +485,7 @@ builder.Services.AddQueryClient();
 @if (userQuery.IsSuccess) { <UserCard User="@userQuery.Data" /> }
 ```
 
-### Mutations
+### Mutations with Auto-Invalidation
 
 ```csharp
 @code {
@@ -563,13 +496,14 @@ builder.Services.AddQueryClient();
         mutation = QueryClient.CreateMutation<UpdateUserRequest, User>(
             async (req, ct) => await api.UpdateUserAsync(req, ct),
             opts => opts.OnSuccess((_, _) =>
-                QueryClient.InvalidateQueries("user-*"))  // Invalidate cache
+                QueryClient.InvalidateQueries("user-*"))  // Refetch all user queries
         );
     }
 
     async Task Save()
     {
         await mutation.MutateAsync(new UpdateUserRequest { Name = "John" });
+        // All "user-*" queries automatically refresh
     }
 }
 ```
@@ -578,9 +512,7 @@ builder.Services.AddQueryClient();
 
 ## Cross-Tab Sync
 
-Sync state across browser tabs in real-time:
-
-### Setup
+**User adds item to cart in Tab 1. Tab 2 updates instantly.** No polling, no manual refresh.
 
 ```csharp
 builder.Services.AddStore(
@@ -589,48 +521,34 @@ builder.Services.AddStore(
         .WithDefaults(sp, "Cart")
         .WithTabSync(sp, opts => opts
             .Channel("shopping-cart")
-            .EnableMessageSigning                       // HMAC security
-            .DeriveKeyFromOrigin                        // Same-origin key derivation
-            .RequireValidSignature = true
-            .MaxMessageAgeSeconds = 30                  // Replay attack prevention
-            .ExcludeActions("HOVER", "FOCUS"))          // Don't sync these
+            .EnableMessageSigning()                    // HMAC-SHA256 security
+            .MaxMessageAgeSeconds(30)                  // Replay attack prevention
+            .ExcludeActions("HOVER", "FOCUS"))         // Don't sync transient state
 );
 ```
 
-### How It Works
+That's all the code needed. Components don't change. Sync is automatic.
 
 ```
-Tab 1: User adds item to cart
-    ↓
-Store updates → TabSyncMiddleware broadcasts
-    ↓
-Tab 2: Receives update → Store syncs → UI updates
-    ↓
-Both tabs show same cart!
+Tab 1: User adds item → Store updates → Broadcast
+                                            ↓
+Tab 2:                                 Receives → Store syncs → UI updates
 ```
 
-No additional code needed in components. Sync happens automatically.
+### Security
 
-### Security Options
-
-| Option | Description |
-|--------|-------------|
-| `EnableMessageSigning` | Enable HMAC-SHA256 message signing |
-| `DeriveKeyFromOrigin` | Auto-derive key from window.location.origin |
-| `SigningKey` | Explicit shared signing key |
-| `RequireValidSignature` | Reject unsigned messages (default: true) |
-| `MaxMessageAgeSeconds` | Prevent replay attacks (default: 30) |
-| `MaxMessageSizeBytes` | Prevent DoS attacks (default: 1MB) |
-| `MaxJsonDepth` | Prevent stack overflow (default: 32) |
-| `FailFastOnInsecureConfiguration` | Throw on misconfiguration |
+| Option | Purpose |
+|--------|---------|
+| `EnableMessageSigning()` | HMAC-SHA256 signatures |
+| `MaxMessageAgeSeconds(30)` | Reject old messages (replay attacks) |
+| `MaxMessageSizeBytes(1MB)` | Prevent DoS |
+| `RequireValidSignature(true)` | Reject unsigned messages |
 
 ---
 
 ## Server Sync (SignalR)
 
-Real-time collaboration with presence and cursors:
-
-### Setup
+**Build Google Docs-style collaboration.** Real-time state sync across users with presence indicators and live cursors.
 
 ```csharp
 builder.Services.AddStore(
@@ -640,50 +558,38 @@ builder.Services.AddStore(
         .WithServerSync(sp, opts => opts
             .HubUrl("/hubs/documents")
             .DocumentId(documentId)
-            .EnablePresence()                            // Who's online
-            .EnableCursorTracking()                      // Live cursors
+            .EnablePresence()                            // "3 users editing"
+            .EnableCursorTracking()                      // See other users' cursors
             .ConflictResolution(ConflictResolution.LastWriteWins)
-            .OnUserJoined(user => Console.WriteLine($"{user} joined"))
+            .OnUserJoined(user => ShowToast($"{user} joined"))
             .OnCursorUpdated((userId, pos) => RenderCursor(userId, pos)))
 );
 ```
 
-### Usage
+### Presence & Cursors
 
 ```csharp
 @inject IServerSync<DocumentState> ServerSync
 
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        // Set your presence
-        await ServerSync.UpdatePresenceAsync(new PresenceData
-        {
-            DisplayName = currentUser.Name,
-            Color = "#ff0000"
-        });
-    }
+// Show your presence
+await ServerSync.UpdatePresenceAsync(new PresenceData
+{
+    DisplayName = currentUser.Name,
+    Color = "#ff0000"
+});
 
-    // Track cursor position
-    async Task OnMouseMove(MouseEventArgs e)
-    {
-        await ServerSync.UpdateCursorAsync(new CursorPosition
-        {
-            X = e.ClientX,
-            Y = e.ClientY
-        });
-    }
-}
+// Broadcast cursor position
+await ServerSync.UpdateCursorAsync(new CursorPosition { X = e.ClientX, Y = e.ClientY });
 ```
 
 ### Conflict Resolution
 
-| Mode | Behavior |
-|------|----------|
-| `ClientWins` | Local changes always win |
-| `ServerWins` | Server changes always win |
-| `LastWriteWins` | Most recent timestamp wins |
-| `Custom` | Your custom resolver |
+| Mode | When to Use |
+|------|-------------|
+| `LastWriteWins` | Default. Most recent change wins. |
+| `ServerWins` | Server is authoritative. |
+| `ClientWins` | Offline-first apps. |
+| `Custom` | Complex merge logic. |
 
 ---
 
@@ -1243,23 +1149,29 @@ public override Task OnAfterUpdateAsync(AppState previousState, AppState newStat
 
 ## Comparison with Other Blazor State Management Libraries
 
-| Feature | EasyAppDev.Blazor.Store | Fluxor | Blazor-State | Morris.Moxy |
-|---------|------------------------|--------|--------------|-------------|
-| **Learning Curve** | Minimal - just C# records | Steep - Redux patterns | Moderate - MediatR patterns | Moderate |
-| **Boilerplate** | Zero - no actions/reducers | High - actions, reducers, effects | Medium - handlers required | Low |
-| **DevTools** | Redux DevTools | Redux DevTools | None | None |
-| **Persistence** | Built-in | Manual | Manual | Manual |
-| **Cross-Tab Sync** | Built-in | Manual | None | None |
-| **Server Sync** | Built-in SignalR | Manual | None | None |
-| **Undo/Redo** | Built-in | Manual | None | None |
-| **Type Safety** | Full | Full | Full | Full |
-| **Bundle Size** | ~50KB | ~100KB | ~30KB | ~20KB |
+| Feature | This Library | Fluxor | Blazor-State |
+|---------|-------------|--------|--------------|
+| **Boilerplate** | Zero | High (actions, reducers, effects) | Medium (handlers) |
+| **Learning Curve** | Minimal (Zustand-like) | Steep (Redux patterns) | Medium (MediatR) |
+| **Query System** | Built-in (TanStack-inspired) | None | None |
+| **Request Deduplication** | Built-in | None | None |
+| **Cross-Tab Sync** | Built-in (BroadcastChannel) | Manual | None |
+| **Server Sync + Presence** | Built-in (SignalR) | Manual | None |
+| **Undo/Redo History** | Built-in | Manual | None |
+| **Optimistic Updates** | Built-in with rollback | Manual | None |
+| **Persistence** | Built-in (localStorage) | Manual | Manual |
+| **DevTools** | Redux DevTools | Redux DevTools | None |
+| **Immer-Style Updates** | Built-in | None | None |
+| **.NET Version** | 8, 9, 10 | 8+ | 8+ |
+| **MAUI Hybrid** | Supported | Limited | Limited |
 
-### When to Choose This Library
+### When to Choose What
 
-- **Choose EasyAppDev.Blazor.Store** if you want minimal boilerplate, built-in features (persistence, sync, undo/redo), and a Zustand-like developer experience
-- **Choose Fluxor** if your team is familiar with Redux/Flux patterns and needs strict unidirectional data flow
-- **Choose Blazor-State** if you prefer MediatR-style request/handler patterns
+**This library** - You want features out of the box. Query system, sync, undo/redo, optimistic updates. All without ceremony.
+
+**Fluxor** - Your team knows Redux. You want strict unidirectional data flow with actions/reducers/effects.
+
+**Blazor-State** - You prefer MediatR-style patterns with request/handler separation.
 
 ---
 
@@ -1353,6 +1265,6 @@ MIT © EasyAppDev
 
 If EasyAppDev.Blazor.Store has made state management easier in your Blazor projects, consider giving it a ⭐ on GitHub. It helps others discover the library and motivates continued development.
 
-[![GitHub stars](https://img.shields.io/github/stars/mashrulhaque/EasyAppDev.Blazor.Store?style=social)](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store)
+[![GitHub stars for EasyAppDev.Blazor.Store - Blazor state management library](https://img.shields.io/github/stars/mashrulhaque/EasyAppDev.Blazor.Store?style=social)](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store)
 
 </div>

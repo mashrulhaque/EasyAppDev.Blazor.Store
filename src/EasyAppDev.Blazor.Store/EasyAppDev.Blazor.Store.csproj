@@ -22,8 +22,8 @@
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
-    <Description>Type-safe state management for Blazor using C# records. Includes async helpers, Redux DevTools integration, persistence, and granular selectors. Inspired by Zustand.</Description>
-    <PackageTags>blazor;state-management;redux;zustand;devtools;reactive;solid;dependency-injection</PackageTags>
+    <Description>Zustand-inspired state management for Blazor WebAssembly, Blazor Server, and MAUI Hybrid. Zero boilerplate with C# records. Features: TanStack-inspired query system, cross-tab sync, SignalR real-time collaboration, undo/redo history, optimistic updates, Redux DevTools, localStorage persistence, request deduplication, and Immer-style updates.</Description>
+    <PackageTags>blazor;state-management;blazor-state;blazor-webassembly;blazor-server;maui-hybrid;zustand;fluxor-alternative;redux-devtools;signalr;cross-tab-sync;undo-redo;optimistic-updates;query-client;tanstack-query;immutable-state;csharp-records;dotnet8;dotnet9;real-time-collaboration;persistence;localstorage</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/mashrulhaque/EasyAppDev.Blazor.Store</PackageProjectUrl>
     <RepositoryUrl>https://github.com/mashrulhaque/EasyAppDev.Blazor.Store</RepositoryUrl>
