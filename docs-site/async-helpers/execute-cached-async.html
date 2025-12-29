@@ -240,6 +240,7 @@ var product = await ExecuteCachedAsync(
               </table>
 
               <h3>Cache Invalidation Methods</h3>
+              <p>Available in components inheriting <code>StoreComponentWithUtilities&lt;TState&gt;</code>:</p>
 
               <table class="table">
                 <thead>
@@ -250,19 +251,21 @@ var product = await ExecuteCachedAsync(
                 </thead>
                 <tbody>
                   <tr>
-                    <td><code>InvalidateCache(string cacheKey)</code></td>
+                    <td><code>InvalidateCachedResult(string cacheKey)</code></td>
                     <td>Removes a specific cache entry by key. Use after edit/delete operations to force fresh data on next call.</td>
                   </tr>
                   <tr>
-                    <td><code>InvalidateCacheByPrefix(string prefix)</code></td>
-                    <td>Removes all cache entries matching the prefix. Example: <code>InvalidateCacheByPrefix("product-")</code> clears all product caches.</td>
+                    <td><code>InvalidateCachedResultsByPrefix(string prefix)</code></td>
+                    <td>Removes all cache entries matching the prefix. Example: <code>InvalidateCachedResultsByPrefix("product-")</code> clears all product caches.</td>
                   </tr>
                   <tr>
-                    <td><code>ClearCache()</code></td>
+                    <td><code>ClearCachedResults()</code></td>
                     <td>Removes all cache entries. Use on logout or when global state reset is needed.</td>
                   </tr>
                 </tbody>
               </table>
+
+              <p class="text-muted">You can also access the executor directly via <code>AsyncExecutor?.InvalidateCache()</code>, <code>AsyncExecutor?.InvalidateCacheByPrefix()</code>, and <code>AsyncExecutor?.ClearCache()</code>.</p>
             </section>
 
             <!-- When to Use -->
@@ -427,7 +430,7 @@ var product = await ExecuteCachedAsync(
 await ProductApi.UpdateAsync(product);
 
 // Force fresh data on next ExecuteCachedAsync call
-InvalidateCache($"product-{product.Id}");
+InvalidateCachedResult($"product-{product.Id}");
 
 // Next component that calls ExecuteCachedAsync will fetch fresh data
 await ExecuteCachedAsync(
@@ -444,10 +447,10 @@ await ExecuteCachedAsync(
 await ProductApi.BulkUpdateAsync(products);
 
 // Clear all product-related caches
-InvalidateCacheByPrefix("product-");
+InvalidateCachedResultsByPrefix("product-");
 
 // Or clear category-specific caches
-InvalidateCacheByPrefix($"category-{categoryId}-products");</code></pre>
+InvalidateCachedResultsByPrefix($"category-{categoryId}-products");</code></pre>
               </div>
 
               <div class="code-block">
@@ -458,7 +461,7 @@ public async Task LogoutAsync()
     await AuthApi.LogoutAsync();
 
     // Clear all cached data
-    ClearCache();
+    ClearCachedResults();
 
     // Reset state
     await UpdateAsync(_ => AppState.Initial);
@@ -469,7 +472,7 @@ public async Task LogoutAsync()
 // On global state reset
 public async Task ResetApplicationAsync()
 {
-    ClearCache();
+    ClearCachedResults();
     await UpdateAsync(_ => AppState.Initial);
 }</code></pre>
               </div>

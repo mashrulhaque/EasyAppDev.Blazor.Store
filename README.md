@@ -363,17 +363,24 @@ var user = await LazyLoad($"user-{userId}", () => UserService.GetUserAsync(userI
 
 #### Cache Invalidation
 
-Control cached entries when data changes:
+Control cached entries when data changes (in components inheriting `StoreComponentWithUtilities<TState>`):
 
 ```csharp
 // Remove specific cached entry
-executor.InvalidateCache($"product-{productId}");
+InvalidateCachedResult($"product-{productId}");
 
 // Remove all entries with prefix (e.g., after bulk operation)
-executor.InvalidateCacheByPrefix("product-");
+InvalidateCachedResultsByPrefix("product-");
 
 // Clear all cached results (e.g., on user logout)
-executor.ClearCache();
+ClearCachedResults();
+```
+
+Or access the executor directly:
+```csharp
+AsyncExecutor?.InvalidateCache($"product-{productId}");
+AsyncExecutor?.InvalidateCacheByPrefix("product-");
+AsyncExecutor?.ClearCache();
 ```
 
 > **Note:** Only the first caller's callbacks (loading, success, error) are executed. Concurrent callers receive the same result but their callbacks are NOT invoked. This is intentional for deduplication.

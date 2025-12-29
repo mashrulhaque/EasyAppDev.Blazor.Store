@@ -918,14 +918,18 @@ builder.Services.AddStoreWithUtilities(...);</code></pre>
               </div>
 
               <h3>Cache Management Methods</h3>
+              <p>These methods are available on <code>IAsyncActionExecutor&lt;TState&gt;</code>. Components inheriting from <code>StoreComponentWithUtilities&lt;TState&gt;</code> also have convenience wrapper methods: <code>InvalidateCachedResult()</code>, <code>InvalidateCachedResultsByPrefix()</code>, and <code>ClearCachedResults()</code>.</p>
 
               <div class="api-section">
                 <h4><code>InvalidateCache(string cacheKey)</code></h4>
                 <p>Removes a specific cached result by key. Use this when you know the exact cache key to invalidate.</p>
+                <p><strong>Component wrapper:</strong> <code>InvalidateCachedResult(cacheKey)</code></p>
                 <div class="code-block">
-                  <pre><code class="language-csharp">// After updating a product, invalidate its cache
-await productService.UpdateProductAsync(product);
-asyncExecutor.InvalidateCache($"product-{productId}");</code></pre>
+                  <pre><code class="language-csharp">// In a component (using wrapper method)
+InvalidateCachedResult($"product-{productId}");
+
+// Or using executor directly
+AsyncExecutor?.InvalidateCache($"product-{productId}");</code></pre>
                 </div>
                 <p><strong>Behavior:</strong></p>
                 <ul>
@@ -938,10 +942,10 @@ asyncExecutor.InvalidateCache($"product-{productId}");</code></pre>
               <div class="api-section">
                 <h4><code>InvalidateCacheByPrefix(string prefix)</code></h4>
                 <p>Removes all cached results with keys starting with the specified prefix. Useful for invalidating related cache entries.</p>
+                <p><strong>Component wrapper:</strong> <code>InvalidateCachedResultsByPrefix(prefix)</code></p>
                 <div class="code-block">
-                  <pre><code class="language-csharp">// After adding a new product, invalidate all product caches
-await productService.CreateProductAsync(newProduct);
-asyncExecutor.InvalidateCacheByPrefix("product-");
+                  <pre><code class="language-csharp">// In a component (using wrapper method)
+InvalidateCachedResultsByPrefix("product-");
 
 // Invalidates: "product-1", "product-2", "product-list", etc.</code></pre>
                 </div>
@@ -967,10 +971,13 @@ asyncExecutor.InvalidateCacheByPrefix($"tenant-{tenantId}-");</code></pre>
               <div class="api-section">
                 <h4><code>ClearCache()</code></h4>
                 <p>Clears all cached results. Use this sparingly, typically only for global state resets.</p>
+                <p><strong>Component wrapper:</strong> <code>ClearCachedResults()</code></p>
                 <div class="code-block">
-                  <pre><code class="language-csharp">// Clear all caches on logout
-await authService.LogoutAsync();
-asyncExecutor.ClearCache();</code></pre>
+                  <pre><code class="language-csharp">// In a component (using wrapper method)
+ClearCachedResults();
+
+// Or using executor directly
+AsyncExecutor?.ClearCache();</code></pre>
                 </div>
                 <p><strong>When to use:</strong></p>
                 <ul>
@@ -994,23 +1001,23 @@ asyncExecutor.ClearCache();</code></pre>
                   <tbody>
                     <tr>
                       <td>Single item updated</td>
-                      <td><code>InvalidateCache("item-{id}")</code></td>
+                      <td><code>InvalidateCachedResult("item-{id}")</code></td>
                     </tr>
                     <tr>
                       <td>Multiple related items changed</td>
-                      <td><code>InvalidateCacheByPrefix("category-")</code></td>
+                      <td><code>InvalidateCachedResultsByPrefix("category-")</code></td>
                     </tr>
                     <tr>
                       <td>User logout</td>
-                      <td><code>ClearCache()</code></td>
+                      <td><code>ClearCachedResults()</code></td>
                     </tr>
                     <tr>
                       <td>List item added/removed</td>
-                      <td><code>InvalidateCacheByPrefix("list-")</code></td>
+                      <td><code>InvalidateCachedResultsByPrefix("list-")</code></td>
                     </tr>
                     <tr>
                       <td>Settings changed</td>
-                      <td><code>InvalidateCacheByPrefix("settings-")</code></td>
+                      <td><code>InvalidateCachedResultsByPrefix("settings-")</code></td>
                     </tr>
                   </tbody>
                 </table>
@@ -1125,15 +1132,15 @@ builder.Services.AddStoreWithUtilities(
                     <td>Validate state integrity</td>
                   </tr>
                   <tr>
-                    <td><code>InvalidateCache()</code></td>
+                    <td><code>InvalidateCachedResult()</code></td>
                     <td>Remove specific cached result</td>
                   </tr>
                   <tr>
-                    <td><code>InvalidateCacheByPrefix()</code></td>
+                    <td><code>InvalidateCachedResultsByPrefix()</code></td>
                     <td>Remove cached results by prefix</td>
                   </tr>
                   <tr>
-                    <td><code>ClearCache()</code></td>
+                    <td><code>ClearCachedResults()</code></td>
                     <td>Clear all cached results</td>
                   </tr>
                 </tbody>

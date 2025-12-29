@@ -357,6 +357,42 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     }
 
     /// <summary>
+    /// Invalidates a cached result from ExecuteCachedAsync by its cache key.
+    /// </summary>
+    /// <param name="cacheKey">The cache key to invalidate.</param>
+    /// <remarks>
+    /// This only affects cached results, not in-flight operations.
+    /// The next call to ExecuteCachedAsync with this key will execute the async action again.
+    /// </remarks>
+    protected void InvalidateCachedResult(string cacheKey)
+    {
+        AsyncExecutor?.InvalidateCache(cacheKey);
+    }
+
+    /// <summary>
+    /// Invalidates all cached results from ExecuteCachedAsync with keys starting with the specified prefix.
+    /// </summary>
+    /// <param name="prefix">The prefix to match cache keys against.</param>
+    /// <remarks>
+    /// Useful for invalidating related cache entries (e.g., "product-" invalidates "product-1", "product-2", etc.).
+    /// </remarks>
+    protected void InvalidateCachedResultsByPrefix(string prefix)
+    {
+        AsyncExecutor?.InvalidateCacheByPrefix(prefix);
+    }
+
+    /// <summary>
+    /// Clears all cached results from ExecuteCachedAsync.
+    /// </summary>
+    /// <remarks>
+    /// This only affects cached results, not in-flight operations.
+    /// </remarks>
+    protected void ClearCachedResults()
+    {
+        AsyncExecutor?.ClearCache();
+    }
+
+    /// <summary>
     /// Loads data with automatic caching and request deduplication.
     /// </summary>
     /// <typeparam name="T">The type of data to load.</typeparam>
