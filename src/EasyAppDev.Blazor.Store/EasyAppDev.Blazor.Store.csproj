@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.5</Version>
+    <Version>2.0.6</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,14 +31,18 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
-v2.0.5 - ExecuteCachedAsync
+v2.0.6 - Cache Invalidation Convenience Methods
 
 New Features:
+- Added convenience wrapper methods in StoreComponentWithUtilities for cache invalidation:
+  - InvalidateCachedResult(key) - Remove specific cached entry
+  - InvalidateCachedResultsByPrefix(prefix) - Remove entries by prefix
+  - ClearCachedResults() - Clear all cached results
+- Improved discoverability of cache management APIs
+
+v2.0.5 - ExecuteCachedAsync
 - Added ExecuteCachedAsync for deduplicated async actions with caching
-- Combines caching with automatic state management (loading, success, error)
-- Deduplicates both the fetch AND state updates across concurrent callers
-- Added cache invalidation methods: InvalidateCache, InvalidateCacheByPrefix, ClearCache
-- Optional cancellation token support for async operations
+- Deduplicates both fetch AND state updates across concurrent callers
 
 v2.0.4 - Bug Fixes &amp; Stability
 (See previous release notes for full changelog)
