@@ -100,7 +100,7 @@ That's it. All components subscribed to `CounterState` update automatically.
 - [Query System](#query-system) | [Async Helpers](#async-helpers) | [Optimistic Updates](#optimistic-updates)
 
 **Sync & Collaboration**
-- [Cross-Tab Sync](#cross-tab-sync) | [Server Sync](#server-sync-signalr) | [Persistence & DevTools](#state-persistence--redux-devtools-integration)
+- [URL Sync](#url-sync-experimental) | [Cross-Tab Sync](#cross-tab-sync) | [Server Sync](#server-sync-signalr) | [Persistence & DevTools](#state-persistence--redux-devtools-integration)
 
 **History & Advanced**
 - [Undo/Redo](#undoredo-history) | [Immer-Style Updates](#immer-style-updates) | [Redux-Style Actions](#redux-style-actions) | [Selectors](#selectors--performance-optimization)
@@ -411,6 +411,129 @@ await store.UpdateOptimistic<AppState, ServerItem>(
     (s, error) => s.RemovePendingItem(item)        // Remove on failure
 );
 ```
+
+---
+
+## URL Sync (Experimental)
+
+**Shareable URLs.** Sync component parameters with store state bidirectionally. Changes to URL update state, state changes update URL.
+
+> **⚠️ Experimental Feature** - This API may change in future versions. `[Experimental("EASB001")]` attribute is applied. Phase 3 with attribute-based auto-sync is now available.
+
+### Attribute-Based Auto-Sync (Zero Boilerplate)
+
+The simplest way to sync URLs - just add attributes:
+
+```csharp
+@page "/products"
+@inherits UrlSyncStoreComponent<ProductsState>
+
+[SupplyParameterFromQuery]
+[AutoSyncWithQuery]
+public int Page { get; set; } = 1;  // Auto-maps to state.Page or state.CurrentPage
+
+[SupplyParameterFromQuery]
+[AutoSyncWithQuery("q")]  // Custom query param name
+public string? Search { get; set; }
+
+[SupplyParameterFromQuery]
+[AutoSyncWithQuery]
+public bool OnSaleOnly { get; set; }
+```
+
+**Convention-based matching:**
+- Exact match: `Page` → `state.Page`
+- "Current" prefix: `Page` → `state.CurrentPage`
+- "Value" suffix: `Name` → `state.NameValue`
+- Case-insensitive: `page` → `state.Page`
+
+### Manual Configuration (Advanced)
+
+For more control, use manual configuration:
+
+```csharp
+@page "/products"
+@inherits UrlSyncStoreComponent<ProductsState>
+
+[SupplyParameterFromQuery] public int Page { get; set; } = 1;
+[SupplyParameterFromQuery] public string? Search { get; set; }
+[SupplyParameterFromQuery] public bool OnSaleOnly { get; set; }
+
+protected override void ConfigureUrlSync(IUrlSyncBuilder<ProductsState> builder)
+{
+    builder
+        .SyncQueryParam(() => Page, s => s.CurrentPage)
+        .SyncQueryParam(() => Search, s => s.SearchQuery)
+        .SyncQueryParam(() => OnSaleOnly, s => s.FilterOnSale)
+        .WithDebounce(TimeSpan.FromMilliseconds(500))
+        .WithNavigationMode(UrlSyncNavigationMode.Replace);
+}
+```
+
+### Hybrid Approach
+
+Combine both for flexibility:
+
+```csharp
+// Auto-sync simple properties
+[SupplyParameterFromQuery, AutoSyncWithQuery]
+public int Page { get; set; }
+
+// Manual config for advanced options
+protected override void ConfigureUrlSync(IUrlSyncBuilder<ProductsState> builder)
+{
+    builder
+        .WithDebounce(TimeSpan.FromMilliseconds(750))
+        .ExcludeActions("SERVER_SYNC");
+}
+```
+
+**What happens:**
+1. User visits `/products?page=2&q=laptop&onSaleOnly=true`
+2. State updates: `state with { CurrentPage = 2, SearchQuery = "laptop", FilterOnSale = true }`
+3. User clicks filter → state changes → URL updates
+4. User shares URL → recipient sees same filtered view
+
+### Supported Types
+
+Only **value types** and **strings** are supported (prevents infinite loops):
+- Primitives: `int`, `long`, `short`, `byte`, `float`, `double`, `decimal`, `bool`
+- Special: `string`, `Guid`, `DateTime`, `DateTimeOffset`, `TimeSpan`
+- Enums: Any enum type
+- Nullable: All above types with `?`
+
+❌ **Not supported**: Lists, arrays, complex objects (causes infinite update loops)
+
+### Options
+
+```csharp
+builder
+    .SyncQueryParam(() => Page, s => s.CurrentPage, "p")   // Custom param name
+    .WithDebounce(TimeSpan.FromMilliseconds(500))          // Debounce rapid changes
+    .WithNavigationMode(UrlSyncNavigationMode.Replace)     // Replace vs Push history
+    .ExcludeActions("SERVER_SYNC", "CURSOR_UPDATE")        // Don't sync these actions
+    .OnConversionError((param, ex) => Logger.LogWarning("Invalid {Param}: {Error}", param, ex.Message))
+    .OnError(ex => Logger.LogError(ex, "URL sync error"));
+```
+
+### Navigation Modes
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| **Replace** (default) | Replaces current history entry | High-frequency updates (sliders, filters) - prevents back button pollution |
+| **Push** | Adds new history entry | Intentional navigation (wizard steps, tabs) |
+
+### Incompatibilities
+
+⚠️ **Cannot use with:**
+- TabSync middleware (each tab needs independent URL)
+- Multiple `UrlSyncStoreComponent` per store (only one component can manage URL)
+
+### Security Notes
+
+- URL parameters are **user-controlled input** - always validate with `IStateValidator<T>`
+- Sensitive data should **never** be in URLs (use session storage or server state)
+- Maximum URL length: ~2000 chars (library warns at 1800)
 
 ---
 

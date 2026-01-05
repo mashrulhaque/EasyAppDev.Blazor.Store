@@ -1,0 +1,448 @@
+@page "/url-sync-demo"
+@inherits StoreComponent<UrlSyncDemoState>
+@inject NavigationManager Navigation
+
+<PageTitle>URL Sync (Planned Feature)</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>URL Sync</h1>
+        <span class="badge bg-warning text-dark">PLANNED FEATURE v2.1.0</span>
+    </div>
+
+    <p class="lead">
+        Bidirectional synchronization between URL parameters and store state with zero boilerplate.
+    </p>
+
+    <div class="alert alert-info">
+        <h5 class="alert-heading">Feature Status: In Design Phase</h5>
+        <p class="mb-0">
+            This page demonstrates the <strong>planned</strong> URL Sync feature.
+            The API shown below represents the target design for v2.1.0-preview.
+        </p>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">The Problem: 50 Lines of Fragile Boilerplate</h5>
+                </div>
+                <div class="card-body">
+                    <p>Currently, implementing URL-state sync requires manual code that's easy to get wrong:</p>
+
+                    <pre class="bg-light p-3 rounded"><code>public partial class ProductPage : StoreComponent&lt;ProductState&gt;
+{
+    [SupplyParameterFromQuery] public int Page { get; set; } = 1;
+    [SupplyParameterFromQuery] public string Search { get; set; } = "";
+
+    private IDisposable? _subscription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        // State → URL subscription (must prevent circular updates!)
+        _subscription = Store.Subscribe(_ =>
+        {
+            SetQueryParametersIfNecessary();
+        });
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+
+        // URL → State (must check to prevent circular update!)
+        if (ParametersDifferFromState())
+        {
+            await Update(s => s.SetPage(Page).SetSearch(Search));
+        }
+    }
+
+    // 20+ more lines of circular update prevention...
+}</code></pre>
+
+                    <div class="alert alert-danger mt-3">
+                        <strong>Common Bugs:</strong>
+                        <ul class="mb-0">
+                            <li>Circular update loops (URL → State → URL → State...)</li>
+                            <li>Browser history pollution from rapid updates</li>
+                            <li>Race conditions with back/forward navigation</li>
+                            <li>Memory leaks from forgotten disposal</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">The Solution: UrlSyncStoreComponent&lt;T&gt;</h5>
+                </div>
+                <div class="card-body">
+                    <p>With URL Sync, the same functionality becomes 5 lines:</p>
+
+                    <pre class="bg-light p-3 rounded"><code>public partial class ProductPage : UrlSyncStoreComponent&lt;ProductState&gt;
+{
+    [SupplyParameterFromQuery] public int Page { get; set; } = 1;
+    [SupplyParameterFromQuery] public string Search { get; set; } = "";
+
+    protected override void ConfigureUrlSync(IUrlSyncBuilder&lt;ProductState&gt; builder)
+    {
+        builder
+            .SyncQueryParam(() =&gt; Page, s =&gt; s.CurrentPage)
+            .SyncQueryParam(() =&gt; Search, s =&gt; s.SearchTerm);
+    }
+}</code></pre>
+
+                    <div class="alert alert-success mt-3">
+                        <strong>Automatic Features:</strong>
+                        <ul class="mb-0">
+                            <li>✅ Circular update prevention (three-layer defense)</li>
+                            <li>✅ Debounced navigation (default 300ms, configurable)</li>
+                            <li>✅ History-safe (Replace mode prevents back button pollution)</li>
+                            <li>✅ Type-safe compile-time validation</li>
+                            <li>✅ SSR/prerendering compatible</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Interactive Demo: Product Catalog</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        This demo simulates what UrlSyncStoreComponent will do automatically.
+                        Try interacting with the filters below - in the real implementation,
+                        URL changes would happen automatically on state updates.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Search Products</label>
+                        <input type="text" class="form-control"
+                               value="@State.Filter.SearchTerm"
+                               @oninput="@(e => HandleSearch(e.Value?.ToString() ?? ""))"
+                               placeholder="Search by name..." />
+
+                        @if (State.RecentSearches.Any())
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">Recent:</small>
+                                @foreach (var search in State.RecentSearches.Take(3))
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary ms-1"
+                                            @onclick="@(() => HandleSearch(search))">
+                                        @search
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" value="@State.Filter.Category"
+                                    @onchange="@(e => HandleCategoryChange(Enum.Parse<ProductCategory>(e.Value?.ToString() ?? "All")))">
+                                @foreach (var cat in Enum.GetValues<ProductCategory>())
+                                {
+                                    <option value="@cat">@cat</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sort By</label>
+                            <select class="form-select" value="@State.SortBy"
+                                    @onchange="@(e => HandleSortChange(e.Value?.ToString() ?? "name"))">
+                                <option value="name">Name</option>
+                                <option value="price">Price</option>
+                                <option value="rating">Rating</option>
+                                <option value="newest">Newest</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   checked="@State.ShowAdvancedFilters"
+                                   @onchange="@(e => Update(s => s.ToggleAdvancedFilters()))" />
+                            <label class="form-check-label">Show Advanced Filters</label>
+                        </div>
+                    </div>
+
+                    @if (State.ShowAdvancedFilters)
+                    {
+                        <div class="card bg-light mb-3">
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Min Price: $@State.Filter.MinPrice</label>
+                                        <input type="range" class="form-range"
+                                               min="0" max="1000" step="10"
+                                               value="@State.Filter.MinPrice"
+                                               @oninput="@(e => HandleMinPrice(decimal.Parse(e.Value?.ToString() ?? "0")))" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Max Price: $@State.Filter.MaxPrice</label>
+                                        <input type="range" class="form-range"
+                                               min="0" max="1000" step="10"
+                                               value="@State.Filter.MaxPrice"
+                                               @oninput="@(e => HandleMaxPrice(decimal.Parse(e.Value?.ToString() ?? "1000")))" />
+                                    </div>
+                                </div>
+
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           checked="@State.Filter.InStock"
+                                           @onchange="@(e => Update(s => s.SetInStockOnly(e.Value as bool? ?? false)))" />
+                                    <label class="form-check-label">In Stock Only</label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <label class="form-label me-2">Items per page:</label>
+                            <select class="form-select d-inline-block w-auto"
+                                    value="@State.PageSize"
+                                    @onchange="@(e => Update(s => s.SetPageSize(int.Parse(e.Value?.ToString() ?? "10"))))">
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+
+                        @if (State.HasFilters)
+                        {
+                            <button class="btn btn-outline-danger" @onclick="@(() => Update(s => s.ResetFilters()))">
+                                Clear All Filters
+                            </button>
+                        }
+                    </div>
+
+                    <div class="alert alert-secondary">
+                        <strong>Current Filters:</strong>
+                        <ul class="mb-0">
+                            <li>Page: @State.CurrentPage of @State.TotalPages</li>
+                            <li>Page Size: @State.PageSize items</li>
+                            <li>Sort: @State.SortBy (@State.SortOrder)</li>
+                            @if (!string.IsNullOrWhiteSpace(State.Filter.SearchTerm))
+                            {
+                                <li>Search: "@State.Filter.SearchTerm"</li>
+                            }
+                            @if (State.Filter.Category != ProductCategory.All)
+                            {
+                                <li>Category: @State.Filter.Category</li>
+                            }
+                            @if (State.Filter.MinPrice > 0 || State.Filter.MaxPrice < 1000)
+                            {
+                                <li>Price: $@State.Filter.MinPrice - $@State.Filter.MaxPrice</li>
+                            }
+                            @if (State.Filter.InStock)
+                            {
+                                <li>In Stock Only: Yes</li>
+                            }
+                        </ul>
+                    </div>
+
+                    <nav>
+                        <ul class="pagination">
+                            <li class="page-item @(State.CurrentPage == 1 ? "disabled" : "")">
+                                <button class="page-link" @onclick="@(() => Update(s => s.SetPage(State.CurrentPage - 1)))">
+                                    Previous
+                                </button>
+                            </li>
+
+                            @for (int i = 1; i <= State.TotalPages; i++)
+                            {
+                                var pageNum = i;
+                                <li class="page-item @(State.CurrentPage == pageNum ? "active" : "")">
+                                    <button class="page-link" @onclick="@(() => Update(s => s.SetPage(pageNum)))">
+                                        @pageNum
+                                    </button>
+                                </li>
+                            }
+
+                            <li class="page-item @(State.CurrentPage == State.TotalPages ? "disabled" : "")">
+                                <button class="page-link" @onclick="@(() => Update(s => s.SetPage(State.CurrentPage + 1)))">
+                                    Next
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+
+                    <div class="alert alert-info small">
+                        <strong>What UrlSyncStoreComponent would do:</strong><br />
+                        When you change filters above, the URL would automatically update to:
+                        <code>/products?page=@State.CurrentPage&amp;pageSize=@State.PageSize&amp;sort=@State.SortBy&amp;order=@State.SortOrder@(string.IsNullOrWhiteSpace(State.Filter.SearchTerm) ? "" : $"&search={State.Filter.SearchTerm}")@(State.Filter.Category != ProductCategory.All ? $"&category={State.Filter.Category}" : "")</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Configuration Options</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>Debouncing</h6>
+                    <pre class="bg-light p-2"><code>builder
+  .SyncQueryParam(() => Search, s => s.SearchTerm)
+  .WithDebounce(TimeSpan.FromMilliseconds(500));</code></pre>
+
+                    <h6 class="mt-3">Navigation Mode</h6>
+                    <pre class="bg-light p-2"><code>builder
+  .WithNavigationMode(UrlSyncNavigationMode.Replace); // Default
+  // or
+  .WithNavigationMode(UrlSyncNavigationMode.Push);</code></pre>
+
+                    <h6 class="mt-3">Action Filtering</h6>
+                    <pre class="bg-light p-2"><code>builder
+  .SyncQueryParam(() => Page, s => s.CurrentPage)
+  .ExcludeActions("SERVER_SYNC", "CURSOR_UPDATE");</code></pre>
+
+                    <h6 class="mt-3">Error Handling</h6>
+                    <pre class="bg-light p-2"><code>builder
+  .OnConversionError((param, ex) =>
+    Logger.LogWarning("Invalid {Param}: {Error}", param, ex))
+  .OnError(ex => Logger.LogError(ex, "URL sync error"));</code></pre>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Supported Types</h5>
+                </div>
+                <div class="card-body small">
+                    <p>Phase 1 supports primitives only:</p>
+                    <ul>
+                        <li>✅ <code>int</code>, <code>long</code>, <code>bool</code></li>
+                        <li>✅ <code>string</code></li>
+                        <li>✅ <code>Guid</code></li>
+                        <li>✅ <code>DateTime</code>, <code>DateTimeOffset</code></li>
+                        <li>✅ Enums</li>
+                        <li>✅ Nullable versions of above</li>
+                        <li>❌ Reference types (prevents circular updates)</li>
+                        <li>❌ Collections (Phase 2 with custom converters)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mb-4 border-warning">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">⚠️ Incompatibilities</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>TabSync</h6>
+                    <p class="text-danger">
+                        <strong>INCOMPATIBLE</strong> - Tabs must maintain independent URLs.
+                        Runtime detection will throw <code>InvalidOperationException</code>.
+                    </p>
+
+                    <h6>ServerSync</h6>
+                    <p class="text-warning">
+                        Use with caution. Server-initiated updates excluded by default:
+                        <code>SERVER_*</code>, <code>CURSOR_*</code>, <code>PRESENCE_*</code>
+                    </p>
+
+                    <h6>Multiple Components</h6>
+                    <p class="text-danger">
+                        Only ONE <code>UrlSyncStoreComponent</code> per store allowed.
+                        Second component will throw.
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Security Considerations</h5>
+                </div>
+                <div class="card-body small">
+                    <p class="text-danger">
+                        <strong>WARNING:</strong> URL parameters are user-controlled input!
+                    </p>
+
+                    <h6>Always Validate</h6>
+                    <pre class="bg-light p-2"><code>builder
+  .WithValidator(sp.GetService&lt;IStateValidator&lt;State&gt;&gt;())
+  .RejectInvalidState();</code></pre>
+
+                    <h6>Never Sync Security Flags</h6>
+                    <ul>
+                        <li>❌ <code>IsAdmin</code>, <code>IsAuthenticated</code></li>
+                        <li>❌ User IDs, session tokens</li>
+                        <li>❌ Permissions, roles</li>
+                    </ul>
+
+                    <p>Attackers can set <code>?isAdmin=true</code> in the URL!</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Implementation Phases</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>Phase 1: MVP (v2.1.0-preview)</h6>
+                    <ul>
+                        <li>Query parameters only</li>
+                        <li>Built-in type converters</li>
+                        <li>Fixed 300ms debounce</li>
+                        <li>Replace navigation mode</li>
+                        <li>Safety guardrails</li>
+                        <li><code>[Experimental]</code> flag</li>
+                    </ul>
+
+                    <h6 class="mt-3">Phase 2: Advanced (v2.2.0)</h6>
+                    <ul>
+                        <li>Route parameters</li>
+                        <li>Custom converters</li>
+                        <li>Configurable debounce</li>
+                        <li>Validation integration</li>
+                        <li>Remove experimental flag</li>
+                    </ul>
+
+                    <h6 class="mt-3">Phase 3: DX (v2.3.0)</h6>
+                    <ul>
+                        <li>Convention-based auto-sync</li>
+                        <li>Attribute configuration</li>
+                        <li>Source generators</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task HandleSearch(string term)
+    {
+        await Update(s => s.SetSearchTerm(term));
+    }
+
+    private async Task HandleCategoryChange(ProductCategory category)
+    {
+        await Update(s => s.SetCategory(category));
+    }
+
+    private async Task HandleSortChange(string sortBy)
+    {
+        await Update(s => s.SetSort(sortBy, State.SortOrder));
+    }
+
+    private async Task HandleMinPrice(decimal min)
+    {
+        await Update(s => s.SetPriceRange(min, State.Filter.MaxPrice));
+    }
+
+    private async Task HandleMaxPrice(decimal max)
+    {
+        await Update(s => s.SetPriceRange(State.Filter.MinPrice, max));
+    }
+}

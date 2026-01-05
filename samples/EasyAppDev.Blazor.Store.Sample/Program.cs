@@ -249,4 +249,12 @@ builder.Services.AddStore(
     SecurityDemoState.Initial,
     (store, sp) => store.WithDefaults(sp, "Security Demo Store"));
 
+// ============================================================================
+// URL Sync Demo Store - Demonstrates PLANNED URL synchronization feature
+// This demo shows the target API for v2.1.0-preview
+// ============================================================================
+builder.Services.AddStore(
+    UrlSyncDemoState.Initial,
+    (store, sp) => store.WithDefaults(sp, "URL Sync Demo Store"));
+
 await builder.Build().RunAsync();
