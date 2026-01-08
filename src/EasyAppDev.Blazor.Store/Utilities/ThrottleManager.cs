@@ -245,7 +245,18 @@ public sealed class ThrottleManager : IThrottleManager
     {
         if (_disposed) return;
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking during dispose
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            // Force dispose even if lock timeout - cancel all CTS without lock
+            _disposed = true;
+            foreach (var state in _throttles.Values)
+            {
+                try { state.TrailingCts?.Cancel(); state.TrailingCts?.Dispose(); } catch { }
+            }
+            _lock.Dispose();
+            return;
+        }
         try
         {
             foreach (var state in _throttles.Values)

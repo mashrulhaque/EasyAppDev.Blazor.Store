@@ -487,11 +487,29 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to send state update");
-            if (_options.EnableOfflineQueue)
+
+            // Guard QueueOfflineUpdate to prevent exceptions escaping async void
+            try
             {
-                QueueOfflineUpdate(update);
+                if (_options.EnableOfflineQueue)
+                {
+                    QueueOfflineUpdate(update);
+                }
             }
-            _options.OnError?.Invoke(ex);
+            catch (Exception queueEx)
+            {
+                _logger?.LogError(queueEx, "Failed to queue offline update");
+            }
+
+            // Guard OnError callback to prevent user code exceptions escaping async void
+            try
+            {
+                _options.OnError?.Invoke(ex);
+            }
+            catch (Exception callbackEx)
+            {
+                _logger?.LogError(callbackEx, "OnError callback threw an exception");
+            }
         }
     }
 
@@ -540,7 +558,15 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         }
         catch (Exception ex)
         {
-            _logger?.LogDebug(ex, "Failed to send cursor update");
+            // Guard logger call to prevent exceptions escaping async void
+            try
+            {
+                _logger?.LogDebug(ex, "Failed to send cursor update");
+            }
+            catch
+            {
+                // Swallow logging exceptions to prevent async void crash
+            }
         }
     }
 

@@ -200,7 +200,18 @@ public sealed class DebounceManager : IDebounceManager
     {
         if (_disposed) return;
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking during dispose
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            // Force dispose even if lock timeout - cancel all CTS without lock
+            _disposed = true;
+            foreach (var cts in _pendingActions.Values)
+            {
+                try { cts.Cancel(); cts.Dispose(); } catch { }
+            }
+            _lock.Dispose();
+            return;
+        }
         try
         {
             foreach (var cts in _pendingActions.Values)

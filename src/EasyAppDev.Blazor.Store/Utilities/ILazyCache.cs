@@ -22,7 +22,7 @@ namespace EasyAppDev.Blazor.Store.Utilities;
 /// }
 /// </code>
 /// </example>
-public interface ILazyCache : IDisposable
+public interface ILazyCache : IDisposable, IAsyncDisposable
 {
     /// <summary>
     /// Gets data from cache or loads it using the provided loader function if not cached or expired.
@@ -76,5 +76,17 @@ public interface ILazyCache : IDisposable
     /// Gets the current number of entries in the cache, including expired entries.
     /// </summary>
     /// <value>The total count of entries in the cache (includes expired entries).</value>
+    /// <remarks>
+    /// Prefer <see cref="GetCountAsync"/> in async contexts to avoid potential deadlocks.
+    /// </remarks>
     int Count { get; }
+
+    /// <summary>
+    /// Gets the current number of entries in the cache asynchronously.
+    /// </summary>
+    /// <returns>The total count of entries in the cache (includes expired entries).</returns>
+    /// <remarks>
+    /// Preferred over <see cref="Count"/> property in async contexts.
+    /// </remarks>
+    Task<int> GetCountAsync();
 }

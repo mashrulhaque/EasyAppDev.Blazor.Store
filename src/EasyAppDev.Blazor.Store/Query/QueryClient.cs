@@ -18,7 +18,7 @@ public sealed class QueryClient : IQueryClient, IDisposable
     private readonly QueryClientOptions _options;
     private readonly ILogger<QueryClient>? _logger;
     private readonly Timer _cleanupTimer;
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed, 1 = disposed (use int for Interlocked)
 
     /// <summary>
     /// Creates a new query client with the specified options.
@@ -249,7 +249,7 @@ public sealed class QueryClient : IQueryClient, IDisposable
 
     private void CleanupExpiredEntries(object? state)
     {
-        if (_disposed) return;
+        if (Volatile.Read(ref _disposed) != 0) return;
 
         var now = DateTime.UtcNow;
         var expiredKeys = new List<string>();
@@ -288,8 +288,9 @@ public sealed class QueryClient : IQueryClient, IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
         _cleanupTimer.Dispose();
         _cache.Clear();

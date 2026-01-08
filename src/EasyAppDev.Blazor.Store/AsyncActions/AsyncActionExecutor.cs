@@ -20,7 +20,7 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     private readonly Dictionary<string, CachedOperation> _inFlightOperations = new();
     private readonly Dictionary<string, CachedResult> _cachedResults = new();
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed, 1 = disposed (use int for Interlocked)
 
     /// <summary>
     /// Tracks an in-flight operation for deduplication.
@@ -300,7 +300,29 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(cacheKey);
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking in edge cases
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            _logger?.LogWarning("InvalidateCache timed out waiting for lock. Consider using InvalidateCacheAsync instead.");
+            return;
+        }
+        try
+        {
+            _cachedResults.Remove(cacheKey);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task InvalidateCacheAsync(string cacheKey)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(cacheKey);
+
+        await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             _cachedResults.Remove(cacheKey);
@@ -317,7 +339,36 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(prefix);
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking in edge cases
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            _logger?.LogWarning("InvalidateCacheByPrefix timed out waiting for lock. Consider using InvalidateCacheByPrefixAsync instead.");
+            return;
+        }
+        try
+        {
+            var keysToRemove = _cachedResults.Keys
+                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
+                .ToList();
+
+            foreach (var key in keysToRemove)
+            {
+                _cachedResults.Remove(key);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task InvalidateCacheByPrefixAsync(string prefix)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(prefix);
+
+        await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             var keysToRemove = _cachedResults.Keys
@@ -340,7 +391,28 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     {
         ThrowIfDisposed();
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking in edge cases
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            _logger?.LogWarning("ClearCache timed out waiting for lock. Consider using ClearCacheAsync instead.");
+            return;
+        }
+        try
+        {
+            _cachedResults.Clear();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task ClearCacheAsync()
+    {
+        ThrowIfDisposed();
+
+        await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             _cachedResults.Clear();
@@ -394,15 +466,18 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        _lock.Dispose();
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         _inFlightOperations.Clear();
         _cachedResults.Clear();
+        _lock.Dispose();
     }
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (Volatile.Read(ref _disposed) != 0)
+            throw new ObjectDisposedException(nameof(AsyncActionExecutor<TState>));
     }
 }

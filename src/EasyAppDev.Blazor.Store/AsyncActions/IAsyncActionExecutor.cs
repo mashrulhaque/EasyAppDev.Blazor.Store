@@ -206,8 +206,20 @@ public interface IAsyncActionExecutor<TState> where TState : notnull
     /// <param name="cacheKey">The cache key to invalidate.</param>
     /// <remarks>
     /// This does not affect in-flight operations. Only cached results are removed.
+    /// Prefer <see cref="InvalidateCacheAsync"/> in async contexts to avoid potential deadlocks.
     /// </remarks>
     void InvalidateCache(string cacheKey);
+
+    /// <summary>
+    /// Removes a specific cached result by key asynchronously.
+    /// </summary>
+    /// <param name="cacheKey">The cache key to invalidate.</param>
+    /// <returns>A task representing the async operation.</returns>
+    /// <remarks>
+    /// This does not affect in-flight operations. Only cached results are removed.
+    /// Preferred over <see cref="InvalidateCache"/> in async contexts.
+    /// </remarks>
+    Task InvalidateCacheAsync(string cacheKey);
 
     /// <summary>
     /// Removes all cached results with keys starting with the specified prefix.
@@ -215,14 +227,37 @@ public interface IAsyncActionExecutor<TState> where TState : notnull
     /// <param name="prefix">The prefix to match cache keys against.</param>
     /// <remarks>
     /// Useful for invalidating related cache entries (e.g., "product-" invalidates "product-1", "product-2", etc.).
+    /// Prefer <see cref="InvalidateCacheByPrefixAsync"/> in async contexts to avoid potential deadlocks.
     /// </remarks>
     void InvalidateCacheByPrefix(string prefix);
+
+    /// <summary>
+    /// Removes all cached results with keys starting with the specified prefix asynchronously.
+    /// </summary>
+    /// <param name="prefix">The prefix to match cache keys against.</param>
+    /// <returns>A task representing the async operation.</returns>
+    /// <remarks>
+    /// Useful for invalidating related cache entries (e.g., "product-" invalidates "product-1", "product-2", etc.).
+    /// Preferred over <see cref="InvalidateCacheByPrefix"/> in async contexts.
+    /// </remarks>
+    Task InvalidateCacheByPrefixAsync(string prefix);
 
     /// <summary>
     /// Clears all cached results.
     /// </summary>
     /// <remarks>
     /// This does not affect in-flight operations. Only cached results are removed.
+    /// Prefer <see cref="ClearCacheAsync"/> in async contexts to avoid potential deadlocks.
     /// </remarks>
     void ClearCache();
+
+    /// <summary>
+    /// Clears all cached results asynchronously.
+    /// </summary>
+    /// <returns>A task representing the async operation.</returns>
+    /// <remarks>
+    /// This does not affect in-flight operations. Only cached results are removed.
+    /// Preferred over <see cref="ClearCache"/> in async contexts.
+    /// </remarks>
+    Task ClearCacheAsync();
 }

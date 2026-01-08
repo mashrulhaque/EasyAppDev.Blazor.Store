@@ -33,7 +33,7 @@ namespace EasyAppDev.Blazor.Store.Utilities;
 /// </code>
 /// </example>
 /// </remarks>
-public sealed class LazyCache : ILazyCache
+public sealed class LazyCache : ILazyCache, IAsyncDisposable
 {
     private sealed class CacheEntry<T>
     {
@@ -267,11 +267,18 @@ public sealed class LazyCache : ILazyCache
     /// <summary>
     /// Gets the number of entries currently in the cache.
     /// </summary>
+    /// <remarks>
+    /// Prefer <see cref="GetCountAsync"/> in async contexts to avoid potential deadlocks.
+    /// </remarks>
     public int Count
     {
         get
         {
-            _lock.Wait();
+            // Use timeout to prevent indefinite blocking in edge cases
+            if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+            {
+                return 0; // Return 0 if lock timeout (cache may be busy)
+            }
             try
             {
                 return _cache.Count;
@@ -284,13 +291,62 @@ public sealed class LazyCache : ILazyCache
     }
 
     /// <summary>
+    /// Gets the number of entries currently in the cache asynchronously.
+    /// </summary>
+    /// <returns>The count of entries in the cache.</returns>
+    public async Task<int> GetCountAsync()
+    {
+        await _lock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return _cache.Count;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
     /// Disposes the cache, clearing all entries.
     /// </summary>
+    /// <remarks>
+    /// Prefer <see cref="DisposeAsync"/> in async contexts to avoid potential deadlocks.
+    /// </remarks>
     public void Dispose()
     {
         if (_disposed) return;
 
-        _lock.Wait();
+        // Use timeout to prevent indefinite blocking during dispose
+        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        {
+            // Force dispose even if lock timeout
+            _disposed = true;
+            _lock.Dispose();
+            return;
+        }
+        try
+        {
+            _cache.Clear();
+            _inFlightRequests.Clear();
+            _disposed = true;
+        }
+        finally
+        {
+            _lock.Release();
+            _lock.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Disposes the cache asynchronously, clearing all entries.
+    /// </summary>
+    /// <returns>A ValueTask representing the async dispose operation.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+
+        await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             _cache.Clear();
