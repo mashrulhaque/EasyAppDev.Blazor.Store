@@ -54,4 +54,26 @@ public static class AsyncDataExtensions
     /// </example>
     public static AsyncData<T> ToFailure<T>(this AsyncData<T> self, string error)
         => AsyncData<T>.Failure(error);
+
+    /// <summary>
+    /// Transitions to a loading state while preserving existing data.
+    /// Use this for background refetches where you want to show a loading indicator
+    /// without clearing the current content (stale-while-revalidate pattern).
+    /// </summary>
+    /// <typeparam name="T">The type of data.</typeparam>
+    /// <param name="self">The current AsyncData.</param>
+    /// <returns>
+    /// A new AsyncData with IsFetching set to true.
+    /// If data exists, HasData and Data are preserved, and IsRefetching will be true.
+    /// If no data exists, behaves like ToLoading.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// // In state method for background refresh
+    /// return this with { User = this.User.ToLoadingPreserved() };
+    /// // User.IsRefetching is true, User.Data still available for display
+    /// </code>
+    /// </example>
+    public static AsyncData<T> ToLoadingPreserved<T>(this AsyncData<T> self)
+        => self.ToLoadingPreserved();
 }

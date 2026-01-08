@@ -334,6 +334,31 @@ public record UserState(AsyncData<User> CurrentUser);
 @if (State.CurrentUser.HasError) { <p class="error">@State.CurrentUser.Error</p> }
 ```
 
+### Background Refetch (Stale-While-Revalidate)
+
+Show existing data while refreshing in the background:
+
+```csharp
+// Transition to loading while preserving existing data
+await UpdateAsync(s => s with { User = s.User.ToLoadingPreserved() });
+
+// In component - show loading overlay on existing content
+@if (State.User.IsRefetching)
+{
+    <div class="overlay"><Spinner /></div>
+}
+@if (State.User.HasData)
+{
+    <UserCard User="@State.User.Data" />
+}
+```
+
+| Property | Description |
+|----------|-------------|
+| `IsFetching` | True during both initial loads and background refetches |
+| `IsRefetching` | True when data exists AND a refetch is in progress |
+| `ToLoadingPreserved()` | Transitions to loading while keeping existing `Data` |
+
 ### ExecuteAsync - Structured Async Flow
 
 ```csharp

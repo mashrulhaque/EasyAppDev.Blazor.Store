@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.7</Version>
+    <Version>2.0.8</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,6 +31,14 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.8 - AsyncData Refetch Support
+
+New Features:
+- Added IsFetching property to AsyncData for tracking fetch operations
+- Added IsRefetching computed property (true when refetching while data exists)
+- Added ToLoadingPreserved() method for stale-while-revalidate pattern
+- Preserves existing data during background refetches
+
 v2.0.7 - URL Sync (Experimental)
 
 New Features:

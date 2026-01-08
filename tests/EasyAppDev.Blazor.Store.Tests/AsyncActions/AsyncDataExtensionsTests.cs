@@ -208,6 +208,104 @@ public class AsyncDataExtensionsTests
         loading.IsLoading.Should().BeTrue("because loading should be unchanged");
     }
 
+    #region ToLoadingPreserved Extension Tests
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_PreservesExistingData()
+    {
+        // Arrange
+        var data = AsyncData<string>.Success("existing value");
+
+        // Act
+        var preserved = data.ToLoadingPreserved();
+
+        // Assert
+        preserved.IsFetching.Should().BeTrue();
+        preserved.IsRefetching.Should().BeTrue();
+        preserved.HasData.Should().BeTrue();
+        preserved.Data.Should().Be("existing value");
+        preserved.IsLoading.Should().BeFalse("because data exists");
+    }
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_FromNotAsked_BehavesLikeLoading()
+    {
+        // Arrange
+        var data = AsyncData<string>.NotAsked();
+
+        // Act
+        var preserved = data.ToLoadingPreserved();
+
+        // Assert
+        preserved.IsFetching.Should().BeTrue();
+        preserved.IsLoading.Should().BeTrue();
+        preserved.IsRefetching.Should().BeFalse();
+        preserved.HasData.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_WorksInWithExpression()
+    {
+        // Arrange
+        var state = new TestState(AsyncData<string>.Success("initial"));
+
+        // Act
+        var refetchingState = state with { Data = state.Data.ToLoadingPreserved() };
+
+        // Assert
+        refetchingState.Data.IsRefetching.Should().BeTrue();
+        refetchingState.Data.Data.Should().Be("initial");
+    }
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_CanChainWithOtherTransitions()
+    {
+        // Arrange
+        var initial = AsyncData<int>.Success(42);
+
+        // Act - Simulate refetch flow
+        var refetching = initial.ToLoadingPreserved();
+        var updated = refetching.ToSuccess(100);
+
+        // Assert
+        refetching.IsRefetching.Should().BeTrue();
+        refetching.Data.Should().Be(42);
+        updated.Data.Should().Be(100);
+        updated.IsRefetching.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_WorksWithComplexTypes()
+    {
+        // Arrange
+        var user = new User(1, "Test", "test@example.com");
+        var data = AsyncData<User>.Success(user);
+
+        // Act
+        var preserved = data.ToLoadingPreserved();
+
+        // Assert
+        preserved.IsRefetching.Should().BeTrue();
+        preserved.Data.Should().Be(user);
+        preserved.Data!.Id.Should().Be(1);
+    }
+
+    [Fact]
+    public void ToLoadingPreserved_Extension_PreservesImmutability()
+    {
+        // Arrange
+        var original = AsyncData<string>.Success("data");
+
+        // Act
+        var preserved = original.ToLoadingPreserved();
+
+        // Assert
+        ReferenceEquals(original, preserved).Should().BeFalse();
+        original.IsFetching.Should().BeFalse("because original should be unchanged");
+    }
+
+    #endregion
+
     private record TestState(AsyncData<string> Data);
     private record User(int Id, string Name, string Email);
 }

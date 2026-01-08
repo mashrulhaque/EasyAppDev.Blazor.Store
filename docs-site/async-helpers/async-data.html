@@ -228,8 +228,14 @@ public record UserState(AsyncData&lt;User&gt; User);
                     <tr>
                       <td><code>Loading</code></td>
                       <td>Request in progress</td>
-                      <td><code>HasData = false</code><br><code>IsLoading = true</code><br><code>HasError = false</code></td>
+                      <td><code>HasData = false</code><br><code>IsLoading = true</code><br><code>IsFetching = true</code><br><code>HasError = false</code></td>
                       <td><code>state.User.ToLoading()</code></td>
+                    </tr>
+                    <tr>
+                      <td><code>Refetching</code></td>
+                      <td>Background refresh with existing data</td>
+                      <td><code>HasData = true</code><br><code>IsLoading = false</code><br><code>IsFetching = true</code><br><code>IsRefetching = true</code></td>
+                      <td><code>state.User.ToLoadingPreserved()</code></td>
                     </tr>
                     <tr>
                       <td><code>Success</code></td>
@@ -316,10 +322,15 @@ else
                 <pre><code class="language-csharp">// Initial state (no request made)
 var data = AsyncData&lt;User&gt;.NotAsked();
 
-// Loading state
+// Loading state (clears existing data)
 var loading = data.ToLoading();
 // Or explicitly
 var loading = AsyncData&lt;User&gt;.Loading();
+
+// Loading state preserving existing data (stale-while-revalidate)
+var refetching = data.ToLoadingPreserved();
+// If data.HasData: IsRefetching = true, Data preserved
+// If no data: behaves like ToLoading()
 
 // Success state with data
 var success = AsyncData&lt;User&gt;.Success(user);
@@ -332,7 +343,9 @@ var failure = AsyncData&lt;User&gt;.Failure("User not found");</code></pre>
               <div class="code-block">
                 <pre><code class="language-csharp">// Check state
 bool isNotAsked = data.IsNotAsked;
-bool isLoading = data.IsLoading;
+bool isLoading = data.IsLoading;     // True only for initial load (no data yet)
+bool isFetching = data.IsFetching;   // True during both initial load and refetch
+bool isRefetching = data.IsRefetching;  // True when HasData &amp;&amp; IsFetching
 bool hasData = data.HasData;
 bool hasError = data.HasError;
 
@@ -340,7 +353,7 @@ bool hasError = data.HasError;
 User user = data.Data!;  // Nullable, use with HasData check
 
 // Access error message (only when HasError is true)
-string error = data.Error;  // Empty string if no error</code></pre>
+string? error = data.Error;  // null if no error</code></pre>
               </div>
 
               <h3>Pattern Matching</h3>
@@ -400,11 +413,11 @@ string status = data switch
 }</code></pre>
               </div>
 
-              <h3>3. Refresh Data</h3>
+              <h3>3. Refresh Data (Clear Current)</h3>
               <div class="code-block">
                 <pre><code class="language-csharp">async Task Refresh()
 {
-    // Set to loading (shows spinner even if data exists)
+    // Set to loading (clears current data, shows full spinner)
     await Update(s =&gt; s with { User = s.User.ToLoading() });
 
     // Reload data
@@ -415,7 +428,34 @@ string status = data switch
 }</code></pre>
               </div>
 
-              <h3>4. Multiple Async Fields</h3>
+              <h3>4. Background Refresh (Stale-While-Revalidate)</h3>
+              <div class="code-block">
+                <pre><code class="language-csharp">// Show existing data while refreshing in the background
+async Task BackgroundRefresh()
+{
+    // Start refetch - keeps existing data visible
+    await Update(s =&gt; s with { User = s.User.ToLoadingPreserved() });
+
+    // Reload data
+    await ExecuteAsync(
+        () =&gt; UserService.GetUserAsync(userId),
+        success: (s, user) =&gt; s with { User = AsyncData.Success(user) },
+        error: (s, ex) =&gt; s with { User = s.User.ToFailure(ex.Message) }
+    );
+}
+
+// Component - show loading overlay on existing content
+@if (State.User.IsRefetching)
+{
+    &lt;div class="loading-overlay"&gt;&lt;Spinner /&gt;&lt;/div&gt;
+}
+@if (State.User.HasData)
+{
+    &lt;UserCard User="@State.User.Data" /&gt;
+}</code></pre>
+              </div>
+
+              <h3>5. Multiple Async Fields</h3>
               <div class="code-block">
                 <pre><code class="language-csharp">public record DashboardState(
     AsyncData&lt;User&gt; User,

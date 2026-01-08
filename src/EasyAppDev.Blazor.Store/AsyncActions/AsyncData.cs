@@ -58,6 +58,20 @@ public record AsyncData<T>
     /// </summary>
     public string? Error { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a fetch operation is in progress.
+    /// Unlike <see cref="IsLoading"/>, this is true during both initial loads and background refetches.
+    /// Use this to show loading indicators while preserving existing data.
+    /// </summary>
+    public bool IsFetching { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a background refetch is in progress while data is available.
+    /// True when both <see cref="HasData"/> and <see cref="IsFetching"/> are true.
+    /// Use this to show a loading overlay on existing content.
+    /// </summary>
+    public bool IsRefetching => HasData && IsFetching;
+
     private AsyncData() { }
 
     /// <summary>
@@ -82,6 +96,7 @@ public record AsyncData<T>
     {
         IsNotAsked = false,
         IsLoading = true,
+        IsFetching = true,
         HasData = false,
         HasError = false,
         Data = default,
@@ -129,6 +144,35 @@ public record AsyncData<T>
     /// </summary>
     /// <returns>A new AsyncData in the Loading state.</returns>
     public AsyncData<T> ToLoading() => Loading();
+
+    /// <summary>
+    /// Transitions to a loading state while preserving existing data.
+    /// Use this for background refetches where you want to show a loading indicator
+    /// without clearing the current content (stale-while-revalidate pattern).
+    /// </summary>
+    /// <returns>
+    /// A new AsyncData with <see cref="IsFetching"/> set to true.
+    /// If data exists, <see cref="HasData"/> and <see cref="Data"/> are preserved,
+    /// and <see cref="IsRefetching"/> will be true.
+    /// If no data exists, behaves like <see cref="ToLoading"/>.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// // In a component updating existing data:
+    /// await Update(s => s with { User = s.User.ToLoadingPreserved() });
+    /// // User.IsRefetching is true, User.Data still available for display
+    /// </code>
+    /// </example>
+    public AsyncData<T> ToLoadingPreserved() => new()
+    {
+        IsNotAsked = false,
+        IsLoading = !HasData,    // Only "loading" if no prior data
+        IsFetching = true,       // Always fetching
+        HasData = HasData,       // Preserve
+        HasError = false,
+        Data = Data,             // Preserve
+        Error = null
+    };
 
     /// <summary>
     /// Transitions this AsyncData to the Success state with data.

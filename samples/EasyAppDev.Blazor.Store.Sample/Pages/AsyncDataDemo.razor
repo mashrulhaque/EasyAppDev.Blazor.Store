@@ -65,7 +65,19 @@
                     }
                     else if (State.User.HasData)
                     {
-                        <div class="user-profile">
+                        <div class="user-profile position-relative">
+                            @if (State.User.IsRefetching)
+                            {
+                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                                     style="background: rgba(255,255,255,0.8); z-index: 10;">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-info" role="status">
+                                            <span class="visually-hidden">Refreshing...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0 text-info fw-bold">Refreshing...</p>
+                                    </div>
+                                </div>
+                            }
                             <div class="text-center mb-4">
                                 <img src="@State.User.Data!.Avatar" alt="@State.User.Data.Name"
                                      class="rounded-circle" width="128" height="128" />
@@ -90,16 +102,25 @@
                 </div>
             </div>
 
-            <div class="mt-3 d-flex gap-2">
-                <button class="btn btn-primary" @onclick="() => LoadUser(State.CurrentUserId)" disabled="@State.User.IsLoading">
+            <div class="mt-3 d-flex gap-2 flex-wrap">
+                <button class="btn btn-primary" @onclick="() => LoadUser(State.CurrentUserId)" disabled="@State.User.IsFetching">
                     Load User @State.CurrentUserId
                 </button>
-                <button class="btn btn-warning" @onclick="SimulateError" disabled="@State.User.IsLoading">
+                <button class="btn btn-info" @onclick="BackgroundRefresh" disabled="@(!State.User.HasData || State.User.IsFetching)">
+                    Background Refresh
+                </button>
+                <button class="btn btn-warning" @onclick="SimulateError" disabled="@State.User.IsFetching">
                     Simulate Error (User 999)
                 </button>
                 <button class="btn btn-secondary" @onclick="Reset">
                     Reset
                 </button>
+            </div>
+
+            <div class="alert alert-info mt-3" role="alert">
+                <strong>Stale-While-Revalidate:</strong> Click "Background Refresh" after loading a user.
+                The current profile stays visible while new data loads in the background.
+                Watch <code>IsRefetching</code> turn true!
             </div>
 
             <div class="card mt-4">
@@ -172,6 +193,23 @@ State.User.Error</code></pre>
                             <span class="badge @(State.User.IsLoading ? "bg-primary" : "bg-secondary")">
                                 @State.User.IsLoading
                             </span>
+                            <small class="text-muted d-block">Initial load only</small>
+                        </dd>
+
+                        <dt>IsFetching</dt>
+                        <dd>
+                            <span class="badge @(State.User.IsFetching ? "bg-info" : "bg-secondary")">
+                                @State.User.IsFetching
+                            </span>
+                            <small class="text-muted d-block">Any fetch (initial or refetch)</small>
+                        </dd>
+
+                        <dt>IsRefetching</dt>
+                        <dd>
+                            <span class="badge @(State.User.IsRefetching ? "bg-warning" : "bg-secondary")">
+                                @State.User.IsRefetching
+                            </span>
+                            <small class="text-muted d-block">HasData + IsFetching</small>
                         </dd>
 
                         <dt>HasData</dt>
@@ -216,9 +254,14 @@ State.User.Error</code></pre>
                     <h5 class="mb-0">State Transitions</h5>
                 </div>
                 <div class="card-body small">
-                    <pre class="bg-light p-2 mb-0"><code>// Start loading
+                    <pre class="bg-light p-2 mb-0"><code>// Start loading (clears data)
 Update(s => s with {
     User = s.User.ToLoading()
+});
+
+// Background refresh (keeps data)
+Update(s => s with {
+    User = s.User.ToLoadingPreserved()
 });
 
 // Success
@@ -257,6 +300,38 @@ Update(s => s with {
                 Update(s => s with { User = AsyncData<UserProfileData>.Failure($"User {userId} not found") });
             }
             else
+            {
+                var profileData = new UserProfileData(
+                    Id: user.Id,
+                    Name: user.Name,
+                    Email: user.Email,
+                    Avatar: user.AvatarUrl,
+                    Bio: user.Bio,
+                    LoadedAt: DateTime.Now
+                );
+                Update(s => s with { User = AsyncData<UserProfileData>.Success(profileData) });
+            }
+        }
+        catch (Exception ex)
+        {
+            Update(s => s with { User = AsyncData<UserProfileData>.Failure(ex.Message) });
+        }
+    }
+
+    async Task BackgroundRefresh()
+    {
+        // Use ToLoadingPreserved() - keeps existing data visible while refetching
+        // This enables the "stale-while-revalidate" pattern
+        Update(s => s with { User = s.User.ToLoadingPreserved() });
+
+        try
+        {
+            // Simulate network delay to see the overlay
+            await Task.Delay(1500);
+
+            var user = await Api.GetUserAsync(State.CurrentUserId);
+
+            if (user != null)
             {
                 var profileData = new UserProfileData(
                     Id: user.Id,

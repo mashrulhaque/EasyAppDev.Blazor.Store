@@ -186,15 +186,19 @@
                 <div class="step-number">2</div>
                 <div class="step-content">
                   <h3>AsyncData&lt;T&gt; - Simple Async State</h3>
-                  <p>Replaces 20+ lines of loading/data/error state management with a single property.</p>
+                  <p>Replaces 20+ lines of loading/data/error state management with a single property. Supports stale-while-revalidate pattern for background refreshes.</p>
                   <div class="code-block">
                     <pre><code class="language-csharp">// State definition
 public record UserState(AsyncData&lt;User&gt; User);
 
 // Component usage
 @if (State.User.IsLoading) { &lt;p&gt;Loading...&lt;/p&gt; }
+@if (State.User.IsRefetching) { &lt;div class="overlay"&gt;&lt;Spinner /&gt;&lt;/div&gt; }
 @if (State.User.HasData) { &lt;p&gt;@State.User.Data.Name&lt;/p&gt; }
-@if (State.User.HasError) { &lt;p&gt;@State.User.Error&lt;/p&gt; }</code></pre>
+@if (State.User.HasError) { &lt;p&gt;@State.User.Error&lt;/p&gt; }
+
+// Background refresh - keeps existing data visible
+await Update(s =&gt; s with { User = s.User.ToLoadingPreserved() });</code></pre>
                   </div>
                   <p><a href="./async-data.html">Learn more about AsyncData&lt;T&gt; →</a></p>
                 </div>
