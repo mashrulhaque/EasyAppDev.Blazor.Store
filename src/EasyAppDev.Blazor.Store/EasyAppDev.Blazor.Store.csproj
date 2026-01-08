@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.6</Version>
+    <Version>2.0.7</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,6 +31,16 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.7 - URL Sync (Experimental)
+
+New Features:
+- UrlSyncStoreComponent&lt;T&gt; base class for bidirectional URL-state synchronization
+- [AutoSyncWithQuery] attribute for zero-boilerplate query parameter binding
+- Fluent IUrlSyncBuilder API for manual configuration
+- 3-layer circular update prevention
+- Configurable debounce and navigation modes (Replace/Push)
+- Convention-based auto-discovery of URL mappings
+
 v2.0.6 - Cache Invalidation Convenience Methods
 
 New Features:
