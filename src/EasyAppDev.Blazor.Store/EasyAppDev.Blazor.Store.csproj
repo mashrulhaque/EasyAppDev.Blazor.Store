@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.8</Version>
+    <Version>2.0.9</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,6 +31,12 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.9 - LLM-Friendly Documentation
+
+New Features:
+- Added llms.txt and llms-full.txt following llmstxt.org specification
+- Enables AI agents to navigate documentation more effectively
+
 v2.0.8 - AsyncData Refetch Support
 
 New Features:
