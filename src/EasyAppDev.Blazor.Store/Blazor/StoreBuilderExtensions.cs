@@ -60,25 +60,46 @@ public static class StoreBuilderExtensions
 
     /// <summary>
     /// Adds persistence middleware with automatic LocalStorageProvider creation.
-    /// Note: In Blazor Server/United, this method is disabled due to IJSRuntime scoping issues.
-    /// Use AddScopedStore with persistence instead.
+    /// Requires the store to be registered as scoped (via AddScopedStore or AddScopedStoreWithUtilities)
+    /// so that IJSRuntime is available during store creation.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The store builder.</param>
     /// <param name="serviceProvider">The service provider for resolving IJSRuntime.</param>
     /// <param name="key">The storage key for persisting state.</param>
     /// <returns>The configured builder for chaining.</returns>
-    [Obsolete("Persistence with singleton stores doesn't work in Blazor Server/United due to scoped IJSRuntime. Persistence is disabled.")]
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when IJSRuntime cannot be resolved. This typically happens when using
+    /// singleton store registration (AddStore) in Blazor Server. Use AddScopedStore instead.
+    /// </exception>
+    /// <example>
+    /// <code>
+    /// // Works with scoped store registration
+    /// builder.Services.AddScopedStoreWithUtilities(new CounterState(0), (store, sp) => store
+    ///     .WithPersistence(sp, nameof(CounterState)));
+    /// </code>
+    /// </example>
     public static StoreBuilder<TState> WithPersistence<TState>(
         this StoreBuilder<TState> builder,
         IServiceProvider serviceProvider,
         string key)
         where TState : notnull
     {
-        // Skip persistence in Blazor Server/United scenarios
-        // IJSRuntime is scoped and cannot be resolved during singleton store creation
-        Console.WriteLine($"Warning: Persistence skipped for {typeof(TState).Name}. Use AddScopedStore for persistence in Blazor Server/United.");
-        return builder;
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var jsRuntime = serviceProvider.GetService<IJSRuntime>();
+        if (jsRuntime == null)
+        {
+            throw new InvalidOperationException(
+                $"IJSRuntime could not be resolved for persistence of {typeof(TState).Name}. " +
+                "This typically happens when using AddStore (singleton) in Blazor Server/United. " +
+                "Use AddScopedStore or AddScopedStoreWithUtilities instead, which creates the store " +
+                "within a circuit where IJSRuntime is available.");
+        }
+
+        var provider = new LocalStorageProvider(jsRuntime);
+        return builder.WithPersistence(provider, key);
     }
 
     /// <summary>

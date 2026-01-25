@@ -248,13 +248,17 @@ builder.Services.AddStoreWithUtilities(
 
 ### AddScopedStoreWithUtilities
 
-Scoped store for Blazor Server per-user isolation:
+Scoped store for Blazor Server per-user isolation (required for persistence/DevTools/TabSync):
 
 ```csharp
 builder.Services.AddScopedStoreWithUtilities(
     new UserSessionState(),
-    (store, sp) => store.WithDefaults(sp, "Session"));
+    (store, sp) => store
+        .WithDefaults(sp, "Session")
+        .WithPersistence(sp, "session-state"));  // Works with scoped stores
 ```
+
+> **Note:** `WithPersistence(sp, key)` requires scoped store registration in Blazor Server. Using it with singleton stores (`AddStore`) will throw an `InvalidOperationException` with guidance to use scoped stores.
 
 ### AddStore / AddScopedStore
 
@@ -1343,11 +1347,19 @@ Yes. Use `AddScopedStore` for full feature support (DevTools, persistence, cross
 ### How do I persist state to localStorage?
 
 ```csharp
+// For Blazor WebAssembly
 builder.Services.AddStoreWithUtilities(
     new AppState(),
     (store, sp) => store
         .WithDefaults(sp, "App")
         .WithPersistence(sp, "app-state"));  // Auto-saves to localStorage
+
+// For Blazor Server - use scoped store
+builder.Services.AddScopedStoreWithUtilities(
+    new AppState(),
+    (store, sp) => store
+        .WithDefaults(sp, "App")
+        .WithPersistence(sp, "app-state"));
 ```
 
 ### Does this work with .NET MAUI Blazor?

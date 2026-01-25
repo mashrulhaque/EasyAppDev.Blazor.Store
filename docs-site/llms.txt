@@ -1,0 +1,62 @@
+# EasyAppDev.Blazor.Store
+
+> A Zustand-inspired state management library for Blazor. Zero boilerplate, built-in data fetching with caching, cross-tab sync, real-time collaboration via SignalR, undo/redo history, Redux DevTools support. All type-safe with C# records. Supports .NET 8, 9, 10 with Blazor Server, WebAssembly, Auto, and MAUI Hybrid.
+
+EasyAppDev.Blazor.Store simplifies state management in Blazor applications by using immutable C# records with transformation methods. State changes are reactive - all subscribed components update automatically. The library provides async helpers for common patterns (debouncing, throttling, caching), optimistic updates with automatic rollback, and a comprehensive plugin system.
+
+Key concepts:
+- State is defined as immutable C# records with pure transformation methods
+- Components inherit from `StoreComponent<T>` for automatic subscription management
+- Updates use `UpdateAsync(s => s.Method())` pattern
+- Uses `ImmutableList<T>` and `ImmutableDictionary<K,V>` for collections
+
+## Getting Started
+
+- [Introduction](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/): Overview of the library and quick start examples
+- [Quick Start](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/getting-started.html): Installation, registration, and first component setup
+- [Core Concepts](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/core-concepts.html): Immutable records, interface segregation, data flow
+- [Render Modes](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/render-modes.html): Feature compatibility for Server, WebAssembly, Auto, and MAUI
+
+## Core Features
+
+- [State Management](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/state-management.html): Store registration, updates, optimistic updates, undo/redo, query system, Immer-style updates, Redux-style actions
+- [Components](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/components.html): StoreComponent, SelectorStoreComponent, UrlSyncStoreComponent
+- [Performance](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/performance.html): Selectors, granular subscriptions, render optimization
+
+## Async Helpers
+
+- [Async Helpers Overview](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/index.html): Overview of async utilities for state management
+- [AsyncData<T>](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/async-data.html): Replace boolean flags with a discriminated union for loading/success/error states
+- [ExecuteAsync](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/execute-async.html): Structured async flow with loading, success, and error callbacks
+- [ExecuteCachedAsync](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/execute-cached-async.html): Request deduplication - multiple components, one API call
+- [UpdateDebounced](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/update-debounced.html): Debounce rapid state updates (search, input)
+- [UpdateThrottled](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/update-throttled.html): Throttle high-frequency updates (mouse tracking, scroll)
+- [LazyLoad](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/lazy-load.html): Simple cached data loading with deduplication
+
+## Sync and Collaboration
+
+- [Persistence](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/persistence.html): LocalStorage persistence, cross-tab sync, and SignalR server sync
+- [Cross-Tab Sync](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/persistence.html#tab-sync): Real-time state synchronization across browser tabs with BroadcastChannel
+- [Server Sync](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/persistence.html#server-sync): SignalR-based real-time collaboration with presence and cursor tracking
+
+## Extensibility
+
+- [Middleware](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/middleware.html): Create custom middleware for cross-cutting concerns
+- [Plugin System](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/middleware.html#plugins): Extensible hooks for analytics, validation, and more
+- [DevTools](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/devtools.html): Redux DevTools integration for time-travel debugging
+- [Security](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/middleware.html#security): Security profiles, state validation, sensitive data filtering, message signing
+
+## Reference
+
+- [API Reference](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/api-reference.html): Complete API documentation for all public types and methods
+- [Best Practices](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/best-practices.html): Patterns, anti-patterns, and recommended approaches
+- [Migration Guide](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/migration.html): Upgrading from v1.x to v2.0 with breaking changes
+- [Examples](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/examples.html): Real-world examples and common patterns
+
+## Optional
+
+These resources provide additional context but can be skipped for basic usage:
+
+- [GitHub Repository](https://github.com/mashrulhaque/EasyAppDev.Blazor.Store): Source code, issues, discussions
+- [NuGet Package](https://www.nuget.org/packages/EasyAppDev.Blazor.Store/): Package installation
+- [Live Demo](http://blazorstore.easyappdev.com/): Interactive demo application

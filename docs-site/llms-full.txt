@@ -1,0 +1,408 @@
+# EasyAppDev.Blazor.Store
+
+> A Zustand-inspired state management library for Blazor. Zero boilerplate, built-in data fetching with caching, cross-tab sync, real-time collaboration via SignalR, undo/redo history, Redux DevTools support. All type-safe with C# records. Supports .NET 8, 9, 10 with Blazor Server, WebAssembly, Auto, and MAUI Hybrid.
+
+## Quick Start
+
+### Installation
+
+```bash
+dotnet add package EasyAppDev.Blazor.Store
+```
+
+### 1. Define State
+
+State is defined as immutable C# records with pure transformation methods:
+
+```csharp
+public record CounterState(int Count, string? LastAction = null)
+{
+    public CounterState Increment() =>
+        this with { Count = Count + 1, LastAction = "Incremented" };
+
+    public CounterState Decrement() =>
+        this with { Count = Count - 1, LastAction = "Decremented" };
+}
+```
+
+### 2. Register Store
+
+```csharp
+// Program.cs
+builder.Services.AddStoreWithUtilities(
+    new CounterState(0),
+    (store, sp) => store.WithDefaults(sp, "Counter"));
+```
+
+### 3. Use in Components
+
+```razor
+@page "/counter"
+@inherits StoreComponent<CounterState>
+
+<h1>@State.Count</h1>
+<button @onclick="@(() => UpdateAsync(s => s.Increment()))">+</button>
+<button @onclick="@(() => UpdateAsync(s => s.Decrement()))">-</button>
+```
+
+## Core Concepts
+
+### Immutable State Pattern
+
+State is always immutable. Use `with` expressions for updates:
+
+```csharp
+public record TodoState(ImmutableList<Todo> Todos)
+{
+    public static TodoState Initial => new(ImmutableList<Todo>.Empty);
+
+    public TodoState AddTodo(string text) =>
+        this with { Todos = Todos.Add(new Todo(Guid.NewGuid(), text, false)) };
+
+    public TodoState ToggleTodo(Guid id) =>
+        this with {
+            Todos = Todos.Select(t =>
+                t.Id == id ? t with { Completed = !t.Completed } : t
+            ).ToImmutableList()
+        };
+}
+```
+
+### Interface Segregation
+
+`IStore<T>` composes three focused interfaces:
+
+```csharp
+public interface IStateReader<TState> where TState : notnull
+{
+    TState GetState();
+}
+
+public interface IStateWriter<TState> where TState : notnull
+{
+    Task UpdateAsync(Func<TState, TState> updater, string? action = null);
+    Task UpdateAsync(Func<TState, Task<TState>> asyncUpdater, string? action = null);
+}
+
+public interface IStateObservable<TState> where TState : notnull
+{
+    IDisposable Subscribe(Action<TState> callback);
+    IDisposable Subscribe<TSelected>(Func<TState, TSelected> selector, Action<TSelected> callback);
+}
+```
+
+## Registration Methods
+
+### AddSecureStore (Recommended for Production)
+
+```csharp
+builder.Services.AddSecureStore(
+    new AppState(),
+    "App",
+    opts =>
+    {
+        opts.PersistenceKey = "app-state";
+        opts.EnableTabSync = true;
+        opts.EnableHistory = true;
+    });
+```
+
+### AddStoreWithUtilities
+
+```csharp
+builder.Services.AddStoreWithUtilities(
+    TodoState.Initial,
+    (store, sp) => store
+        .WithDefaults(sp, "Todos")
+        .WithPersistence(sp, "todos"));
+```
+
+### AddScopedStoreWithUtilities (Blazor Server)
+
+```csharp
+builder.Services.AddScopedStoreWithUtilities(
+    new UserSessionState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Session")
+        .WithPersistence(sp, "session-state"));
+```
+
+### AddStoreWithHistory
+
+```csharp
+builder.Services.AddStoreWithHistory(
+    new EditorState(),
+    opts => opts
+        .WithMaxSize(100)
+        .WithMaxMemoryMB(50)
+        .ExcludeActions("CURSOR_MOVE"),
+    (store, sp) => store.WithDefaults(sp, "Editor")
+);
+```
+
+## Async Helpers
+
+### AsyncData<T>
+
+Replace boolean flags with a discriminated union:
+
+```csharp
+public record UserState(AsyncData<User> CurrentUser);
+
+// Usage in component
+@if (State.CurrentUser.IsLoading) { <Spinner /> }
+@if (State.CurrentUser.HasData) { <p>@State.CurrentUser.Data.Name</p> }
+@if (State.CurrentUser.HasError) { <p class="error">@State.CurrentUser.Error</p> }
+```
+
+### ExecuteCachedAsync
+
+Request deduplication - 10 components call this, only 1 API call:
+
+```csharp
+await ExecuteCachedAsync(
+    $"product-{productId}",
+    async () => await ProductService.GetAsync(productId),
+    loading: s => s with { Product = s.Product.ToLoading() },
+    success: (s, product) => s with { Product = AsyncData.Success(product) },
+    error: (s, ex) => s with { Product = AsyncData.Failure(ex.Message) },
+    cacheFor: TimeSpan.FromMinutes(5)
+);
+```
+
+### ExecuteAsync
+
+Structured async flow:
+
+```csharp
+await ExecuteAsync(
+    () => UserService.GetCurrentUserAsync(),
+    loading: s => s with { CurrentUser = s.CurrentUser.ToLoading() },
+    success: (s, user) => s with { CurrentUser = AsyncData<User>.Success(user) },
+    error: (s, ex) => s with { CurrentUser = AsyncData<User>.Failure(ex.Message) }
+);
+```
+
+### Debounce and Throttle
+
+```csharp
+// Search with 300ms debounce
+<input @oninput="@(e => UpdateDebounced(s => s.SetSearchQuery(e.Value?.ToString()), 300))" />
+
+// Mouse tracking throttled to 100ms
+<div @onmousemove="@(e => UpdateThrottled(s => s.SetPosition(e.ClientX, e.ClientY), 100))">
+```
+
+## Optimistic Updates
+
+Update UI immediately, rollback on error:
+
+```csharp
+await store.UpdateOptimistic(
+    s => s.RemoveItem(itemId),
+    async s => await api.DeleteItemAsync(itemId),
+    (s, error) => s.RestoreItem(itemId)
+);
+```
+
+With server response:
+
+```csharp
+await store.UpdateOptimistic<AppState, ServerItem>(
+    s => s.AddPendingItem(item),
+    async s => await api.CreateItemAsync(item),
+    (s, result) => s.ConfirmItem(result),
+    (s, error) => s.RemovePendingItem(item)
+);
+```
+
+## Undo/Redo History
+
+```csharp
+@inject IStoreHistory<EditorState> History
+
+<button @onclick="@(() => History.UndoAsync())" disabled="@(!History.CanUndo)">Undo</button>
+<button @onclick="@(() => History.RedoAsync())" disabled="@(!History.CanRedo)">Redo</button>
+```
+
+## Query System
+
+TanStack Query-inspired data fetching:
+
+```csharp
+@inject IQueryClient QueryClient
+
+@code {
+    private IQuery<User> userQuery = null!;
+
+    protected override void OnInitialized()
+    {
+        userQuery = QueryClient.CreateQuery<User>(
+            "user-123",
+            async ct => await api.GetUserAsync(123, ct),
+            opts => opts
+                .WithStaleTime(TimeSpan.FromMinutes(5))
+                .WithCacheTime(TimeSpan.FromHours(1))
+                .WithRetry(3)
+        );
+    }
+}
+```
+
+## Cross-Tab Sync
+
+```csharp
+builder.Services.AddStore(
+    new CartState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Cart")
+        .WithTabSync(sp, opts => opts
+            .Channel("shopping-cart")
+            .EnableMessageSigning()
+            .MaxMessageAgeSeconds(30))
+);
+```
+
+## Server Sync (SignalR)
+
+```csharp
+builder.Services.AddStore(
+    new DocumentState(),
+    (store, sp) => store
+        .WithDefaults(sp, "Document")
+        .WithServerSync(sp, opts => opts
+            .HubUrl("/hubs/documents")
+            .DocumentId(documentId)
+            .EnablePresence()
+            .EnableCursorTracking()
+            .ConflictResolution(ConflictResolution.LastWriteWins))
+);
+```
+
+## Immer-Style Updates
+
+Clean syntax for complex nested updates:
+
+```csharp
+await store.ProduceAsync(draft => draft
+    .Set(s => s.User.Profile.Address.City, "NYC")
+    .Append(s => s.Items, newItem)
+    .Increment(s => s.Count)
+    .Toggle(s => s.IsActive));
+```
+
+## Redux-Style Actions
+
+```csharp
+public record Increment : IAction<CounterState>;
+public record IncrementBy(int Amount) : IAction<CounterState>;
+
+await store.DispatchAsync(new IncrementBy(5), (state, action) =>
+    state with { Count = state.Count + action.Amount });
+```
+
+## Selectors (Performance)
+
+Only re-render when selected value changes:
+
+```csharp
+@inherits SelectorStoreComponent<AppState, int>
+
+@code {
+    protected override int SelectState(AppState state) => state.Count;
+}
+```
+
+## Plugin System
+
+```csharp
+public class AnalyticsPlugin : StorePluginBase<AppState>
+{
+    public override Task OnAfterUpdateAsync(AppState prev, AppState next, string action)
+    {
+        Analytics.Track(action, new { prev.Count, next.Count });
+        return Task.CompletedTask;
+    }
+}
+
+// Register
+builder.Services.AddStore(
+    new AppState(),
+    (store, sp) => store.WithPlugin<AppState, AnalyticsPlugin>(sp)
+);
+```
+
+## Security
+
+### Sensitive Data Filtering
+
+```csharp
+public record UserState(
+    string Username,
+    [property: SensitiveData] string Password,
+    [property: SensitiveData] string AuthToken
+);
+```
+
+### State Validation
+
+```csharp
+builder.Services.AddStateValidator<AppState>(state =>
+{
+    var errors = new List<string>();
+    if (state.UserId < 0) errors.Add("UserId cannot be negative");
+    return errors;
+});
+```
+
+## StoreBuilder Extensions
+
+```csharp
+store
+    .WithDefaults(sp, "Name")           // DevTools + Logging
+    .WithLogging()                      // Logging only
+    .WithPersistence(sp, "key")         // LocalStorage
+    .WithHistory(opts => ...)           // Undo/redo
+    .WithTabSync(sp, opts => ...)       // Cross-tab
+    .WithServerSync(sp, opts => ...)    // SignalR
+    .WithPlugin<TState, TPlugin>(sp)    // Plugin
+    .WithDiagnostics(sp)                // DEBUG only
+```
+
+## Feature Compatibility
+
+| Feature | WebAssembly | Server (Singleton) | Server (Scoped) | Auto |
+|---------|-------------|-------------------|-----------------|------|
+| Core Store | Yes | Yes | Yes | Yes |
+| Async Helpers | Yes | Yes | Yes | Yes |
+| DevTools | Yes | No | Yes | Yes |
+| Persistence | Yes | No | Yes | Yes |
+| TabSync | Yes | No | Yes | Yes |
+| History | Yes | Yes | Yes | Yes |
+| Query | Yes | Yes | Yes | Yes |
+| Plugins | Yes | Yes | Yes | Yes |
+
+## Common Gotchas
+
+1. Always use `with` expressions: `state with { X = 1 }` not `state.X = 1`
+2. Use ImmutableList: `Todos.Add(item)` returns new list
+3. State methods must be pure: No logging, no API calls
+4. Use UpdateAsync: Synchronous `Update()` is obsolete
+5. Register utilities: Call `AddStoreWithUtilities()` for async helpers
+6. Blazor Server: Use `AddScopedStore` for DevTools/Persistence/TabSync
+7. Security: Use `AddSecureStore` for production deployments
+
+## Documentation Links
+
+- [Introduction](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/)
+- [Quick Start](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/getting-started.html)
+- [Core Concepts](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/core-concepts.html)
+- [State Management](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/state-management.html)
+- [Components](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/components.html)
+- [Async Helpers](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/async-helpers/index.html)
+- [Middleware](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/middleware.html)
+- [Persistence](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/persistence.html)
+- [API Reference](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/api-reference.html)
+- [Best Practices](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/best-practices.html)
+- [Migration Guide](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/migration.html)
+- [Examples](https://mashrulhaque.github.io/EasyAppDev.Blazor.Store/examples.html)
