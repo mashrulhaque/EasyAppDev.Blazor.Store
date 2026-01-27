@@ -12,10 +12,12 @@ namespace EasyAppDev.Blazor.Store.Persistence;
 /// Operations are async due to Blazor's JS interop requirements.
 /// Errors are logged at Warning level and don't throw exceptions to ensure
 /// application stability when storage is unavailable or quota exceeded.
+/// In WebAssembly mode, synchronous operations are available via <see cref="IJSInProcessRuntime"/>.
 /// </remarks>
 public class LocalStorageProvider : IPersistenceProvider
 {
     private readonly IJSRuntime _jsRuntime;
+    private readonly IJSInProcessRuntime? _jsInProcessRuntime;
     private readonly ILogger<LocalStorageProvider>? _logger;
 
     /// <summary>
@@ -29,7 +31,55 @@ public class LocalStorageProvider : IPersistenceProvider
     public LocalStorageProvider(IJSRuntime jsRuntime, ILogger<LocalStorageProvider>? logger = null)
     {
         _jsRuntime = jsRuntime ?? throw new ArgumentNullException(nameof(jsRuntime));
+        _jsInProcessRuntime = jsRuntime as IJSInProcessRuntime;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Gets whether synchronous operations are available (WebAssembly mode).
+    /// </summary>
+    public bool SupportsSyncOperations => _jsInProcessRuntime != null;
+
+    /// <summary>
+    /// Synchronously loads a value from localStorage.
+    /// Only available in WebAssembly mode where <see cref="IJSInProcessRuntime"/> is available.
+    /// </summary>
+    /// <param name="key">The storage key.</param>
+    /// <returns>The stored value, or null if not found.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when called in Blazor Server mode where synchronous JS interop is not available.
+    /// </exception>
+    public string? LoadSync(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        if (_jsInProcessRuntime == null)
+        {
+            throw new InvalidOperationException(
+                "Synchronous JS interop is not available. " +
+                "Use LoadAsync instead, or ensure you're running in WebAssembly mode.");
+        }
+
+        try
+        {
+            var value = _jsInProcessRuntime.Invoke<string?>("localStorage.getItem", key);
+
+            if (value != null)
+            {
+                _logger?.LogDebug("Loaded from localStorage key: {Key}, Size: {Size:N0} bytes (sync)", key, value.Length);
+            }
+            else
+            {
+                _logger?.LogDebug("No value found in localStorage for key: {Key} (sync)", key);
+            }
+
+            return value;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to load from localStorage key: {Key} (sync)", key);
+            return null;
+        }
     }
 
     /// <inheritdoc />

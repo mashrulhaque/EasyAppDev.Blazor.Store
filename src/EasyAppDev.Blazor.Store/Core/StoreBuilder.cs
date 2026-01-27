@@ -39,6 +39,31 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
+    /// Creates a new builder with the specified initial state while preserving all other configuration.
+    /// Used internally for state hydration from persistence.
+    /// </summary>
+    /// <param name="newInitialState">The new initial state.</param>
+    /// <returns>A new builder with the updated initial state and all existing configuration.</returns>
+    public StoreBuilder<TState> WithInitialState(TState newInitialState)
+    {
+        ArgumentNullException.ThrowIfNull(newInitialState);
+
+        var newBuilder = new StoreBuilder<TState>(newInitialState)
+        {
+            _comparer = this._comparer,
+            _middlewarePipelineLogger = this._middlewarePipelineLogger,
+            _storeLogger = this._storeLogger,
+            _subscriptionManagerLogger = this._subscriptionManagerLogger,
+            _middlewareOptions = this._middlewareOptions,
+            _errorHandler = this._errorHandler,
+            _stateValidator = this._stateValidator,
+            _requireValidation = this._requireValidation
+        };
+        newBuilder._middlewares.AddRange(this._middlewares);
+        return newBuilder;
+    }
+
+    /// <summary>
     /// Gets the configured state validator, if any.
     /// </summary>
     public IStateValidator<TState>? StateValidator => _stateValidator;
