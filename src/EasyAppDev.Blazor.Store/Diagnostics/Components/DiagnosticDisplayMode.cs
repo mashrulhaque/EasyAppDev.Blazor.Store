@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Components;
 
 /// <summary>
@@ -16,4 +15,3 @@ public enum DiagnosticDisplayMode
     /// </summary>
     Inline
 }
-#endif

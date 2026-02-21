@@ -1,4 +1,3 @@
-#if DEBUG
 using EasyAppDev.Blazor.Store.Core;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -49,4 +48,3 @@ public static class DiagnosticsExtensions
         return builder.WithMiddleware(middleware);
     }
 }
-#endif

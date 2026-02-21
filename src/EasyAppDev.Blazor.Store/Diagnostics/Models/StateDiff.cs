@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 /// <summary>
@@ -64,4 +63,3 @@ public sealed class PropertyChange
     /// </summary>
     public bool IsRemoved { get; init; }
 }
-#endif

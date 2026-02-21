@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 /// <summary>
@@ -51,4 +50,3 @@ public sealed class ActionHistoryEntry
     /// </summary>
     public int NewStateSize { get; init; }
 }
-#endif

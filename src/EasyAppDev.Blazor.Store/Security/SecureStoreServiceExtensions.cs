@@ -233,9 +233,7 @@ public static class SecureStoreServiceExtensions
         {
             case SecurityProfile.Development:
                 builder = builder.WithLogging();
-#if DEBUG
                 builder = builder.WithDevTools(sp, storeName);
-#endif
                 break;
 
             case SecurityProfile.Production:
@@ -335,9 +333,7 @@ public static class SecureStoreBuilderExtensions
         {
             case SecurityProfile.Development:
                 builder = builder.WithLogging();
-#if DEBUG
                 builder = builder.WithDevTools(serviceProvider, storeName);
-#endif
                 break;
 
             case SecurityProfile.Production:

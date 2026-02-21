@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 /// <summary>
@@ -66,4 +65,3 @@ public sealed class PerformanceMetrics
     /// </summary>
     public double AverageStateSize { get; init; }
 }
-#endif

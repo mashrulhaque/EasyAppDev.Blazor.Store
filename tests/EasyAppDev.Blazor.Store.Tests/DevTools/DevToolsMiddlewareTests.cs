@@ -35,7 +35,6 @@ public class DevToolsMiddlewareTests
         return (serviceProviderMock, jsRuntimeMock, jsModuleMock);
     }
 
-#if DEBUG
     [Fact]
     public async Task OnAfterUpdateAsync_SendsActionToDevTools()
     {
@@ -68,7 +67,6 @@ public class DevToolsMiddlewareTests
         Assert.Throws<ArgumentNullException>(() =>
             new DevToolsMiddleware<TestState>((IServiceProvider)null!, "TestStore"));
     }
-#endif
 
     [Fact]
     public async Task OnAfterUpdateAsync_WhenDevToolsNotAvailable_DoesNotThrow()
@@ -99,7 +97,6 @@ public class DevToolsMiddlewareTests
             "TEST");
     }
 
-#if DEBUG
     [Fact]
     public async Task OnAfterUpdateAsync_WithNullAction_UsesDefaultActionName()
     {
@@ -152,7 +149,6 @@ public class DevToolsMiddlewareTests
         // Assert
         jsModuleMock.Verify(x => x.DisposeAsync(), Times.Once);
     }
-#endif
 
     [Fact]
     public async Task DisposeAsync_WhenModuleNotInitialized_DoesNotThrow()
@@ -171,7 +167,6 @@ public class DevToolsMiddlewareTests
         await middleware.DisposeAsync();
     }
 
-#if DEBUG
     [Fact]
     public async Task WithDevTools_AddsDevToolsMiddleware()
     {
@@ -195,7 +190,6 @@ public class DevToolsMiddlewareTests
                 It.IsAny<object[]>()),
             Times.Once);
     }
-#endif
 
     [Fact]
     public async Task WithDevTools_WhenJSRuntimeNotAvailable_SilentlySkipsDevTools()
@@ -219,7 +213,6 @@ public class DevToolsMiddlewareTests
         store.GetState().Counter.Should().Be(1);
     }
 
-#if DEBUG
     [Fact]
     public async Task DevToolsMiddleware_SerializesStateWithCamelCase()
     {
@@ -254,7 +247,6 @@ public class DevToolsMiddlewareTests
         capturedStateJson.Should().Contain("\"counter\":42"); // camelCase
         capturedStateJson.Should().Contain("\"message\":\"After\""); // camelCase
     }
-#endif
 
     [Fact]
     public async Task DevToolsMiddleware_WhenJSRuntimeNotInServiceProvider_GracefullyFails()

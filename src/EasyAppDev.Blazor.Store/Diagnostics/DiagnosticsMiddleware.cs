@@ -1,4 +1,3 @@
-#if DEBUG
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
@@ -206,4 +205,3 @@ public sealed class DiagnosticsMiddleware<TState> : IMiddleware<TState>
         }
     }
 }
-#endif

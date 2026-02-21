@@ -1,4 +1,3 @@
-#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 namespace EasyAppDev.Blazor.Store.Diagnostics;
@@ -109,4 +108,3 @@ public interface IDiagnosticsService
     /// <param name="stateType">The state type to clear data for.</param>
     void Clear(Type stateType);
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
 using FluentAssertions;
@@ -374,4 +373,3 @@ public class DiagnosticsServiceTests
     private record TestState(int Value);
     private record OtherTestState(string Text);
 }
-#endif

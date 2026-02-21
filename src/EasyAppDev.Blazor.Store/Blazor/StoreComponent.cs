@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using EasyAppDev.Blazor.Store.Core;
-#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
 using Microsoft.Extensions.DependencyInjection;
-#endif
 
 namespace EasyAppDev.Blazor.Store.Blazor;
 
@@ -21,9 +19,7 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
 {
     private IDisposable? _subscription;
     private volatile bool _disposed;
-#if DEBUG
     private Guid _subscriptionId;
-#endif
 
     /// <summary>
     /// Gets the injected store instance.
@@ -37,7 +33,6 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
     [Inject]
     protected ILogger<StoreComponent<TState>>? Logger { get; set; }
 
-#if DEBUG
     /// <summary>
     /// Gets the injected service provider.
     /// </summary>
@@ -45,10 +40,9 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
     private IServiceProvider ServiceProvider { get; set; } = default!;
 
     /// <summary>
-    /// Gets the diagnostics service if available (DEBUG only).
+    /// Gets the diagnostics service if available.
     /// </summary>
     protected IDiagnosticsService? DiagnosticsService { get; private set; }
-#endif
 
     /// <summary>
     /// Gets the current state from the store.
@@ -85,14 +79,11 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
     {
         base.OnInitialized();
 
-#if DEBUG
         DiagnosticsService = ServiceProvider.GetService(typeof(IDiagnosticsService)) as IDiagnosticsService;
-#endif
 
         SubscribeToStore();
     }
 
-#if DEBUG
     /// <inheritdoc />
     protected override void OnAfterRender(bool firstRender)
     {
@@ -110,14 +101,12 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
             });
         }
     }
-#endif
 
     /// <summary>
     /// Subscribes to store changes. Can be overridden for custom subscription logic.
     /// </summary>
     protected virtual void SubscribeToStore()
     {
-#if DEBUG
         _subscriptionId = Guid.NewGuid();
 
         if (DiagnosticsService is not null)
@@ -132,13 +121,10 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
                 NotificationCount = 0
             });
         }
-#endif
 
         _subscription = Store.Subscribe(state =>
         {
-#if DEBUG
             DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
-#endif
             // Use try-catch to handle component disposal during async invoke
             try
             {
@@ -201,9 +187,7 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
 
         if (disposing)
         {
-#if DEBUG
             DiagnosticsService?.RecordSubscriptionDisposed(_subscriptionId);
-#endif
             _subscription?.Dispose();
             _subscription = null;
         }

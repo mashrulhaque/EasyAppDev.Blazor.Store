@@ -1,4 +1,3 @@
-#if DEBUG
 using System.Collections.Concurrent;
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
 
@@ -321,4 +320,3 @@ public sealed class DiagnosticsService : IDiagnosticsService
         };
     }
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 /// <summary>
@@ -31,4 +30,3 @@ public sealed class RenderEvent
     /// </summary>
     public string? Reason { get; init; }
 }
-#endif

@@ -1,4 +1,3 @@
-#if DEBUG
 namespace EasyAppDev.Blazor.Store.Diagnostics.Models;
 
 /// <summary>
@@ -46,4 +45,3 @@ public sealed record SubscriptionInfo
     /// </summary>
     public int NotificationCount { get; init; }
 }
-#endif

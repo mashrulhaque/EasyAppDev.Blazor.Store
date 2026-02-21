@@ -1,8 +1,6 @@
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Core;
-#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
-#endif
 using EasyAppDev.Blazor.Store.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
@@ -50,12 +48,10 @@ public static class StoreBuilderExtensions
         bool includeDevTools)
         where TState : notnull
     {
-#if DEBUG
         if (includeDevTools)
         {
             builder = builder.WithDevTools(serviceProvider, storeName ?? typeof(TState).Name);
         }
-#endif
         return builder.WithLogging();
     }
 
@@ -184,13 +180,11 @@ public static class StoreBuilderExtensions
         IServiceProvider serviceProvider)
         where TState : notnull
     {
-#if DEBUG
         var diagnosticsService = serviceProvider.GetService<IDiagnosticsService>();
         if (diagnosticsService != null)
         {
             return builder.WithDiagnostics(diagnosticsService);
         }
-#endif
         return builder;
     }
 }

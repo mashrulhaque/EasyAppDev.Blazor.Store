@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using EasyAppDev.Blazor.Store.Core;
-#if DEBUG
 using EasyAppDev.Blazor.Store.Diagnostics;
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
 using Microsoft.Extensions.DependencyInjection;
-#endif
 
 namespace EasyAppDev.Blazor.Store.Blazor;
 
@@ -40,9 +38,7 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     private object? _lastRenderedValue;
     private int _isFirstRender = 1; // 1 = true, 0 = false (for thread-safe access)
     private readonly object _valueLock = new();
-#if DEBUG
     private Guid _subscriptionId;
-#endif
 
     /// <summary>
     /// Gets the injected store instance.
@@ -50,18 +46,16 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     [Inject]
     protected IStore<TState> Store { get; set; } = default!;
 
-#if DEBUG
     /// <summary>
-    /// Gets the injected service provider (DEBUG only).
+    /// Gets the injected service provider.
     /// </summary>
     [Inject]
     private IServiceProvider ServiceProvider { get; set; } = default!;
 
     /// <summary>
-    /// Gets the diagnostics service if available (DEBUG only).
+    /// Gets the diagnostics service if available.
     /// </summary>
     protected IDiagnosticsService? DiagnosticsService { get; private set; }
-#endif
 
     /// <summary>
     /// Gets the current state from the store.
@@ -131,10 +125,8 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     {
         base.OnInitialized();
 
-#if DEBUG
         // Try to resolve diagnostics service if available
         DiagnosticsService = ServiceProvider.GetService(typeof(IDiagnosticsService)) as IDiagnosticsService;
-#endif
 
         SubscribeToStore();
     }
@@ -181,7 +173,6 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
             _lastRenderedValue = _selectedValue;
         }
 
-#if DEBUG
         // Record render event for diagnostics
         // This is now safe with ShouldRender() optimization preventing cascade renders
         if (DiagnosticsService is not null)
@@ -195,7 +186,6 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
                 Reason = firstRender ? "Initial Render" : "Selector Value Changed"
             });
         }
-#endif
     }
 
     /// <summary>
@@ -207,7 +197,6 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
         // Get initial selected value
         _selectedValue = SelectState(Store.GetState());
 
-#if DEBUG
         _subscriptionId = Guid.NewGuid();
 
         if (DiagnosticsService is not null)
@@ -222,18 +211,15 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
                 NotificationCount = 0
             });
         }
-#endif
 
         // Subscribe using the selector
         _subscription = Store.Subscribe(
             selector: SelectState,
             callback: value =>
             {
-#if DEBUG
                 // Record subscription notification for diagnostics
                 // This is now safe with ShouldRender() optimization preventing cascade renders
                 DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
-#endif
                 // Thread-safe write to _selectedValue
                 lock (_valueLock)
                 {
@@ -269,9 +255,7 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
 
         if (disposing)
         {
-#if DEBUG
             DiagnosticsService?.RecordSubscriptionDisposed(_subscriptionId);
-#endif
             _subscription?.Dispose();
             _subscription = null;
         }
