@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.11</Version>
+    <Version>2.0.12</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,6 +31,18 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v2.0.12 - Persistence Hydration Fixes (fixes #11)
+
+Bug Fixes:
+- WithPersistence(provider, options) and WithSecurePersistence() now hydrate
+  state on init in WebAssembly mode (previously only WithPersistence(sp, key) did)
+- Unified sync hydration path: wrapper format, HMAC signature verification,
+  state validation, and TransformOnLoad are applied consistently across all
+  WithPersistence overloads
+- Hydration errors now log to ILogger and Console.Error (was silent
+  Debug.WriteLine in Release WASM)
+- New public API: PersistenceMiddleware.TryLoadStateSync() for advanced scenarios
+
 v2.0.9 - LLM-Friendly Documentation
 
 New Features:
