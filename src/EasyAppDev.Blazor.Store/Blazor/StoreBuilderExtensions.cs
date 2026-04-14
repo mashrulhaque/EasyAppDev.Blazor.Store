@@ -1,4 +1,3 @@
-using System.Text.Json;
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Diagnostics;
 using EasyAppDev.Blazor.Store.Persistence;
@@ -98,74 +97,11 @@ public static class StoreBuilderExtensions
 
         var provider = new LocalStorageProvider(jsRuntime);
 
-        // In WebAssembly mode, synchronous JS interop is available
-        // Load persisted state before building the store
-        if (provider.SupportsSyncOperations)
-        {
-            builder = TryHydrateStateSync(builder, provider, key);
-        }
-
+        // Hydration is now performed inside StoreBuilder.WithPersistence via the middleware
+        // when the provider supports sync operations (WebAssembly). This unifies the
+        // hydration path so wrapper handling, signature verification, validation, and
+        // transforms apply consistently regardless of which WithPersistence overload is used.
         return builder.WithPersistence(provider, key);
-    }
-
-    /// <summary>
-    /// Attempts to hydrate state synchronously from localStorage (WebAssembly only).
-    /// </summary>
-    private static StoreBuilder<TState> TryHydrateStateSync<TState>(
-        StoreBuilder<TState> builder,
-        LocalStorageProvider provider,
-        string key)
-        where TState : notnull
-    {
-        try
-        {
-            var json = provider.LoadSync(key);
-            if (string.IsNullOrEmpty(json))
-            {
-                return builder;
-            }
-
-            var jsonOptions = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-
-            // Try to deserialize as new format (with wrapper)
-            string stateJson;
-            try
-            {
-                var wrapper = JsonSerializer.Deserialize<PersistedStateWrapper>(json, jsonOptions);
-                if (wrapper != null && !string.IsNullOrEmpty(wrapper.State))
-                {
-                    stateJson = wrapper.State;
-                }
-                else
-                {
-                    // Legacy format - plain JSON state
-                    stateJson = json;
-                }
-            }
-            catch
-            {
-                // Deserialization failed, try legacy format
-                stateJson = json;
-            }
-
-            var loadedState = JsonSerializer.Deserialize<TState>(stateJson, jsonOptions);
-            if (loadedState != null)
-            {
-                // Create new builder with hydrated state, preserving configuration
-                return builder.WithInitialState(loadedState);
-            }
-        }
-        catch (Exception ex)
-        {
-            // Log but don't fail - fall back to initial state
-            System.Diagnostics.Debug.WriteLine(
-                $"[EasyAppDev.Store] Failed to hydrate state for {typeof(TState).Name} from key '{key}': {ex.Message}");
-        }
-
-        return builder;
     }
 
     /// <summary>

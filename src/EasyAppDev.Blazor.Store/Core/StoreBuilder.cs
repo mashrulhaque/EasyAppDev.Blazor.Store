@@ -285,14 +285,13 @@ public class StoreBuilder<TState> where TState : notnull
         JsonSerializerOptions? jsonOptions = null,
         int debounceMs = 0)
     {
-        var hydratedBuilder = TryLoadPersistedState(key, jsonOptions);
-
         var middleware = new PersistenceMiddleware<TState>(
             provider,
             key,
             jsonOptions,
             debounceMs);
 
+        var hydratedBuilder = TryHydrateFromMiddleware(middleware);
         return hydratedBuilder.WithMiddleware(middleware);
     }
 
@@ -322,7 +321,25 @@ public class StoreBuilder<TState> where TState : notnull
         ArgumentNullException.ThrowIfNull(options);
 
         var middleware = new PersistenceMiddleware<TState>(provider, options);
-        return WithMiddleware(middleware);
+        var hydratedBuilder = options.HydrateOnInit
+            ? TryHydrateFromMiddleware(middleware)
+            : this;
+        return hydratedBuilder.WithMiddleware(middleware);
+    }
+
+    /// <summary>
+    /// Attempts sync hydration through the middleware. Returns a builder with the hydrated
+    /// initial state if the provider supports sync operations (WebAssembly) and a persisted
+    /// state was successfully loaded. Otherwise returns <c>this</c> unchanged.
+    /// </summary>
+    private StoreBuilder<TState> TryHydrateFromMiddleware(PersistenceMiddleware<TState> middleware)
+    {
+        var (supported, state) = middleware.TryLoadStateSync();
+        if (supported && state is not null)
+        {
+            return WithInitialState(state);
+        }
+        return this;
     }
 
     /// <summary>

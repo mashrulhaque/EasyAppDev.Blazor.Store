@@ -384,4 +384,140 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
     /// Gets whether hydration should occur on initialization.
     /// </summary>
     public bool HydrateOnInit => _options?.HydrateOnInit ?? true;
+
+    /// <summary>
+    /// Synchronously loads the persisted state if the provider supports sync operations
+    /// (i.e., WebAssembly mode via Microsoft.JSInterop.IJSInProcessRuntime).
+    /// </summary>
+    /// <returns>
+    /// A tuple of (supported, state). If <c>supported</c> is false, sync loading is not
+    /// available on this provider and the caller should fall back to async hydration.
+    /// If <c>supported</c> is true but <c>state</c> is default, no persisted state was found
+    /// or it failed validation/integrity checks.
+    /// </returns>
+    public (bool Supported, TState? State) TryLoadStateSync()
+    {
+        if (_provider is not LocalStorageProvider lsp || !lsp.SupportsSyncOperations)
+        {
+            return (false, default);
+        }
+
+        try
+        {
+            var json = lsp.LoadSync(_key);
+            if (string.IsNullOrEmpty(json))
+            {
+                _options?.OnHydrationSkipped?.Invoke();
+                return (true, default);
+            }
+
+            var loaded = ParsePersistedJson(json);
+            return (true, loaded);
+        }
+        catch (StateIntegrityException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error loading persisted state synchronously from key: {Key}", _key);
+            // Surface to the browser console as well, since Debug.WriteLine is silent in Release WASM.
+            Console.Error.WriteLine(
+                $"[EasyAppDev.Store] Sync hydration failed for {typeof(TState).Name} (key '{_key}'): {ex.GetType().Name}: {ex.Message}");
+            _options?.OnHydrationFailure?.Invoke(ex);
+            return (true, default);
+        }
+    }
+
+    /// <summary>
+    /// Shared JSON parsing logic for both sync and async hydration paths.
+    /// Handles wrapper unwrapping, signature verification, validation, and transformation.
+    /// </summary>
+    private TState? ParsePersistedJson(string json)
+    {
+        string stateJson;
+        PersistedStateWrapper? wrapper = null;
+
+        try
+        {
+            wrapper = JsonSerializer.Deserialize<PersistedStateWrapper>(json, _jsonOptions);
+        }
+        catch
+        {
+            // Ignore - will fall back to legacy plain-JSON format below.
+        }
+
+        if (wrapper != null && !string.IsNullOrEmpty(wrapper.State))
+        {
+            stateJson = wrapper.State;
+
+            if (_messageSigner != null && !string.IsNullOrEmpty(wrapper.Signature))
+            {
+                if (!_messageSigner.Verify(stateJson, wrapper.Signature))
+                {
+                    var integrityEx = new StateIntegrityException(
+                        $"State integrity verification failed for key '{_key}'. The persisted state may have been tampered with.");
+                    _logger?.LogError(integrityEx, "Integrity check failed for key: {Key}", _key);
+                    _options?.OnHydrationFailure?.Invoke(integrityEx);
+                    return default;
+                }
+            }
+            else if (_messageSigner != null && string.IsNullOrEmpty(wrapper.Signature))
+            {
+                _logger?.LogWarning(
+                    "State loaded without signature for key: {Key}. RequireSignature: {Required}",
+                    _key,
+                    _options?.RequireSignature ?? false);
+
+                if (_options?.RequireSignature == true)
+                {
+                    var integrityEx = new StateIntegrityException(
+                        $"Unsigned state rejected for key '{_key}'. Integrity signing is required but no signature found.");
+                    _logger?.LogError(integrityEx, "Unsigned state rejected for key: {Key}", _key);
+                    _options.OnHydrationFailure?.Invoke(integrityEx);
+                    return default;
+                }
+            }
+        }
+        else
+        {
+            // Legacy plain-JSON format (pre-wrapper).
+            stateJson = json;
+        }
+
+        var loadedState = JsonSerializer.Deserialize<TState>(stateJson, _jsonOptions);
+        if (loadedState == null)
+        {
+            _options?.OnHydrationSkipped?.Invoke();
+            return default;
+        }
+
+        if (_options?.StateValidator != null)
+        {
+            var validationResult = _options.StateValidator.Validate(loadedState);
+            if (!validationResult.IsValid)
+            {
+                _logger?.LogWarning(
+                    "State validation failed for key {Key}: {Errors}",
+                    _key,
+                    string.Join(", ", validationResult.Errors));
+                _options.OnValidationFailed?.Invoke(validationResult with { Source = "Persistence" });
+
+                if (_options.RejectInvalidState)
+                {
+                    _options.OnHydrationFailure?.Invoke(
+                        new InvalidOperationException(
+                            $"State validation failed: {string.Join(", ", validationResult.Errors)}"));
+                    return default;
+                }
+            }
+        }
+
+        var transformedState = _options?.TransformOnLoad != null
+            ? _options.TransformOnLoad(loadedState)
+            : loadedState;
+
+        _options?.OnHydrationSuccess?.Invoke(transformedState);
+        return transformedState;
+    }
 }
