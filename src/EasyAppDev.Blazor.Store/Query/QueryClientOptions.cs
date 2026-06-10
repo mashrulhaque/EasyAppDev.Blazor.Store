@@ -28,13 +28,13 @@ public class QueryClientOptions
 
     /// <summary>
     /// Gets or sets whether to refetch on window focus by default.
-    /// Default is true.
+    /// Reserved for future use — window-focus refetching is not yet implemented.
     /// </summary>
     public bool DefaultRefetchOnWindowFocus { get; set; } = true;
 
     /// <summary>
     /// Gets or sets whether to refetch on reconnect by default.
-    /// Default is true.
+    /// Reserved for future use — reconnect refetching is not yet implemented.
     /// </summary>
     public bool DefaultRefetchOnReconnect { get; set; } = true;
 

@@ -149,16 +149,27 @@ public abstract class QueryComponent : ComponentBase, IDisposable
     {
         await base.OnInitializedAsync();
 
-        // Initialize all queries
-        foreach (var disposable in _disposables)
+        try
         {
-            if (disposable is IQueryInitializable initializable)
+            // Initialize all queries. Iterate by index (not foreach) so queries
+            // added to _disposables while awaiting (e.g. UseQuery called during
+            // a render triggered by a state change) don't throw
+            // InvalidOperationException and are also initialized.
+            for (var i = 0; i < _disposables.Count; i++)
             {
-                await initializable.InitializeAsync();
+                if (_disposables[i] is IQueryInitializable initializable)
+                {
+                    await initializable.InitializeAsync();
+                }
             }
         }
-
-        _initialized = true;
+        finally
+        {
+            // Always mark initialized, even if an individual init throws, so the
+            // component is not permanently broken (later UseQuery calls would
+            // otherwise never initialize their queries).
+            _initialized = true;
+        }
     }
 
     /// <summary>
@@ -180,18 +191,14 @@ public abstract class QueryComponent : ComponentBase, IDisposable
 
         if (disposing)
         {
-            // Wait for any pending initializations to complete to prevent orphaned tasks
-            Task[] pendingTasks;
+            // Do NOT block on pending initializations here: a synchronous wait
+            // would freeze the Blazor Server dispatcher (deterministic 1s circuit
+            // stall) and throws PlatformNotSupportedException on WebAssembly.
+            // Pending init tasks tolerate disposal (InitializeQueryAsync catches
+            // ObjectDisposedException), so they can simply be dropped.
             lock (_initLock)
             {
-                pendingTasks = _pendingInitializations.ToArray();
                 _pendingInitializations.Clear();
-            }
-
-            if (pendingTasks.Length > 0)
-            {
-                // Give a short timeout for pending initializations
-                Task.WhenAll(pendingTasks).Wait(TimeSpan.FromSeconds(1));
             }
 
             foreach (var disposable in _disposables)

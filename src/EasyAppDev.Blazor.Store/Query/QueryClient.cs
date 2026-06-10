@@ -42,6 +42,8 @@ public sealed class QueryClient : IQueryClient, IDisposable
     /// </summary>
     public QueryClientOptions Options => _options;
 
+    QueryClientOptions? IQueryClient.Options => _options;
+
     /// <inheritdoc />
     public T? GetQueryData<T>(string key)
     {
@@ -54,8 +56,9 @@ public sealed class QueryClient : IQueryClient, IDisposable
                 return typedEntry.Data;
             }
 
-            // Expired, remove it
-            _cache.TryRemove(key, out _);
+            // Expired - conditionally remove only the exact expired entry instance,
+            // so a concurrent SetQueryData write is never deleted.
+            _cache.TryRemove(new KeyValuePair<string, object>(key, entry));
         }
 
         return default;
@@ -136,7 +139,15 @@ public sealed class QueryClient : IQueryClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(predicate);
 
-        foreach (var key in _cache.Keys.Where(predicate))
+        // Include active-but-uncached queries (registered refetchers) as well as
+        // cached keys, deduplicated.
+        var keys = _cache.Keys
+            .Concat(_queryRefetchers.Keys)
+            .Distinct()
+            .Where(predicate)
+            .ToList();
+
+        foreach (var key in keys)
         {
             InvalidateQueries(key);
         }
@@ -195,10 +206,19 @@ public sealed class QueryClient : IQueryClient, IDisposable
 
     void IQueryClient.RegisterQuery(string key, Func<Task> refetch)
     {
-        var list = _queryRefetchers.GetOrAdd(key, _ => new List<Func<Task>>());
-        lock (list)
+        while (true)
         {
-            list.Add(refetch);
+            var list = _queryRefetchers.GetOrAdd(key, _ => new List<Func<Task>>());
+            lock (list)
+            {
+                // The list may have been removed from the dictionary (when it became
+                // empty) between GetOrAdd and taking the lock - retry if so.
+                if (_queryRefetchers.TryGetValue(key, out var current) && ReferenceEquals(current, list))
+                {
+                    list.Add(refetch);
+                    return;
+                }
+            }
         }
     }
 
@@ -209,6 +229,14 @@ public sealed class QueryClient : IQueryClient, IDisposable
             lock (list)
             {
                 list.Remove(refetch);
+
+                // Remove the dictionary entry when the per-key list becomes empty
+                // to avoid unbounded growth. Conditional removal (key + exact list
+                // instance) under the list lock keeps RegisterQuery race-free.
+                if (list.Count == 0)
+                {
+                    _queryRefetchers.TryRemove(new KeyValuePair<string, List<Func<Task>>>(key, list));
+                }
             }
         }
     }
@@ -252,7 +280,7 @@ public sealed class QueryClient : IQueryClient, IDisposable
         if (Volatile.Read(ref _disposed) != 0) return;
 
         var now = DateTime.UtcNow;
-        var expiredKeys = new List<string>();
+        var expiredEntries = new List<KeyValuePair<string, object>>();
 
         // Create a snapshot of the cache to avoid concurrent modification issues
         var cacheSnapshot = _cache.ToArray();
@@ -264,7 +292,7 @@ public sealed class QueryClient : IQueryClient, IDisposable
                 // Use interface for type-safe expiration check without reflection
                 if (kvp.Value is IQueryCacheEntry entry && now >= entry.ExpiresAt)
                 {
-                    expiredKeys.Add(kvp.Key);
+                    expiredEntries.Add(kvp);
                 }
             }
             catch (Exception ex)
@@ -274,12 +302,24 @@ public sealed class QueryClient : IQueryClient, IDisposable
             }
         }
 
-        foreach (var key in expiredKeys)
+        foreach (var kvp in expiredEntries)
         {
-            _cache.TryRemove(key, out _);
-            // Also clean up invalidation flags to prevent memory leak
-            _invalidatedKeys.TryRemove(key, out _);
-            _logger?.LogDebug("Expired cache entry removed for key {Key}", key);
+            // Conditionally remove only the exact expired entry instance so freshly
+            // written data for the same key is never deleted.
+            if (_cache.TryRemove(kvp))
+            {
+                _logger?.LogDebug("Expired cache entry removed for key {Key}", kvp.Key);
+            }
+        }
+
+        // Clean up invalidation flags for keys that have neither a cache entry nor
+        // any registered (active) query, to prevent unbounded growth.
+        foreach (var key in _invalidatedKeys.Keys)
+        {
+            if (!_cache.ContainsKey(key) && !_queryRefetchers.ContainsKey(key))
+            {
+                _invalidatedKeys.TryRemove(key, out _);
+            }
         }
     }
 

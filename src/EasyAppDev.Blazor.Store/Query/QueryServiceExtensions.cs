@@ -13,6 +13,12 @@ public static class QueryServiceExtensions
     /// <summary>
     /// Adds the query client and related services to the service collection.
     /// </summary>
+    /// <remarks>
+    /// The <see cref="IQueryClient"/> is registered as a scoped service so that on
+    /// Blazor Server each user circuit gets its own isolated query cache (a singleton
+    /// would leak cached data across users). On Blazor WebAssembly the scope is the
+    /// application, so behavior is unchanged (effectively a singleton per app).
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection for chaining.</returns>
     public static IServiceCollection AddQueryClient(this IServiceCollection services)
@@ -23,6 +29,12 @@ public static class QueryServiceExtensions
     /// <summary>
     /// Adds the query client with custom options.
     /// </summary>
+    /// <remarks>
+    /// The <see cref="IQueryClient"/> is registered as a scoped service so that on
+    /// Blazor Server each user circuit gets its own isolated query cache (a singleton
+    /// would leak cached data across users). On Blazor WebAssembly the scope is the
+    /// application, so behavior is unchanged (effectively a singleton per app).
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Action to configure query client options.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -33,7 +45,7 @@ public static class QueryServiceExtensions
         ArgumentNullException.ThrowIfNull(configure);
 
         services.Configure(configure);
-        services.AddSingleton<IQueryClient, QueryClient>();
+        services.AddScoped<IQueryClient, QueryClient>();
 
         return services;
     }
@@ -41,6 +53,12 @@ public static class QueryServiceExtensions
     /// <summary>
     /// Adds the query client with a configuration section.
     /// </summary>
+    /// <remarks>
+    /// The <see cref="IQueryClient"/> is registered as a scoped service so that on
+    /// Blazor Server each user circuit gets its own isolated query cache (a singleton
+    /// would leak cached data across users). On Blazor WebAssembly the scope is the
+    /// application, so behavior is unchanged (effectively a singleton per app).
+    /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <param name="options">The pre-configured options.</param>
     /// <returns>The service collection for chaining.</returns>
@@ -51,7 +69,7 @@ public static class QueryServiceExtensions
         ArgumentNullException.ThrowIfNull(options);
 
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(options));
-        services.AddSingleton<IQueryClient, QueryClient>();
+        services.AddScoped<IQueryClient, QueryClient>();
 
         return services;
     }
