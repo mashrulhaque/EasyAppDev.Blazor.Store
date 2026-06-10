@@ -46,7 +46,7 @@ public sealed class LazyCache : ILazyCache, IAsyncDisposable
     private readonly Dictionary<string, object> _cache = new();
     private readonly Dictionary<string, Task<object?>> _inFlightRequests = new();
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed, 1 = disposed (use int for Interlocked)
 
     /// <summary>
     /// Gets or loads data from cache.
@@ -274,10 +274,14 @@ public sealed class LazyCache : ILazyCache, IAsyncDisposable
     {
         get
         {
-            // Use timeout to prevent indefinite blocking in edge cases
+            ThrowIfDisposed();
+
+            // Use timeout to prevent indefinite blocking in edge cases. Throw on timeout
+            // rather than returning a misleading value such as 0.
             if (!_lock.Wait(TimeSpan.FromSeconds(5)))
             {
-                return 0; // Return 0 if lock timeout (cache may be busy)
+                throw new TimeoutException(
+                    "Timed out waiting to read LazyCache.Count. Use GetCountAsync in async contexts.");
             }
             try
             {
@@ -296,6 +300,8 @@ public sealed class LazyCache : ILazyCache, IAsyncDisposable
     /// <returns>The count of entries in the cache.</returns>
     public async Task<int> GetCountAsync()
     {
+        ThrowIfDisposed();
+
         await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -315,26 +321,28 @@ public sealed class LazyCache : ILazyCache, IAsyncDisposable
     /// </remarks>
     public void Dispose()
     {
-        if (_disposed) return;
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
         // Use timeout to prevent indefinite blocking during dispose
-        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
-        {
-            // Force dispose even if lock timeout
-            _disposed = true;
-            _lock.Dispose();
-            return;
-        }
+        var acquired = _lock.Wait(TimeSpan.FromSeconds(5));
         try
         {
             _cache.Clear();
             _inFlightRequests.Clear();
-            _disposed = true;
         }
         finally
         {
-            _lock.Release();
-            _lock.Dispose();
+            if (acquired)
+            {
+                _lock.Release();
+            }
+
+            // NOTE: _lock (SemaphoreSlim) is intentionally NOT disposed. It holds no
+            // unmanaged resources as long as AvailableWaitHandle is never accessed
+            // (it is not), and disposing it would make in-flight GetOrLoadAsync calls
+            // throw ObjectDisposedException when they re-acquire it during cleanup.
         }
     }
 
@@ -344,25 +352,26 @@ public sealed class LazyCache : ILazyCache, IAsyncDisposable
     /// <returns>A ValueTask representing the async dispose operation.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
         await _lock.WaitAsync().ConfigureAwait(false);
         try
         {
             _cache.Clear();
             _inFlightRequests.Clear();
-            _disposed = true;
         }
         finally
         {
             _lock.Release();
-            _lock.Dispose();
+            // NOTE: _lock intentionally not disposed - see Dispose().
         }
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(LazyCache));
         }

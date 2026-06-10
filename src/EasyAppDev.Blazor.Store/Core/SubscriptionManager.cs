@@ -13,6 +13,10 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
     private readonly Queue<SubscriptionBase> _pendingRemovals = new();
     private int _disposed; // 0 = not disposed, 1 = disposed
     private bool _isNotifying;
+    // Highest commit version delivered so far. Guarded by the _subscriptions lock so it is
+    // serialized against both other notifications and Subscribe (closing the
+    // subscribe-vs-notify race window).
+    private long _highestNotifiedVersion;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SubscriptionManager{TState}"/> class.
@@ -54,6 +58,23 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
     }
 
     /// <inheritdoc />
+    public IDisposable Subscribe(Action<TState, string?> callback, Func<TState> stateGetter)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        ArgumentNullException.ThrowIfNull(stateGetter);
+        ThrowIfDisposed();
+
+        var subscription = new ActionAwareSubscription(callback, stateGetter, RemoveSubscription);
+
+        lock (_subscriptions)
+        {
+            _subscriptions.Add(subscription);
+        }
+
+        return subscription;
+    }
+
+    /// <inheritdoc />
     public IDisposable Subscribe<TSelected>(
         Func<TState, TSelected> selector,
         Action<TSelected> callback,
@@ -66,14 +87,20 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
         ArgumentNullException.ThrowIfNull(comparer);
         ThrowIfDisposed();
 
-        var state = stateGetter();
-        var initialValue = selector(state);
+        SelectorSubscription<TSelected> subscription;
 
-        var subscription = new SelectorSubscription<TSelected>(
-            selector, callback, stateGetter, comparer, initialValue, RemoveSubscription);
-
+        // Compute the initial value and add the subscription inside the same lock used by
+        // NotifyAll for copying the subscription list. This serializes Subscribe against
+        // NotifyAll: an update committed before the snapshot here is reflected in the
+        // initial value, and one committed after will notify the now-registered subscription.
         lock (_subscriptions)
         {
+            var state = stateGetter();
+            var initialValue = selector(state);
+
+            subscription = new SelectorSubscription<TSelected>(
+                selector, callback, stateGetter, comparer, initialValue, RemoveSubscription);
+
             _subscriptions.Add(subscription);
         }
 
@@ -116,12 +143,35 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
     /// <inheritdoc />
     public void NotifyAll(TState capturedState)
     {
+        NotifyAllCore(capturedState, version: null, action: null);
+    }
+
+    /// <inheritdoc />
+    public void NotifyAll(TState capturedState, long version, string? action)
+    {
+        NotifyAllCore(capturedState, version, action);
+    }
+
+    private void NotifyAllCore(TState capturedState, long? version, string? action)
+    {
         ThrowIfDisposed();
 
         List<SubscriptionBase> subscriptionsCopy;
 
         lock (_subscriptions)
         {
+            if (version.HasValue)
+            {
+                if (version.Value <= _highestNotifiedVersion)
+                {
+                    // A newer (or the same) state has already been delivered - skip this
+                    // stale notification so subscribers never regress to an older value.
+                    return;
+                }
+
+                _highestNotifiedVersion = version.Value;
+            }
+
             subscriptionsCopy = new List<SubscriptionBase>(_subscriptions);
             _isNotifying = true;
         }
@@ -132,7 +182,7 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
             {
                 try
                 {
-                    subscription.InvokeWithSnapshot(capturedState);
+                    subscription.InvokeWithSnapshot(capturedState, action);
                 }
                 catch (Exception ex)
                 {
@@ -219,11 +269,33 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
             _unsubscribe = unsubscribe;
         }
 
+        private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
         /// <summary>Invokes using the stored state getter (legacy behavior).</summary>
-        public abstract void Invoke();
+        public void Invoke()
+        {
+            // Skip disposed subscriptions even when they are still present in a
+            // notification snapshot taken before disposal.
+            if (IsDisposed)
+                return;
+
+            InvokeCore();
+        }
 
         /// <summary>Invokes with a captured state snapshot for consistency.</summary>
-        public abstract void InvokeWithSnapshot(TState capturedState);
+        public void InvokeWithSnapshot(TState capturedState, string? action)
+        {
+            // Skip disposed subscriptions even when they are still present in a
+            // notification snapshot taken before disposal.
+            if (IsDisposed)
+                return;
+
+            InvokeWithSnapshotCore(capturedState, action);
+        }
+
+        protected abstract void InvokeCore();
+
+        protected abstract void InvokeWithSnapshotCore(TState capturedState, string? action);
 
         public void Dispose()
         {
@@ -252,8 +324,33 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
             _stateGetter = stateGetter;
         }
 
-        public override void Invoke() => _callback(_stateGetter());
-        public override void InvokeWithSnapshot(TState capturedState) => _callback(capturedState);
+        protected override void InvokeCore() => _callback(_stateGetter());
+
+        protected override void InvokeWithSnapshotCore(TState capturedState, string? action) =>
+            _callback(capturedState);
+    }
+
+    /// <summary>
+    /// Subscription for full state callbacks that also receive the action name.
+    /// </summary>
+    private sealed class ActionAwareSubscription : SubscriptionBase
+    {
+        private readonly Action<TState, string?> _callback;
+        private readonly Func<TState> _stateGetter;
+
+        public ActionAwareSubscription(
+            Action<TState, string?> callback,
+            Func<TState> stateGetter,
+            Action<SubscriptionBase> unsubscribe) : base(unsubscribe)
+        {
+            _callback = callback;
+            _stateGetter = stateGetter;
+        }
+
+        protected override void InvokeCore() => _callback(_stateGetter(), null);
+
+        protected override void InvokeWithSnapshotCore(TState capturedState, string? action) =>
+            _callback(capturedState, action);
     }
 
     /// <summary>
@@ -283,12 +380,12 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
             _previousValue = initialValue;
         }
 
-        public override void Invoke()
+        protected override void InvokeCore()
         {
             InvokeWithState(_stateGetter());
         }
 
-        public override void InvokeWithSnapshot(TState capturedState)
+        protected override void InvokeWithSnapshotCore(TState capturedState, string? action)
         {
             InvokeWithState(capturedState);
         }
@@ -296,14 +393,23 @@ public sealed class SubscriptionManager<TState> : ISubscriptionManager<TState> w
         private void InvokeWithState(TState state)
         {
             var currentValue = _selector(state);
+            bool shouldNotify;
 
+            // Decide and record the change under the lock, but invoke the user callback
+            // OUTSIDE it: callbacks can be arbitrarily slow or re-entrant and must not
+            // execute while holding _valueLock.
             lock (_valueLock)
             {
-                if (!_comparer.Equals(_previousValue, currentValue))
+                shouldNotify = !_comparer.Equals(_previousValue, currentValue);
+                if (shouldNotify)
                 {
                     _previousValue = currentValue;
-                    _callback(currentValue);
                 }
+            }
+
+            if (shouldNotify)
+            {
+                _callback(currentValue);
             }
         }
     }

@@ -3,6 +3,7 @@
 
 using EasyAppDev.Blazor.Store.Core;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
@@ -17,8 +18,10 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     private const int MaxCacheSize = 1000;
     private readonly IStateWriter<TState> _stateWriter;
     private readonly ILogger<AsyncActionExecutor<TState>>? _logger;
-    private readonly Dictionary<string, CachedOperation> _inFlightOperations = new();
-    private readonly Dictionary<string, CachedResult> _cachedResults = new();
+    private readonly ConcurrentDictionary<string, CachedOperation> _inFlightOperations = new();
+    private readonly ConcurrentDictionary<string, CachedResult> _cachedResults = new();
+    // Used ONLY for the short check-and-register section of ExecuteCachedAsync.
+    // It is never held across state updates or user-provided async actions.
     private readonly SemaphoreSlim _lock = new(1, 1);
     private int _disposed; // 0 = not disposed, 1 = disposed (use int for Interlocked)
 
@@ -157,17 +160,29 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
         ArgumentNullException.ThrowIfNull(loading);
         ArgumentNullException.ThrowIfNull(success);
 
+        // Fast path: lock-free cache hit
+        if (_cachedResults.TryGetValue(cacheKey, out var cached) && !cached.IsExpired)
+        {
+            return (TResult)cached.Value!;
+        }
+
+        TaskCompletionSource<object?>? tcs = null;
+        Task<object?> operationTask;
+
+        // Short check-and-register section. The semaphore is released BEFORE any state
+        // update runs so subscriber re-entry into this executor cannot deadlock and
+        // operations for different keys do not serialize on state updates.
         await _lock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            // Check for cached result first
-            if (_cachedResults.TryGetValue(cacheKey, out var cached))
+            // Re-check the cache now that we hold the lock
+            if (_cachedResults.TryGetValue(cacheKey, out cached))
             {
                 if (!cached.IsExpired)
                 {
                     return (TResult)cached.Value!;
                 }
-                _cachedResults.Remove(cacheKey);
+                _cachedResults.TryRemove(cacheKey, out _);
             }
 
             // Aggressive cleanup when cache is large
@@ -176,47 +191,29 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
             // Check for in-flight operation (deduplication)
             if (_inFlightOperations.TryGetValue(cacheKey, out var inFlight))
             {
-                // Release lock while waiting for in-flight operation
-                _lock.Release();
-                try
-                {
-                    var result = await inFlight.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    return (TResult)result!;
-                }
-                finally
-                {
-                    await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-                }
+                operationTask = inFlight.Task;
             }
-
-            // First caller - set loading state and start the operation
-            await _stateWriter.UpdateAsync(loading, $"{action}_LOADING");
-
-            // Create the operation task (captures loading/success/error callbacks)
-            var operationTask = ExecuteCachedOperationAsync(
-                cacheKey, asyncAction, success, error, cacheFor, action);
-
-            _inFlightOperations[cacheKey] = new CachedOperation { Task = operationTask };
-
-            // Release lock before awaiting
-            _lock.Release();
-            try
+            else
             {
-                var result = await operationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
-                return (TResult)result!;
-            }
-            finally
-            {
-                // Re-acquire lock to clean up - don't use cancellation token here
-                // since cleanup must happen even if cancelled
-                await _lock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
-                _inFlightOperations.Remove(cacheKey);
+                tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                operationTask = tcs.Task;
+                _inFlightOperations[cacheKey] = new CachedOperation { Task = operationTask };
             }
         }
         finally
         {
             _lock.Release();
         }
+
+        if (tcs != null)
+        {
+            // First caller - run the operation (the loading-state update happens inside,
+            // outside the semaphore). The task completes the shared TCS for all waiters.
+            _ = RunCachedOperationAsync(tcs, cacheKey, asyncAction, loading, success, error, cacheFor, action);
+        }
+
+        var result = await operationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return (TResult)result!;
     }
 
     /// <inheritdoc />
@@ -241,6 +238,36 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
             action);
     }
 
+    private async Task RunCachedOperationAsync<TResult>(
+        TaskCompletionSource<object?> tcs,
+        string cacheKey,
+        Func<Task<TResult>> asyncAction,
+        Func<TState, TState> loading,
+        Func<TState, TResult, TState> success,
+        Func<TState, Exception, TState>? error,
+        TimeSpan? cacheFor,
+        string? action)
+    {
+        try
+        {
+            // Set loading state - the executor lock is NOT held here, so subscribers
+            // reacting to this update can safely call back into the executor.
+            await _stateWriter.UpdateAsync(loading, $"{action}_LOADING");
+
+            var result = await ExecuteCachedOperationAsync(cacheKey, asyncAction, success, error, cacheFor, action)
+                .ConfigureAwait(false);
+            tcs.TrySetResult(result);
+        }
+        catch (Exception ex)
+        {
+            tcs.TrySetException(ex);
+        }
+        finally
+        {
+            _inFlightOperations.TryRemove(cacheKey, out _);
+        }
+    }
+
     private async Task<object?> ExecuteCachedOperationAsync<TResult>(
         string cacheKey,
         Func<Task<TResult>> asyncAction,
@@ -260,21 +287,13 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
             // Cache the result if cacheFor is specified
             if (cacheFor.HasValue)
             {
-                await _lock.WaitAsync().ConfigureAwait(false);
-                try
+                var now = DateTime.UtcNow;
+                _cachedResults[cacheKey] = new CachedResult
                 {
-                    var now = DateTime.UtcNow;
-                    _cachedResults[cacheKey] = new CachedResult
-                    {
-                        Value = result,
-                        ExpiresAt = now.Add(cacheFor.Value),
-                        CreatedAt = now
-                    };
-                }
-                finally
-                {
-                    _lock.Release();
-                }
+                    Value = result,
+                    ExpiresAt = now.Add(cacheFor.Value),
+                    CreatedAt = now
+                };
             }
 
             return result;
@@ -300,37 +319,14 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(cacheKey);
 
-        // Use timeout to prevent indefinite blocking in edge cases
-        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
-        {
-            _logger?.LogWarning("InvalidateCache timed out waiting for lock. Consider using InvalidateCacheAsync instead.");
-            return;
-        }
-        try
-        {
-            _cachedResults.Remove(cacheKey);
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        _cachedResults.TryRemove(cacheKey, out _);
     }
 
     /// <inheritdoc />
-    public async Task InvalidateCacheAsync(string cacheKey)
+    public Task InvalidateCacheAsync(string cacheKey)
     {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(cacheKey);
-
-        await _lock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            _cachedResults.Remove(cacheKey);
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        InvalidateCache(cacheKey);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -339,51 +335,20 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(prefix);
 
-        // Use timeout to prevent indefinite blocking in edge cases
-        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
+        foreach (var key in _cachedResults.Keys)
         {
-            _logger?.LogWarning("InvalidateCacheByPrefix timed out waiting for lock. Consider using InvalidateCacheByPrefixAsync instead.");
-            return;
-        }
-        try
-        {
-            var keysToRemove = _cachedResults.Keys
-                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
-                .ToList();
-
-            foreach (var key in keysToRemove)
+            if (key.StartsWith(prefix, StringComparison.Ordinal))
             {
-                _cachedResults.Remove(key);
+                _cachedResults.TryRemove(key, out _);
             }
-        }
-        finally
-        {
-            _lock.Release();
         }
     }
 
     /// <inheritdoc />
-    public async Task InvalidateCacheByPrefixAsync(string prefix)
+    public Task InvalidateCacheByPrefixAsync(string prefix)
     {
-        ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(prefix);
-
-        await _lock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            var keysToRemove = _cachedResults.Keys
-                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal))
-                .ToList();
-
-            foreach (var key in keysToRemove)
-            {
-                _cachedResults.Remove(key);
-            }
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        InvalidateCacheByPrefix(prefix);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -391,41 +356,18 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
     {
         ThrowIfDisposed();
 
-        // Use timeout to prevent indefinite blocking in edge cases
-        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
-        {
-            _logger?.LogWarning("ClearCache timed out waiting for lock. Consider using ClearCacheAsync instead.");
-            return;
-        }
-        try
-        {
-            _cachedResults.Clear();
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        _cachedResults.Clear();
     }
 
     /// <inheritdoc />
-    public async Task ClearCacheAsync()
+    public Task ClearCacheAsync()
     {
-        ThrowIfDisposed();
-
-        await _lock.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            _cachedResults.Clear();
-        }
-        finally
-        {
-            _lock.Release();
-        }
+        ClearCache();
+        return Task.CompletedTask;
     }
 
     /// <summary>
     /// Performs cache cleanup by removing expired entries and enforcing size limits.
-    /// Must be called while holding the lock.
     /// </summary>
     private void PerformCacheCleanup()
     {
@@ -434,14 +376,12 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
             return;
 
         // First pass: remove all expired entries
-        var expiredKeys = _cachedResults
-            .Where(kvp => kvp.Value.IsExpired)
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        foreach (var key in expiredKeys)
+        foreach (var kvp in _cachedResults)
         {
-            _cachedResults.Remove(key);
+            if (kvp.Value.IsExpired)
+            {
+                _cachedResults.TryRemove(kvp.Key, out _);
+            }
         }
 
         // Second pass: if still at or over capacity, remove oldest entries (FIFO)
@@ -456,7 +396,7 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
 
             foreach (var key in oldestKeys)
             {
-                _cachedResults.Remove(key);
+                _cachedResults.TryRemove(key, out _);
             }
         }
     }
@@ -472,7 +412,11 @@ public sealed class AsyncActionExecutor<TState> : IAsyncActionExecutor<TState>, 
 
         _inFlightOperations.Clear();
         _cachedResults.Clear();
-        _lock.Dispose();
+
+        // NOTE: _lock (SemaphoreSlim) is intentionally NOT disposed. It holds no unmanaged
+        // resources as long as AvailableWaitHandle is never accessed (it is not), and
+        // disposing it would make in-flight ExecuteCachedAsync calls throw
+        // ObjectDisposedException from their finally { _lock.Release(); } blocks.
     }
 
     private void ThrowIfDisposed()

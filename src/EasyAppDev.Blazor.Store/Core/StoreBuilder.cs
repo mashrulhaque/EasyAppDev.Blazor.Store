@@ -378,22 +378,10 @@ public class StoreBuilder<TState> where TState : notnull
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 };
 
-                var loadedState = JsonSerializer.Deserialize<TState>(json, options);
+                var loadedState = DeserializePersistedState(json, options);
                 if (loadedState != null)
                 {
-                    var builder = new StoreBuilder<TState>(loadedState)
-                    {
-                        _comparer = this._comparer,
-                        _middlewarePipelineLogger = this._middlewarePipelineLogger,
-                        _storeLogger = this._storeLogger,
-                        _subscriptionManagerLogger = this._subscriptionManagerLogger,
-                        _middlewareOptions = this._middlewareOptions,
-                        _errorHandler = this._errorHandler,
-                        _stateValidator = this._stateValidator,
-                        _requireValidation = this._requireValidation
-                    };
-                    builder._middlewares.AddRange(this._middlewares);
-                    return builder;
+                    return WithInitialState(loadedState);
                 }
             }
         }
@@ -408,6 +396,36 @@ public class StoreBuilder<TState> where TState : notnull
     }
 
     /// <summary>
+    /// Deserializes a persisted payload into <typeparamref name="TState"/>.
+    /// The library's options-based persistence writes a <see cref="PersistedStateWrapper"/>
+    /// envelope ({"state": "...", "signature": ...}), so that format is tried first;
+    /// raw (legacy) payloads are deserialized directly as a fallback.
+    /// </summary>
+    private static TState? DeserializePersistedState(string json, JsonSerializerOptions options)
+    {
+        // Try the wrapped format first (PersistedStateWrapper envelope).
+        try
+        {
+            var wrapper = JsonSerializer.Deserialize<PersistedStateWrapper>(json, options);
+            if (!string.IsNullOrEmpty(wrapper?.State))
+            {
+                var inner = JsonSerializer.Deserialize<TState>(wrapper.State, options);
+                if (inner != null)
+                {
+                    return inner;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Not the wrapped format - fall through to direct deserialization.
+        }
+
+        // Legacy format: the payload is the state itself.
+        return JsonSerializer.Deserialize<TState>(json, options);
+    }
+
+    /// <summary>
     /// Builds the configured store instance.
     /// </summary>
     /// <returns>A new <see cref="IStore{TState}"/> instance.</returns>
@@ -415,7 +433,7 @@ public class StoreBuilder<TState> where TState : notnull
     {
         var subscriptionManager = new SubscriptionManager<TState>(_subscriptionManagerLogger);
 
-        return new Store<TState>(
+        var store = new Store<TState>(
             initialState: _initialState,
             subscriptionManager: subscriptionManager,
             comparer: _comparer,
@@ -424,5 +442,17 @@ public class StoreBuilder<TState> where TState : notnull
             logger: _storeLogger,
             middlewareOptions: _middlewareOptions,
             errorHandler: _errorHandler);
+
+        // Wire up middlewares that need a reference to the store they belong to
+        // (e.g. StoreHistory). AttachStore implementations are required to be idempotent.
+        foreach (var middleware in _middlewares)
+        {
+            if (middleware is IStoreAwareMiddleware<TState> storeAware)
+            {
+                storeAware.AttachStore(store);
+            }
+        }
+
+        return store;
     }
 }

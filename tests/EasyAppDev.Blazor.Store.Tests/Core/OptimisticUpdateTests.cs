@@ -315,8 +315,9 @@ public class OptimisticUpdateTests : IDisposable
         var tempItem = new CartItem("temp-1", "New Item", 1);
         var concurrentItem = new CartItem("concurrent", "Concurrent Item", 1);
 
-        // Act & Assert
-        await Assert.ThrowsAsync<ConcurrentModificationException>(async () =>
+        // Act & Assert - the original server exception must be preserved alongside the
+        // rollback failure (it must NOT be replaced by the ConcurrentModificationException)
+        var exception = await Assert.ThrowsAsync<AggregateException>(async () =>
         {
             await _store.UpdateOptimisticWithConfirm(
                 optimistic: s => s with { Items = s.Items.Append(tempItem).ToList() },
@@ -340,6 +341,13 @@ public class OptimisticUpdateTests : IDisposable
                 }
             );
         });
+
+        // Should contain both the original server exception and the rollback failure
+        exception.InnerExceptions.Should().HaveCount(2);
+        exception.InnerExceptions.Should().ContainSingle(e =>
+            e.GetType() == typeof(InvalidOperationException) && e.Message == "Server failed");
+        exception.InnerExceptions.Should().ContainSingle(e =>
+            e.GetType() == typeof(ConcurrentModificationException));
 
         // State should still have both items since rollback failed
         var state = _store.GetState();

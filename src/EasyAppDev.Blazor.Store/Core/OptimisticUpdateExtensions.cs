@@ -219,6 +219,13 @@ public static class OptimisticUpdateExtensions
                 // Default rollback: detect concurrent updates and throw if detected
                 await store.UpdateAsync(currentState =>
                 {
+                    if (ReferenceEquals(currentState, previousState))
+                    {
+                        // The optimistic update was never committed (e.g. a custom store
+                        // comparer considered it a no-op) - nothing to roll back and no
+                        // concurrent modification occurred.
+                        return previousState;
+                    }
                     if (EqualityComparer<TState>.Default.Equals(currentState, optimisticState))
                     {
                         // No concurrent updates - safe to restore previous state
@@ -396,11 +403,21 @@ public static class OptimisticUpdateExtensions
         {
             result = await action().ConfigureAwait(false);
         }
-        catch
+        catch (Exception serverException)
         {
-            // Server action failed - rollback is appropriate
-            await RollbackWithConfirmAsync(store, previousState!, optimisticState!, baseActionName)
-                .ConfigureAwait(false);
+            // Server action failed - rollback is appropriate. A rollback failure must not
+            // replace the original server exception; surface both via AggregateException.
+            try
+            {
+                await RollbackWithConfirmAsync(store, previousState!, optimisticState!, baseActionName)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception rollbackException)
+            {
+                throw new AggregateException(
+                    "Server action failed and rollback also failed",
+                    serverException, rollbackException);
+            }
             throw;
         }
 
@@ -437,6 +454,13 @@ public static class OptimisticUpdateExtensions
     {
         await store.UpdateAsync(currentState =>
         {
+            if (ReferenceEquals(currentState, previousState))
+            {
+                // The optimistic update was never committed (e.g. a custom store comparer
+                // considered it a no-op) - nothing to roll back and no concurrent
+                // modification occurred.
+                return previousState;
+            }
             // If no concurrent updates occurred, safely restore previous state
             if (EqualityComparer<TState>.Default.Equals(currentState, optimisticState))
             {

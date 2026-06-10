@@ -105,95 +105,95 @@ public class CrossStoreReentrancyTests
     }
 
     [Fact]
-    public async Task ReentrancyDetection_LogsWarning_WhenDetected()
+    public async Task SubscriberInitiatedUpdate_IsNotTreatedAsNestedUpdate()
     {
-        // Arrange
-        var logMessages = new List<string>();
-        var loggerFactory = LoggerFactory.Create(builder =>
-        {
-            builder.AddProvider(new TestLoggerProvider(logMessages));
-            builder.SetMinimumLevel(LogLevel.Warning);
-        });
-        var logger = loggerFactory.CreateLogger<Store<StoreAState>>();
-
+        // A subscriber-initiated update is SAFE (the store lock is already released when
+        // subscribers are notified) and must NOT be reported/rejected as a nested update.
         var store = new Store<StoreAState>(
             new StoreAState(0),
-            new SubscriptionManager<StoreAState>(null!),
-            logger: logger);
+            new SubscriptionManager<StoreAState>(null!));
 
         var updateCount = 0;
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource<Exception?>();
 
-        // Subscribe to trigger reentrancy (only once to avoid infinite loop)
         store.Subscribe(_ =>
         {
             if (updateCount == 0)
             {
                 updateCount++;
-                // Fire-and-forget to trigger reentrancy
+                // Subscriber-initiated follow-up update (flows the same execution context)
                 Task.Run(async () =>
                 {
-                    await store.UpdateAsync(s => s with { Value = s.Value + 100 });
-                    tcs.TrySetResult(true);
-                }).ContinueWith(t =>
-                {
-                    if (t.IsFaulted) throw t.Exception!;
-                }, TaskScheduler.Default);
+                    try
+                    {
+                        await store.UpdateAsync(s => s with { Value = s.Value + 100 });
+                        tcs.TrySetResult(null);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.TrySetResult(ex);
+                    }
+                });
             }
         });
 
         // Act
         await store.UpdateAsync(s => s with { Value = 1 });
 
-        // Wait for nested update
-        await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        var completed = await Task.WhenAny(tcs.Task, Task.Delay(2000)) == tcs.Task;
 
-        // Assert
-        logMessages.Should().Contain(msg => msg.Contains("Reentrancy detected"),
-            "because nested update should trigger reentrancy warning");
+        // Assert - the follow-up update must complete without being rejected as nested
+        completed.Should().BeTrue("because the subscriber-initiated update should not deadlock");
+        tcs.Task.Result.Should().BeNull("because subscriber-initiated updates are safe and must not throw");
+        store.GetState().Value.Should().Be(101);
     }
 
     [Fact]
-    public async Task DeeplyNestedUpdates_DetectsMultipleLevels()
+    public async Task NestedUpdate_FromMiddleware_ThrowsInsteadOfDeadlocking()
     {
-        // Arrange
-        var logMessages = new List<string>();
-        var loggerFactory = LoggerFactory.Create(builder =>
-        {
-            builder.AddProvider(new TestLoggerProvider(logMessages));
-            builder.SetMinimumLevel(LogLevel.Warning);
-        });
-        var logger = loggerFactory.CreateLogger<Store<StoreAState>>();
+        // A nested UpdateAsync from middleware would await the non-reentrant store lock
+        // that the outer update still holds - a guaranteed deadlock. The store must throw
+        // a clear InvalidOperationException instead of hanging.
+        Store<StoreAState>? store = null;
+        var middleware = new NestedUpdateMiddleware(() => store!);
 
-        var store = new Store<StoreAState>(
+        store = new Store<StoreAState>(
             new StoreAState(0),
             new SubscriptionManager<StoreAState>(null!),
-            logger: logger);
-
-        var updateCount = 0;
-        var tcs = new TaskCompletionSource<bool>();
-
-        store.Subscribe(state =>
-        {
-            if (state.Value < 2 && updateCount < 2)
+            middlewares: new[] { middleware },
+            middlewareOptions: new EasyAppDev.Blazor.Store.Middleware.MiddlewarePipelineOptions
             {
-                updateCount++;
-                // Fire-and-forget to avoid blocking
-                _ = Task.Run(async () => await store.UpdateAsync(s => s with { Value = s.Value + 1 }));
-            }
-            else if (updateCount >= 2)
-            {
-                tcs.TrySetResult(true);
-            }
-        });
+                StopOnError = true,
+                MaxRetries = 0
+            });
 
         // Act
-        await store.UpdateAsync(s => s with { Value = 1 });
-        await Task.WhenAny(tcs.Task, Task.Delay(1000));
+        var updateTask = store.UpdateAsync(s => s with { Value = 1 });
+        var completed = await Task.WhenAny(updateTask, Task.Delay(5000)) == updateTask;
 
-        // Assert
-        updateCount.Should().BeGreaterThan(0);
-        logMessages.Should().Contain(msg => msg.Contains("Reentrancy detected"));
+        // Assert - must fail fast with a clear message, not deadlock
+        completed.Should().BeTrue("because nested updates must fail fast instead of deadlocking");
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => updateTask);
+        ex.Message.Should().Contain("Nested UpdateAsync");
+    }
+
+    private class NestedUpdateMiddleware : EasyAppDev.Blazor.Store.Middleware.IMiddleware<StoreAState>
+    {
+        private readonly Func<Store<StoreAState>> _storeAccessor;
+
+        public NestedUpdateMiddleware(Func<Store<StoreAState>> storeAccessor)
+        {
+            _storeAccessor = storeAccessor;
+        }
+
+        public async Task OnBeforeUpdateAsync(StoreAState currentState, string? action)
+        {
+            // Nested update from middleware - must be detected and rejected
+            await _storeAccessor().UpdateAsync(s => s with { Value = s.Value + 1 });
+        }
+
+        public Task OnAfterUpdateAsync(StoreAState previousState, StoreAState currentState, string? action)
+            => Task.CompletedTask;
     }
 
     [Fact]

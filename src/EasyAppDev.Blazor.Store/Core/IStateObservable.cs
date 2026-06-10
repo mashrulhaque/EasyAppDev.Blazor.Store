@@ -60,6 +60,28 @@ public interface IStateObservable<TState> where TState : notnull
     IDisposable Subscribe(Action<TState> callback);
 
     /// <summary>
+    /// Subscribes to all state changes with a callback that receives the entire state
+    /// and the action name that produced the change.
+    /// </summary>
+    /// <param name="listener">
+    /// Callback invoked on state changes with the new state and the action name passed to
+    /// <c>UpdateAsync</c> (or <c>null</c> when no action name was supplied). Must not be null.
+    /// </param>
+    /// <returns>Disposable subscription. Call Dispose to unsubscribe.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="listener"/> is null.</exception>
+    /// <example>
+    /// <code>
+    /// var subscription = store.Subscribe((state, action) => {
+    ///     if (action != "CURSOR_MOVE")
+    ///     {
+    ///         SyncToUrl(state);
+    ///     }
+    /// });
+    /// </code>
+    /// </example>
+    IDisposable Subscribe(Action<TState, string?> listener);
+
+    /// <summary>
     /// Subscribes to specific state changes using a selector function.
     /// The callback is only invoked when the selected value changes.
     /// </summary>
