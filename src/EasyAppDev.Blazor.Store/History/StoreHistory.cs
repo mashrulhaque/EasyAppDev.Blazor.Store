@@ -9,7 +9,7 @@ namespace EasyAppDev.Blazor.Store.History;
 /// Also acts as middleware to intercept state updates.
 /// </summary>
 /// <typeparam name="TState">The type of state being tracked.</typeparam>
-public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TState>
+public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TState>, IStoreAwareMiddleware<TState>
     where TState : notnull
 {
     private readonly List<HistoryEntry<TState>> _history = new();
@@ -19,9 +19,11 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
     private readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
     private IStore<TState>? _store;
     private int _currentIndex = -1;
-    // Use AsyncLocal to properly scope undo/redo flag to current execution context
-    // This prevents race conditions where concurrent updates could see the flag incorrectly
-    private static readonly AsyncLocal<bool> _isUndoRedo = new();
+    // Use AsyncLocal to properly scope undo/redo flag to current execution context.
+    // This prevents race conditions where concurrent updates could see the flag incorrectly.
+    // Must be an INSTANCE field: a static would be shared across all histories of the same
+    // TState, so an undo on one store would suppress tracking on unrelated stores.
+    private readonly AsyncLocal<bool> _isUndoRedo = new();
     private bool _isInitialized;
     private DateTime _lastEntryTime = DateTime.MinValue;
     private long _estimatedMemoryUsage = 0;
@@ -48,7 +50,9 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
         lock (_lock)
         {
             // Make initialization idempotent - skip if already initialized
-            if (_isInitialized)
+            // (AddStoreWithHistory paths call Initialize explicitly in addition to
+            // StoreBuilder.Build calling AttachStore).
+            if (_store != null || _isInitialized)
                 return;
 
             _store = store;
@@ -63,6 +67,13 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
             _isInitialized = true;
         }
     }
+
+    /// <summary>
+    /// Attaches the store this history belongs to. Called by <c>StoreBuilder.Build()</c>
+    /// for middlewares implementing <see cref="IStoreAwareMiddleware{TState}"/>. Idempotent.
+    /// </summary>
+    /// <param name="store">The store to track.</param>
+    public void AttachStore(IStore<TState> store) => Initialize(store);
 
     /// <inheritdoc />
     public bool CanUndo
@@ -305,9 +316,12 @@ public sealed class StoreHistory<TState> : IStoreHistory<TState>, IMiddleware<TS
             // Estimate size INSIDE the lock to ensure consistent state
             var newEntrySize = EstimateStateSize(currentState);
 
-            // Check if we should group with the previous entry
+            // Check if we should group with the previous entry. Grouping is only valid when
+            // we are at the END of the history (after an Undo/GoTo, replacing the current
+            // entry would corrupt the timeline) and never into index 0 (the INITIAL entry).
             if (_options.GroupWindow > TimeSpan.Zero &&
-                _currentIndex >= 0 &&
+                _currentIndex == _history.Count - 1 &&
+                _currentIndex > 0 &&
                 (now - _lastEntryTime) < _options.GroupWindow)
             {
                 // Use cached size from entry if available, otherwise estimate

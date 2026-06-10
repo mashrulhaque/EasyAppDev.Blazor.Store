@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Utilities;
 
@@ -39,7 +40,19 @@ public sealed class DebounceManager : IDebounceManager
 {
     private readonly Dictionary<string, CancellationTokenSource> _pendingActions = new();
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private bool _disposed;
+    private readonly ILogger<DebounceManager>? _logger;
+    private int _disposed; // 0 = not disposed, 1 = disposed (use int for Interlocked)
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DebounceManager"/> class.
+    /// </summary>
+    /// <param name="logger">
+    /// Optional logger used to report failures of fire-and-forget debounced actions.
+    /// </param>
+    public DebounceManager(ILogger<DebounceManager>? logger = null)
+    {
+        _logger = logger;
+    }
 
     /// <summary>
     /// Debounces the specified action, cancelling any pending execution with the same key.
@@ -114,23 +127,35 @@ public sealed class DebounceManager : IDebounceManager
         {
             // Expected when debounce is cancelled - ignore
         }
+        catch (Exception ex)
+        {
+            // This task is fire-and-forget; never let action failures go unobserved
+            _logger?.LogError(ex, "Debounced action for key '{Key}' failed", key);
+        }
         finally
         {
             // Clean up completed action - only remove and dispose if this is still the current CTS
             bool shouldDispose = false;
-            await _lock.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (_pendingActions.TryGetValue(key, out var currentCts) &&
-                    ReferenceEquals(currentCts, cts))
+                await _lock.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    _pendingActions.Remove(key);
-                    shouldDispose = true;
+                    if (_pendingActions.TryGetValue(key, out var currentCts) &&
+                        ReferenceEquals(currentCts, cts))
+                    {
+                        _pendingActions.Remove(key);
+                        shouldDispose = true;
+                    }
+                }
+                finally
+                {
+                    _lock.Release();
                 }
             }
-            finally
+            catch (ObjectDisposedException)
             {
-                _lock.Release();
+                // Manager was disposed while the action was running - nothing to clean up
             }
 
             // Dispose outside lock - only if we owned it
@@ -198,40 +223,37 @@ public sealed class DebounceManager : IDebounceManager
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
+        // Use Interlocked.Exchange for atomic check-and-set to prevent race conditions
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
         // Use timeout to prevent indefinite blocking during dispose
-        if (!_lock.Wait(TimeSpan.FromSeconds(5)))
-        {
-            // Force dispose even if lock timeout - cancel all CTS without lock
-            _disposed = true;
-            foreach (var cts in _pendingActions.Values)
-            {
-                try { cts.Cancel(); cts.Dispose(); } catch { }
-            }
-            _lock.Dispose();
-            return;
-        }
+        var acquired = _lock.Wait(TimeSpan.FromSeconds(5));
         try
         {
             foreach (var cts in _pendingActions.Values)
             {
-                cts.Cancel();
-                cts.Dispose();
+                try { cts.Cancel(); cts.Dispose(); } catch { }
             }
             _pendingActions.Clear();
-            _disposed = true;
         }
         finally
         {
-            _lock.Release();
-            _lock.Dispose();
+            if (acquired)
+            {
+                _lock.Release();
+            }
+
+            // NOTE: _lock (SemaphoreSlim) is intentionally NOT disposed. It holds no
+            // unmanaged resources as long as AvailableWaitHandle is never accessed
+            // (it is not), and disposing it would make in-flight debounced actions
+            // throw ObjectDisposedException when they re-acquire it during cleanup.
         }
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
+        if (Volatile.Read(ref _disposed) != 0)
         {
             throw new ObjectDisposedException(nameof(DebounceManager));
         }

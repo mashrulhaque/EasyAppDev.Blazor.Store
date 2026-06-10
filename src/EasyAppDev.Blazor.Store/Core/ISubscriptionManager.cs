@@ -20,6 +20,15 @@ public interface ISubscriptionManager<TState> : IDisposable where TState : notnu
     IDisposable Subscribe(Action<TState> callback, Func<TState> stateGetter);
 
     /// <summary>
+    /// Subscribes to all state changes with a callback that also receives the action name
+    /// that produced the change (null for notifications without an action).
+    /// </summary>
+    /// <param name="callback">Callback invoked on state changes. Exceptions are caught and logged.</param>
+    /// <param name="stateGetter">Function to get the current state when notifying.</param>
+    /// <returns>Disposable subscription.</returns>
+    IDisposable Subscribe(Action<TState, string?> callback, Func<TState> stateGetter);
+
+    /// <summary>
     /// Subscribes to selective state changes. Callback invoked only when selected value changes per comparer.
     /// </summary>
     /// <typeparam name="TSelected">The type of the selected value.</typeparam>
@@ -45,6 +54,17 @@ public interface ISubscriptionManager<TState> : IDisposable where TState : notnu
     /// </summary>
     /// <param name="capturedState">The state snapshot captured before releasing the store lock.</param>
     void NotifyAll(TState capturedState);
+
+    /// <summary>
+    /// Notifies all subscribers of a state change with a captured state snapshot, the
+    /// monotonically increasing commit version of that snapshot, and the action name.
+    /// Notifications carrying a version lower than one already delivered are skipped,
+    /// preventing out-of-order delivery from leaving subscribers with stale values.
+    /// </summary>
+    /// <param name="capturedState">The state snapshot captured before releasing the store lock.</param>
+    /// <param name="version">The commit version of the snapshot (incremented under the store lock).</param>
+    /// <param name="action">The action name associated with the update, if any.</param>
+    void NotifyAll(TState capturedState, long version, string? action);
 
     /// <summary>
     /// Clears all active subscriptions. Typically called during store disposal.
