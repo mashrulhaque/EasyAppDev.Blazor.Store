@@ -18,7 +18,7 @@
   <PropertyGroup>
     <!-- NuGet Package Metadata -->
     <PackageId>EasyAppDev.Blazor.Store</PackageId>
-    <Version>2.0.12</Version>
+    <Version>3.0.0</Version>
     <Authors>Mashrul Haque</Authors>
     <Company>EasyAppDev</Company>
     <Product>EasyAppDev.Blazor.Store</Product>
@@ -31,6 +31,44 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReleaseNotes>
+v3.0.0 - Major Reliability Release
+
+This release fixes ~56 verified bugs found in a full-codebase audit and wires up
+several previously non-functional features. It contains breaking changes.
+
+Now actually working (previously dead code):
+- Cross-tab sync now APPLIES incoming updates (receive path was never wired)
+- Server sync (SignalR) connects automatically and applies remote updates
+- Plugin lifecycle hooks (OnStoreCreated/OnBeforeUpdate/OnAfterUpdate/OnStoreDisposing)
+- WithHistory(out history) undo/redo on the builder path
+- Redux DevTools ship in the package (runtime-gated: debugger-attached or
+  DevToolsOptions.Enabled = true), including time travel
+- UrlSync ExcludeActions filtering
+- Query client defaults (DefaultStaleTime/DefaultRetry)
+- NEW: RefetchOnWindowFocus / RefetchOnReconnect for queries
+
+Breaking changes:
+- IQueryClient is now scoped (fixes cross-user cache leakage on Blazor Server)
+- Persistence with EnableIntegrityCheck=true (the options-based default) now
+  throws at startup unless a stable SigningKey is supplied
+- Nested UpdateAsync from middleware/updaters throws (previously deadlocked)
+- ActionDispatcher throws on unhandled actions (matches documented contract)
+- AddTransientStore no longer registers reader/writer/observable aliases
+- ServerSync protocol: signed full-state messages, 3-arg JoinDocument
+- TabSync default channel name uses the full type name
+- Store now disposes its middlewares (IAsyncDisposable)
+
+Reliability highlights:
+- Fixed cancellation races in Query/Mutation (stale overwrites, duplicate
+  fetches/writes, a process-crash path on Blazor Server)
+- Fixed sensitive-data filter corrupting persisted dictionaries and non-string
+  properties; token-boundary keyword matching (ShippingAddress no longer filtered)
+- Debounced persistence/tab-sync no longer block the store lock and now coalesce
+- Fixed UrlSync wiping state, erasing unrelated query params, and crashing on
+  page-to-page navigation; URL values now merge instead of replace
+- Fixed unbounded memory growth in DiagnosticsService and QueryClient
+- History grouping no longer corrupts the undo stack after Undo
+
 v2.0.12 - Persistence Hydration Fixes (fixes #11)
 
 Bug Fixes:
