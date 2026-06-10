@@ -50,7 +50,9 @@ public class ReadmeQueryExamplesTests : TestContext
                 QueryFn = async ct => await Api.GetUserAsync(123, ct),
                 StaleTime = TimeSpan.FromMinutes(5),
                 CacheTime = TimeSpan.FromHours(1),
-                Retry = 3
+                Retry = 3,
+                RefetchOnWindowFocus = true,
+                RefetchOnReconnect = true
             });
 
             Mutation = UseMutation(new MutationOptions<User, UpdateUserRequest>

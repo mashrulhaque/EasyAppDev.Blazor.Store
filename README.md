@@ -604,7 +604,17 @@ builder.Services.AddStoreWithHistory(
 
 ```csharp
 builder.Services.AddQueryClient();
+
+// Or with client-wide defaults (per-query options always win):
+builder.Services.AddQueryClient(opts =>
+{
+    opts.DefaultStaleTime = TimeSpan.FromSeconds(30);
+    opts.DefaultRetry = 1;
+    opts.DefaultRefetchOnWindowFocus = true;
+});
 ```
+
+The query client is **scoped**: on Blazor Server each circuit (user) gets its own isolated cache; in WebAssembly this is effectively app-wide.
 
 ### Why This Matters
 
@@ -614,6 +624,7 @@ Without a query system, every component manages its own loading states, error ha
 |---------|----------------------|
 | Duplicate API calls | Automatic request deduplication |
 | Stale data after mutations | `InvalidateQueries(k => k.StartsWith("user-"))` |
+| Stale data after tab switch / reconnect | `RefetchOnWindowFocus` / `RefetchOnReconnect` (on by default) |
 | Loading spinners everywhere | Centralized loading/error states |
 | Manual retry logic | Built-in with exponential backoff |
 | Cache invalidation headaches | Configurable stale/cache times |
@@ -636,7 +647,9 @@ Inherit from `QueryComponent` — it injects `IQueryClient` for you (available a
             QueryFn = async ct => await api.GetUserAsync(123, ct),  // Fetch function
             StaleTime = TimeSpan.FromMinutes(5),                    // Fresh for 5 min
             CacheTime = TimeSpan.FromHours(1),                      // Cache for 1 hour
-            Retry = 3                                               // Retry 3 times
+            Retry = 3,                                              // Retry 3 times
+            RefetchOnWindowFocus = true,                            // Refetch stale data on tab focus
+            RefetchOnReconnect = true                               // ...and when the browser comes back online
         });
     }
 }
@@ -689,13 +702,18 @@ builder.Services.AddStore(
     new CartState(),
     (store, sp) => store
         .WithDefaults(sp, "Cart")
-        .WithTabSync(sp, opts => opts
-            .Channel("shopping-cart")
-            .EnableMessageSigning()                    // HMAC-SHA256 security
-            .MaxMessageAgeSeconds(30)                  // Replay attack prevention
-            .ExcludeActions("HOVER", "FOCUS"))         // Don't sync transient state
+        .WithTabSync(sp, opts =>
+        {
+            opts.Channel("shopping-cart")
+                .ExcludeActions("HOVER", "FOCUS");     // Don't sync transient state
+            opts.EnableMessageSigning = true;          // HMAC-SHA256 security
+            opts.DeriveKeyFromOrigin = true;           // Shared signing key across same-origin tabs
+            opts.MaxMessageAgeSeconds = 30;            // Replay attack prevention
+        })
 );
 ```
+
+> **Note:** When `EnableMessageSigning` is true, supply a key all tabs share — `DeriveKeyFromOrigin = true` or a `SigningKey` from `MessageSigner.DeriveKeyFromSeed(...)`. Without one, each tab generates its own random key and signed messages from other tabs fail verification (the middleware logs a warning).
 
 That's all the code needed. Components don't change. Sync is automatic.
 
@@ -709,10 +727,11 @@ Tab 2:                                 Receives → Store syncs → UI updates
 
 | Option | Purpose |
 |--------|---------|
-| `EnableMessageSigning()` | HMAC-SHA256 signatures |
-| `MaxMessageAgeSeconds(30)` | Reject old messages (replay attacks) |
-| `MaxMessageSizeBytes(1MB)` | Prevent DoS |
-| `RequireValidSignature(true)` | Reject unsigned messages |
+| `EnableMessageSigning = true` | HMAC-SHA256 signatures |
+| `SigningKey` / `DeriveKeyFromOrigin` | Shared key so all tabs can verify each other |
+| `MaxMessageAgeSeconds = 30` | Reject old messages (replay attacks) |
+| `MaxMessageSizeBytes` | Prevent DoS |
+| `RequireValidSignature = true` | Reject unsigned messages |
 
 ---
 
@@ -994,6 +1013,10 @@ Use `TransformOnSave` to exclude sensitive fields from localStorage:
 .WithPersistence(sp, new PersistenceOptions<UserState>
 {
     Key = "user-state",
+    // Integrity checking is on by default and requires a stable key —
+    // supply one (e.g. MessageSigner.DeriveKeyFromSeed("your-app-seed"))
+    // or disable it explicitly:
+    EnableIntegrityCheck = false,
     TransformOnSave = state => state with
     {
         Password = null,
@@ -1002,6 +1025,8 @@ Use `TransformOnSave` to exclude sensitive fields from localStorage:
     }
 })
 ```
+
+> **Note:** Options-based persistence enables HMAC integrity checking by default. Since a random per-session key can never verify state across reloads, the store now **throws at startup** if `EnableIntegrityCheck` is true and no `SigningKey` is provided — supply a stable key via `MessageSigner.DeriveKeyFromSeed(...)` / `DeriveKeyFromPassphrase(...)`, or set `EnableIntegrityCheck = false`.
 
 ### Security Gotchas
 
