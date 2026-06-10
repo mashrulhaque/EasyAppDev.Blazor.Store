@@ -60,6 +60,12 @@ public static class PluginExtensions
             builder.WithMiddleware(middleware);
         }
 
+        // Wrap the plugin in a PluginMiddleware so its lifecycle hooks
+        // (OnStoreCreatedAsync, OnBeforeUpdateAsync, OnAfterUpdateAsync,
+        // OnStoreDisposingAsync) actually fire.
+        var pluginLogger = serviceProvider.GetService<ILogger<PluginMiddleware<TState>>>();
+        builder.WithMiddleware(new PluginMiddleware<TState>(plugin, pluginLogger));
+
         return builder;
     }
 

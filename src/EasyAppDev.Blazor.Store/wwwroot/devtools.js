@@ -1,10 +1,18 @@
 // Redux DevTools integration
-let devToolsExtension = null;
+// Connections are kept in a Map keyed by store name so multiple stores in the
+// same app each get their own DevTools connection (module-level singletons used
+// to clobber each other in multi-store apps).
+const connections = new Map();
 
 export function initDevTools(storeName) {
     if (typeof window !== 'undefined' && window.__REDUX_DEVTOOLS_EXTENSION__) {
         try {
-            devToolsExtension = window.__REDUX_DEVTOOLS_EXTENSION__.connect({
+            if (connections.has(storeName)) {
+                // Already connected for this store
+                return true;
+            }
+
+            const connection = window.__REDUX_DEVTOOLS_EXTENSION__.connect({
                 name: storeName,
                 features: {
                     pause: true,
@@ -20,6 +28,8 @@ export function initDevTools(storeName) {
                 }
             });
 
+            connections.set(storeName, connection);
+
             console.log(`Redux DevTools connected for store: ${storeName}`);
             return true;
         } catch (error) {
@@ -32,11 +42,12 @@ export function initDevTools(storeName) {
     }
 }
 
-export function sendToDevTools(actionType, stateJson) {
-    if (devToolsExtension) {
+export function sendToDevTools(storeName, actionType, stateJson) {
+    const connection = connections.get(storeName);
+    if (connection) {
         try {
             const state = JSON.parse(stateJson);
-            devToolsExtension.send(
+            connection.send(
                 {
                     type: actionType,
                     payload: {}
@@ -49,13 +60,14 @@ export function sendToDevTools(actionType, stateJson) {
     }
 }
 
-export function disconnect() {
-    if (devToolsExtension) {
+export function disconnect(storeName) {
+    const connection = connections.get(storeName);
+    if (connection) {
         try {
-            devToolsExtension.disconnect();
+            connection.disconnect();
         } catch (error) {
             console.error('Error disconnecting DevTools:', error);
         }
-        devToolsExtension = null;
+        connections.delete(storeName);
     }
 }

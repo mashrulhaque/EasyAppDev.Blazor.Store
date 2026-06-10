@@ -20,9 +20,14 @@ public sealed class DiagnosticsService : IDiagnosticsService
     private readonly List<ActionHistoryEntry> _actionHistory = new();
     private readonly List<RenderEvent> _renderHistory = new();
 
-    // Subscriptions tracking
+    // Subscriptions tracking (active subscriptions only - disposed entries are
+    // removed to prevent unbounded growth in long-running applications)
     private readonly ConcurrentDictionary<Guid, SubscriptionInfo> _subscriptions = new();
     private readonly ConcurrentDictionary<Guid, int> _subscriptionNotificationCounts = new();
+
+    // Small bounded ring of recently disposed subscriptions (for inspection in
+    // the diagnostics panel without leaking memory)
+    private readonly Queue<SubscriptionInfo> _recentlyDisposedSubscriptions = new();
 
     // Render counts by component
     private readonly ConcurrentDictionary<string, int> _renderCounts = new();
@@ -101,10 +106,27 @@ public sealed class DiagnosticsService : IDiagnosticsService
     /// <inheritdoc />
     public void RecordSubscriptionDisposed(Guid subscriptionId)
     {
-        if (_subscriptions.TryGetValue(subscriptionId, out var info))
+        // Remove the subscription and its notification count so memory does not
+        // grow unboundedly as components subscribe/unsubscribe over time.
+        if (_subscriptions.TryRemove(subscriptionId, out var info))
         {
-            var updatedInfo = info with { DisposedAt = DateTime.UtcNow };
-            _subscriptions[subscriptionId] = updatedInfo;
+            _subscriptionNotificationCounts.TryRemove(subscriptionId, out var notificationCount);
+
+            var disposedInfo = info with
+            {
+                DisposedAt = DateTime.UtcNow,
+                NotificationCount = Math.Max(info.NotificationCount, notificationCount)
+            };
+
+            // Keep a small bounded ring of recently disposed entries for inspection
+            lock (_lock)
+            {
+                _recentlyDisposedSubscriptions.Enqueue(disposedInfo);
+                while (_recentlyDisposedSubscriptions.Count > _maxHistorySize)
+                {
+                    _recentlyDisposedSubscriptions.Dequeue();
+                }
+            }
 
             // Notify listeners that data has changed
             DataChanged?.Invoke(this, EventArgs.Empty);
@@ -114,6 +136,13 @@ public sealed class DiagnosticsService : IDiagnosticsService
     /// <inheritdoc />
     public void RecordSubscriptionNotification(Guid subscriptionId)
     {
+        // Ignore notifications for unknown/disposed subscriptions so the
+        // notification-count dictionary cannot grow unboundedly.
+        if (!_subscriptions.ContainsKey(subscriptionId))
+        {
+            return;
+        }
+
         _subscriptionNotificationCounts.AddOrUpdate(subscriptionId, 1, (_, count) => count + 1);
 
         // Update the subscription info with the new notification count
@@ -223,7 +252,13 @@ public sealed class DiagnosticsService : IDiagnosticsService
     /// <inheritdoc />
     public IReadOnlyList<SubscriptionInfo> GetAllSubscriptions(Type? stateType = null)
     {
-        var query = _subscriptions.Values.AsEnumerable();
+        List<SubscriptionInfo> recentlyDisposed;
+        lock (_lock)
+        {
+            recentlyDisposed = _recentlyDisposedSubscriptions.ToList();
+        }
+
+        var query = _subscriptions.Values.Concat(recentlyDisposed);
 
         if (stateType is not null)
         {
@@ -246,6 +281,7 @@ public sealed class DiagnosticsService : IDiagnosticsService
         {
             _actionHistory.Clear();
             _renderHistory.Clear();
+            _recentlyDisposedSubscriptions.Clear();
         }
 
         _subscriptions.Clear();
@@ -261,6 +297,16 @@ public sealed class DiagnosticsService : IDiagnosticsService
         {
             _actionHistory.RemoveAll(a => a.StateType == stateType);
             _renderHistory.RemoveAll(r => r.StateType == stateType);
+
+            // Rebuild the recently-disposed ring without entries for this state type
+            var retained = _recentlyDisposedSubscriptions
+                .Where(s => s.StateType != stateType)
+                .ToList();
+            _recentlyDisposedSubscriptions.Clear();
+            foreach (var entry in retained)
+            {
+                _recentlyDisposedSubscriptions.Enqueue(entry);
+            }
         }
 
         _currentStateSnapshots.TryRemove(stateType, out _);

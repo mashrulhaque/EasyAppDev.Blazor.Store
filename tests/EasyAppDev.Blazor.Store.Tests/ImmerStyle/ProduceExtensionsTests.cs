@@ -276,6 +276,53 @@ public class ProduceExtensionsTests
     }
 
     [Fact]
+    public void Draft_Current_ShouldReflectPriorModifications()
+    {
+        // Arrange - Current must always reflect prior Set/Update calls
+        // (previously modifications were deferred until Produce, so Current was stale)
+        var state = new TestState(10, "Test", false);
+        var draft = state.CreateDraft();
+
+        // Act & Assert
+        draft.Set(s => s.Count, 20);
+        draft.Current.Count.Should().Be(20);
+
+        draft.Update(s => s.Count, c => c + 5);
+        draft.Current.Count.Should().Be(25);
+
+        draft.Set(s => s.Name, "Changed");
+        draft.Current.Name.Should().Be("Changed");
+        draft.Current.Count.Should().Be(25);
+
+        // Produce returns the working copy
+        var result = draft.Produce();
+        result.Count.Should().Be(25);
+        result.Name.Should().Be("Changed");
+
+        // Original state untouched
+        state.Count.Should().Be(10);
+    }
+
+    [Fact]
+    public void Draft_Set_GetOnlyPropertyDeclaredOnBaseRecord_UsesBaseBackingField()
+    {
+        // Arrange - CreatedBy is a get-only property declared on the BASE record,
+        // so its private backing field lives on the base type. The backing-field
+        // fallback must walk the type hierarchy to find it.
+        var entity = new AuditedEntity(42);
+        var draft = entity.CreateDraft();
+
+        // Act
+        draft.Set(s => s.CreatedBy, "admin");
+        var result = draft.Produce();
+
+        // Assert
+        result.CreatedBy.Should().Be("admin");
+        result.Value.Should().Be(42);
+        entity.CreatedBy.Should().Be("system"); // Original unchanged
+    }
+
+    [Fact]
     public void Draft_MultipleProduce_ShouldReturnSameResult()
     {
         // Arrange
@@ -655,3 +702,11 @@ public class ProduceExtensionsTests
 public record DictionaryState(ImmutableDictionary<string, int> Items);
 
 public record NumericState(int IntValue, long LongValue, double DoubleValue);
+
+public abstract record AuditedBase
+{
+    /// <summary>Get-only property: its backing field is declared on this base type.</summary>
+    public string CreatedBy { get; } = "system";
+}
+
+public record AuditedEntity(int Value) : AuditedBase;

@@ -8,6 +8,7 @@
 // 2. Add: <FrameworkReference Include="Microsoft.AspNetCore.App" />
 // 3. Implement the abstract authorization methods
 
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -61,13 +62,17 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
     where TState : notnull
 {
     private readonly ILogger? _logger;
-    private readonly Dictionary<string, HashSet<string>> _documentConnections = new();
-    private readonly Dictionary<string, PresenceInfo> _presenceInfo = new();
-    private readonly Dictionary<string, CursorInfo> _cursorInfo = new();
-    private readonly Dictionary<string, long> _documentVersions = new();
-    private readonly Dictionary<string, Queue<DateTime>> _rateLimitTracking = new();
-    private readonly Dictionary<string, SessionInfo> _sessionTracking = new();
-    private readonly object _syncLock = new();
+
+    // IMPORTANT: SignalR creates a NEW hub instance for every invocation, so all
+    // tracking state MUST be static to survive across invocations. These fields are
+    // per closed generic type (one set of state per TState/hub type).
+    private static readonly ConcurrentDictionary<string, HashSet<string>> s_documentConnections = new();
+    private static readonly ConcurrentDictionary<string, PresenceInfo> s_presenceInfo = new();
+    private static readonly ConcurrentDictionary<string, CursorInfo> s_cursorInfo = new();
+    private static readonly ConcurrentDictionary<string, long> s_documentVersions = new();
+    private static readonly ConcurrentDictionary<string, Queue<DateTime>> s_rateLimitTracking = new();
+    private static readonly ConcurrentDictionary<string, SessionInfo> s_sessionTracking = new();
+    private static readonly object s_syncLock = new();
 
     /// <summary>
     /// Gets the maximum number of messages per second per connection.
@@ -154,18 +159,14 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         return Task.FromResult<IReadOnlyList<StateOperation>>(Array.Empty<StateOperation>());
     }
 
-    /// <inheritdoc />
-    public async Task JoinDocument(string documentId, string? displayName)
-    {
-        await JoinDocument(documentId, displayName, null);
-    }
-
     /// <summary>
-    /// Joins a document with session token for reconnection validation.
+    /// Joins a document with an optional session token for reconnection validation.
+    /// This matches the signature invoked by <see cref="ServerSyncMiddleware{TState}"/>
+    /// (sessionToken may be null).
     /// </summary>
     /// <param name="documentId">The document to join.</param>
     /// <param name="displayName">Display name for presence.</param>
-    /// <param name="sessionToken">Session token for reconnection validation.</param>
+    /// <param name="sessionToken">Session token for reconnection validation. May be null.</param>
     public async Task JoinDocument(string documentId, string? displayName, string? sessionToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(documentId);
@@ -180,37 +181,32 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         await Groups.AddToGroupAsync(Context.ConnectionId, documentId);
 
         // Track connection and session
-        lock (_syncLock)
+        var connections = s_documentConnections.GetOrAdd(documentId, _ => new HashSet<string>());
+        lock (connections)
         {
-            if (!_documentConnections.TryGetValue(documentId, out var connections))
-            {
-                connections = new HashSet<string>();
-                _documentConnections[documentId] = connections;
-            }
             connections.Add(Context.ConnectionId);
+        }
 
-            // Track presence
-            var presence = new PresenceInfo
+        // Track presence
+        s_presenceInfo[Context.ConnectionId] = new PresenceInfo
+        {
+            ConnectionId = Context.ConnectionId,
+            DisplayName = displayName ?? GetUserDisplayName(),
+            ConnectedAt = DateTime.UtcNow
+        };
+
+        // Track session for reconnection validation
+        if (!string.IsNullOrEmpty(sessionToken))
+        {
+            var userId = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            s_sessionTracking[Context.ConnectionId] = new SessionInfo
             {
-                ConnectionId = Context.ConnectionId,
-                DisplayName = displayName ?? GetUserDisplayName(),
-                ConnectedAt = DateTime.UtcNow
+                Token = sessionToken,
+                UserId = userId,
+                DocumentId = documentId,
+                CreatedAt = DateTime.UtcNow,
+                LastValidated = DateTime.UtcNow
             };
-            _presenceInfo[Context.ConnectionId] = presence;
-
-            // Track session for reconnection validation
-            if (!string.IsNullOrEmpty(sessionToken))
-            {
-                var userId = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                _sessionTracking[Context.ConnectionId] = new SessionInfo
-                {
-                    Token = sessionToken,
-                    UserId = userId,
-                    DocumentId = documentId,
-                    CreatedAt = DateTime.UtcNow,
-                    LastValidated = DateTime.UtcNow
-                };
-            }
         }
 
         LogAuditEvent("JoinDocument", documentId, $"User joined: {displayName ?? "anonymous"}");
@@ -241,10 +237,10 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
 
         var currentUserId = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-        lock (_syncLock)
+        lock (s_syncLock)
         {
             // Check if we have a previous session with this token
-            var existingSession = _sessionTracking.Values
+            var existingSession = s_sessionTracking.Values
                 .FirstOrDefault(s => s.Token == sessionToken && s.DocumentId == documentId);
 
             if (existingSession == null)
@@ -269,7 +265,7 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
             {
                 LogSecurityEvent("ValidateSession", documentId,
                     $"Session expired: age {sessionAge.TotalMinutes:F1} minutes > timeout {SessionTimeoutMinutes} minutes");
-                _sessionTracking.Remove(Context.ConnectionId);
+                s_sessionTracking.TryRemove(Context.ConnectionId, out _);
                 return Task.FromResult(false);
             }
 
@@ -294,18 +290,16 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
 
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, documentId);
 
-        PresenceInfo? presence;
-        lock (_syncLock)
+        if (s_documentConnections.TryGetValue(documentId, out var connections))
         {
-            if (_documentConnections.TryGetValue(documentId, out var connections))
+            lock (connections)
             {
                 connections.Remove(Context.ConnectionId);
             }
-
-            _presenceInfo.TryGetValue(Context.ConnectionId, out presence);
-            _presenceInfo.Remove(Context.ConnectionId);
-            _cursorInfo.Remove(Context.ConnectionId);
         }
+
+        s_presenceInfo.TryRemove(Context.ConnectionId, out var presence);
+        s_cursorInfo.TryRemove(Context.ConnectionId, out _);
 
         LogAuditEvent("LeaveDocument", documentId, "User left");
 
@@ -349,16 +343,8 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         update.SenderId = Context.ConnectionId;
         update.Timestamp = DateTime.UtcNow;
 
-        // Update version
-        lock (_syncLock)
-        {
-            if (!_documentVersions.TryGetValue(update.DocumentId, out var version))
-            {
-                version = 0;
-            }
-            update.Version = ++version;
-            _documentVersions[update.DocumentId] = version;
-        }
+        // Update version atomically
+        update.Version = s_documentVersions.AddOrUpdate(update.DocumentId, 1, (_, version) => version + 1);
 
         LogAuditEvent("SendUpdate", update.DocumentId, $"Action: {update.Action}");
 
@@ -389,16 +375,8 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         operation.SenderId = Context.ConnectionId;
         operation.Timestamp = DateTime.UtcNow;
 
-        // Update version
-        lock (_syncLock)
-        {
-            if (!_documentVersions.TryGetValue(operation.DocumentId, out var version))
-            {
-                version = 0;
-            }
-            operation.Version = ++version;
-            _documentVersions[operation.DocumentId] = version;
-        }
+        // Update version atomically
+        operation.Version = s_documentVersions.AddOrUpdate(operation.DocumentId, 1, (_, version) => version + 1);
 
         LogAuditEvent("SendOperation", operation.DocumentId, $"Type: {operation.OperationType}, Path: {operation.Path}");
 
@@ -424,10 +402,7 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         cursor.ConnectionId = Context.ConnectionId;
         cursor.Timestamp = DateTime.UtcNow;
 
-        lock (_syncLock)
-        {
-            _cursorInfo[Context.ConnectionId] = cursor;
-        }
+        s_cursorInfo[Context.ConnectionId] = cursor;
 
         await Clients.OthersInGroup(cursor.DocumentId).CursorUpdated(cursor);
     }
@@ -465,26 +440,26 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
     /// <inheritdoc />
     public Task<IReadOnlyList<CursorInfo>> GetCursors(string documentId)
     {
-        lock (_syncLock)
-        {
-            var cursors = _cursorInfo.Values
-                .Where(c => c.DocumentId == documentId)
-                .ToList();
-            return Task.FromResult<IReadOnlyList<CursorInfo>>(cursors);
-        }
+        var cursors = s_cursorInfo.Values
+            .Where(c => c.DocumentId == documentId)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<CursorInfo>>(cursors);
     }
 
     /// <inheritdoc />
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Clean up all document associations
-        List<string> documentsToLeave;
-        lock (_syncLock)
+        var documentsToLeave = new List<string>();
+        foreach (var kvp in s_documentConnections)
         {
-            documentsToLeave = _documentConnections
-                .Where(kvp => kvp.Value.Contains(Context.ConnectionId))
-                .Select(kvp => kvp.Key)
-                .ToList();
+            lock (kvp.Value)
+            {
+                if (kvp.Value.Contains(Context.ConnectionId))
+                {
+                    documentsToLeave.Add(kvp.Key);
+                }
+            }
         }
 
         foreach (var documentId in documentsToLeave)
@@ -499,7 +474,28 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
             }
         }
 
+        // Remove per-connection rate-limit tracking; sessions are kept (bounded by
+        // pruning below) so reconnecting clients can still validate their token.
+        s_rateLimitTracking.TryRemove(Context.ConnectionId, out _);
+        PruneStaleSessions();
+
         await base.OnDisconnectedAsync(exception);
+    }
+
+    /// <summary>
+    /// Removes sessions that have not been validated for over 24 hours to bound
+    /// growth of the static session tracking dictionary.
+    /// </summary>
+    private static void PruneStaleSessions()
+    {
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        foreach (var kvp in s_sessionTracking)
+        {
+            if (kvp.Value.LastValidated < cutoff)
+            {
+                s_sessionTracking.TryRemove(kvp.Key, out _);
+            }
+        }
     }
 
     private bool CheckRateLimit()
@@ -507,16 +503,12 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
         if (MaxMessagesPerSecond <= 0)
             return true;
 
-        lock (_syncLock)
+        var timestamps = s_rateLimitTracking.GetOrAdd(Context.ConnectionId, _ => new Queue<DateTime>());
+
+        lock (timestamps)
         {
             var now = DateTime.UtcNow;
             var oneSecondAgo = now.AddSeconds(-1);
-
-            if (!_rateLimitTracking.TryGetValue(Context.ConnectionId, out var timestamps))
-            {
-                timestamps = new Queue<DateTime>();
-                _rateLimitTracking[Context.ConnectionId] = timestamps;
-            }
 
             // Remove old timestamps
             while (timestamps.Count > 0 && timestamps.Peek() < oneSecondAgo)
@@ -550,12 +542,9 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
 
     private PresenceInfo GetPresenceInfo()
     {
-        lock (_syncLock)
+        if (s_presenceInfo.TryGetValue(Context.ConnectionId, out var info))
         {
-            if (_presenceInfo.TryGetValue(Context.ConnectionId, out var info))
-            {
-                return info;
-            }
+            return info;
         }
 
         return new PresenceInfo
@@ -568,18 +557,24 @@ public abstract class SecureStoreHubBase<TState> : Hub<IStoreHubClient>, IStoreH
 
     private async Task BroadcastPresenceListAsync(string documentId)
     {
-        List<PresenceInfo> presenceList;
-        lock (_syncLock)
+        if (!s_documentConnections.TryGetValue(documentId, out var connections))
         {
-            if (!_documentConnections.TryGetValue(documentId, out var connections))
-            {
-                return;
-            }
+            return;
+        }
 
-            presenceList = connections
-                .Where(c => _presenceInfo.ContainsKey(c))
-                .Select(c => _presenceInfo[c])
-                .ToList();
+        List<string> connectionSnapshot;
+        lock (connections)
+        {
+            connectionSnapshot = connections.ToList();
+        }
+
+        var presenceList = new List<PresenceInfo>();
+        foreach (var connectionId in connectionSnapshot)
+        {
+            if (s_presenceInfo.TryGetValue(connectionId, out var presence))
+            {
+                presenceList.Add(presence);
+            }
         }
 
         await Clients.Group(documentId).PresenceUpdated(presenceList);

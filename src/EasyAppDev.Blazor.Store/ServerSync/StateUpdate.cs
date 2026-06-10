@@ -151,6 +151,19 @@ public class StateOperation
     public Dictionary<string, object>? Metadata { get; set; }
 
     /// <summary>
+    /// Gets or sets the HMAC-SHA256 signature for message integrity verification.
+    /// Only set when EnableMessageSigning is true in ServerSyncOptions.
+    /// The signature covers <see cref="GetSignaturePayload"/>.
+    /// </summary>
+    public string? Signature { get; set; }
+
+    /// <summary>
+    /// Gets the canonical payload string used for signing and verifying this operation.
+    /// </summary>
+    public string GetSignaturePayload()
+        => $"{Id}|{OperationType}|{Path}|{ValueJson}";
+
+    /// <summary>
     /// Creates a SET operation.
     /// </summary>
     public static StateOperation Set(string path, string valueJson, string? documentId = null)

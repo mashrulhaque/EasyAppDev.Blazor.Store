@@ -162,6 +162,58 @@ public class DiagnosticsServiceTests
     }
 
     [Fact]
+    public void RecordSubscriptionDisposed_ShouldBoundDisposedHistory()
+    {
+        // Arrange - disposed subscriptions must not accumulate forever (memory leak
+        // in long-running apps); only a bounded ring of recent entries is kept.
+        var service = new DiagnosticsService(maxHistorySize: 5);
+
+        // Act - create and dispose many subscriptions
+        for (var i = 0; i < 20; i++)
+        {
+            var id = Guid.NewGuid();
+            service.RecordSubscription(new SubscriptionInfo
+            {
+                SubscriptionId = id,
+                StateType = typeof(TestState),
+                SubscriberName = $"Component{i}",
+                SubscriptionType = "Full",
+                CreatedAt = DateTime.UtcNow,
+                NotificationCount = 0
+            });
+            service.RecordSubscriptionDisposed(id);
+        }
+
+        // Assert
+        service.GetActiveSubscriptions(typeof(TestState)).Should().BeEmpty();
+        service.GetAllSubscriptions(typeof(TestState)).Should().HaveCount(5);
+        service.GetAllSubscriptions(typeof(TestState)).Should().OnlyContain(s => !s.IsActive);
+    }
+
+    [Fact]
+    public void RecordSubscriptionNotification_AfterDispose_DoesNotResurrectSubscription()
+    {
+        // Arrange
+        var id = Guid.NewGuid();
+        _service.RecordSubscription(new SubscriptionInfo
+        {
+            SubscriptionId = id,
+            StateType = typeof(TestState),
+            SubscriberName = "TestComponent",
+            SubscriptionType = "Full",
+            CreatedAt = DateTime.UtcNow,
+            NotificationCount = 0
+        });
+        _service.RecordSubscriptionDisposed(id);
+
+        // Act - a stray notification after disposal must not re-add tracking entries
+        _service.RecordSubscriptionNotification(id);
+
+        // Assert
+        _service.GetActiveSubscriptions(typeof(TestState)).Should().BeEmpty();
+    }
+
+    [Fact]
     public void RecordSubscriptionNotification_ShouldIncrementCount()
     {
         // Arrange

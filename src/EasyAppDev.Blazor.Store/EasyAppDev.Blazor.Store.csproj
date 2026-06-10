@@ -141,10 +141,4 @@ v2.0.4 - Bug Fixes &amp; Stability
     <Compile Remove="Diagnostics\Components\*.razor" />
   </ItemGroup>
 
-  <!-- Exclude DevTools JavaScript files from Release builds (DEBUG-only feature) -->
-  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
-    <Content Remove="wwwroot\devtools.js" />
-    <Content Remove="wwwroot\devtools-enhanced.js" />
-  </ItemGroup>
-
 </Project>

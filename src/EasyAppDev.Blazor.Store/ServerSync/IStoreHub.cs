@@ -87,7 +87,8 @@ public interface IStoreHub
     /// </summary>
     /// <param name="documentId">The document identifier.</param>
     /// <param name="displayName">Optional display name for presence.</param>
-    Task JoinDocument(string documentId, string? displayName);
+    /// <param name="sessionToken">Optional session token used for reconnection validation. May be null.</param>
+    Task JoinDocument(string documentId, string? displayName, string? sessionToken);
 
     /// <summary>
     /// Leaves a document/room.
@@ -155,7 +156,9 @@ public interface IStoreHubClient
     /// </summary>
     /// <param name="stateJson">The serialized state.</param>
     /// <param name="version">The current version.</param>
-    Task ReceiveFullState(string stateJson, long version);
+    /// <param name="signature">Optional HMAC-SHA256 signature of <paramref name="stateJson"/>.
+    /// Required (and verified) by clients when message signing is enabled.</param>
+    Task ReceiveFullState(string stateJson, long version, string? signature);
 
     /// <summary>
     /// Receives presence update when user joins.

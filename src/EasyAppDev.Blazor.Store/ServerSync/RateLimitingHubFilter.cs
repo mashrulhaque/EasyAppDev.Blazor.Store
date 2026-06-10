@@ -26,8 +26,9 @@ public sealed class RateLimitingOptions
     public int MaxMessagesPerSecondPerDocument { get; set; } = 100;
 
     /// <summary>
-    /// Gets or sets the maximum number of messages allowed in a burst window.
-    /// Allows short bursts of activity above the per-second limit.
+    /// Gets or sets the maximum number of messages allowed ABOVE the per-second
+    /// limit within the burst window. Allows short bursts of activity above the
+    /// sustained per-second rate without throttling compliant clients.
     /// Default is 20.
     /// </summary>
     public int BurstLimit { get; set; } = 20;
@@ -209,24 +210,31 @@ public sealed class RateLimitingHubFilter : IHubFilter, IDisposable
                 limit.BurstMessages.Dequeue();
             }
 
-            // Check per-second limit
-            if (limit.RecentMessages.Count >= _options.MaxMessagesPerSecond)
+            // A message is allowed if the per-second window has room, OR - when it
+            // doesn't - if the burst window still has capacity. The burst window is a
+            // short-term allowance ABOVE the sustained per-second rate, not an
+            // additional cap on compliant clients.
+            var withinPerSecondLimit = limit.RecentMessages.Count < _options.MaxMessagesPerSecond;
+            var withinBurstAllowance = limit.BurstMessages.Count < _options.BurstLimit;
+
+            if (!withinPerSecondLimit && !withinBurstAllowance)
             {
                 limit.ViolationCount++;
                 return false;
             }
 
-            // Check burst limit
-            if (limit.BurstMessages.Count >= _options.BurstLimit)
-            {
-                limit.ViolationCount++;
-                return false;
-            }
-
-            // Record this message
+            // Record this message. Only messages exceeding the sustained per-second
+            // rate consume burst capacity.
             limit.RecentMessages.Enqueue(now);
-            limit.BurstMessages.Enqueue(now);
+            if (!withinPerSecondLimit)
+            {
+                limit.BurstMessages.Enqueue(now);
+            }
             limit.LastActivity = now;
+
+            // A compliant message resets the violation streak so transient spikes
+            // don't accumulate toward ViolationsBeforeBlock.
+            limit.ViolationCount = 0;
 
             return true;
         }

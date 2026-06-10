@@ -1,6 +1,7 @@
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
+using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.ServerSync;
 using FluentAssertions;
 using Xunit;
@@ -219,6 +220,7 @@ public class ServerSyncTests
         // Assert
         options.HubUrl.Should().Be("/hubs/sync");
         options.ConflictResolution.Should().Be(ConflictResolution.LastWriteWins);
+        options.AutoConnect.Should().BeTrue();
         options.AutoReconnect.Should().BeTrue();
         options.EnablePresence.Should().BeFalse();
         options.EnableCursorTracking.Should().BeFalse();
@@ -282,5 +284,104 @@ public class ServerSyncTests
             // Merge: take max count, prefer remote name
             return new SyncTestState(Math.Max(local.Count, remote.Count), remote.Name);
         }
+    }
+
+    // --- Operation signing tests ---
+
+    [Fact]
+    public void StateOperation_GetSignaturePayload_ShouldCoverIdentityAndValue()
+    {
+        // Arrange
+        var operation = StateOperation.Set("user.name", "\"John\"", "doc1");
+
+        // Act
+        var payload = operation.GetSignaturePayload();
+
+        // Assert - payload binds the operation's identity, type, path and value
+        payload.Should().Be($"{operation.Id}|SET|user.name|\"John\"");
+    }
+
+    [Fact]
+    public void StateOperation_Signature_ShouldBeNullByDefault()
+    {
+        // Arrange & Act
+        var operation = StateOperation.Set("/", "{}", "doc1");
+
+        // Assert
+        operation.Signature.Should().BeNull();
+    }
+
+    // --- Middleware attach/store wiring tests ---
+
+    [Fact]
+    public void AttachStore_WithAutoConnectDisabled_DoesNotConnect()
+    {
+        // Arrange
+        var options = new ServerSyncOptions<SyncTestState>
+        {
+            HubUrl = "https://localhost/hubs/sync",
+            RequireValidation = false,
+            AutoConnect = false
+        };
+        var middleware = new ServerSyncMiddleware<SyncTestState>(options);
+        var store = StoreBuilder<SyncTestState>.Create(new SyncTestState(0, "init")).Build();
+
+        // Act
+        middleware.AttachStore(store);
+
+        // Assert - no connection attempt was made
+        middleware.ConnectionState.Should().Be(SyncConnectionState.Disconnected);
+    }
+
+    [Fact]
+    public void AttachStore_CalledTwiceWithSameStore_IsIdempotent()
+    {
+        // Arrange
+        var options = new ServerSyncOptions<SyncTestState>
+        {
+            HubUrl = "https://localhost/hubs/sync",
+            RequireValidation = false,
+            AutoConnect = false
+        };
+        var middleware = new ServerSyncMiddleware<SyncTestState>(options);
+        var store = StoreBuilder<SyncTestState>.Create(new SyncTestState(0, "init")).Build();
+
+        // Act & Assert - no throw on repeated attach
+        middleware.AttachStore(store);
+        var act = () => middleware.AttachStore(store);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void AttachStore_NullStore_Throws()
+    {
+        // Arrange
+        var options = new ServerSyncOptions<SyncTestState>
+        {
+            HubUrl = "https://localhost/hubs/sync",
+            RequireValidation = false,
+            AutoConnect = false
+        };
+        var middleware = new ServerSyncMiddleware<SyncTestState>(options);
+
+        // Act & Assert
+        var act = () => middleware.AttachStore(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ServerSyncMiddleware_ImplementsIStoreAwareMiddleware()
+    {
+        // Arrange
+        var options = new ServerSyncOptions<SyncTestState>
+        {
+            HubUrl = "https://localhost/hubs/sync",
+            RequireValidation = false,
+            AutoConnect = false
+        };
+        var middleware = new ServerSyncMiddleware<SyncTestState>(options);
+
+        // Assert - StoreBuilder.Build attaches stores via this interface
+        middleware.Should().BeAssignableTo<EasyAppDev.Blazor.Store.Middleware.IStoreAwareMiddleware<SyncTestState>>();
     }
 }
