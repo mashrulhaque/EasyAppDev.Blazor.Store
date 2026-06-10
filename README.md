@@ -725,32 +725,22 @@ builder.Services.AddStore(
     new DocumentState(),
     (store, sp) => store
         .WithDefaults(sp, "Document")
-        .WithServerSync(sp, opts => opts
-            .HubUrl("/hubs/documents")
-            .DocumentId(documentId)
-            .EnablePresence()                            // "3 users editing"
-            .EnableCursorTracking()                      // See other users' cursors
-            .ConflictResolution(ConflictResolution.LastWriteWins)
-            .OnUserJoined(user => ShowToast($"{user} joined"))
-            .OnCursorUpdated((userId, pos) => RenderCursor(userId, pos)))
+        .WithServerSync(sp, opts =>
+        {
+            opts.HubUrl = "/hubs/documents";
+            opts.DocumentId = documentId;
+            opts.EnablePresence = true;                  // "3 users editing"
+            opts.EnableCursorTracking = true;            // See other users' cursors
+            opts.ConflictResolution = ConflictResolution.LastWriteWins;
+            opts.UserDisplayName = currentUser.Name;
+            opts.UserCursorColor = "#ff0000";
+            opts.OnUserJoined = user => ShowToast($"{user.DisplayName} joined");
+            opts.OnCursorUpdated = cursor => RenderCursor(cursor);
+        })
 );
 ```
 
-### Presence & Cursors
-
-```csharp
-@inject IServerSync<DocumentState> ServerSync
-
-// Show your presence
-await ServerSync.UpdatePresenceAsync(new PresenceData
-{
-    DisplayName = currentUser.Name,
-    Color = "#ff0000"
-});
-
-// Broadcast cursor position
-await ServerSync.UpdateCursorAsync(new CursorPosition { X = e.ClientX, Y = e.ClientY });
-```
+The connection is established automatically when the store is built (`AutoConnect = true` by default). Presence identity is configured via `UserDisplayName`/`UserCursorColor`, and presence/cursor changes from other users arrive through the `OnUserJoined`, `OnUserLeft`, `OnPresenceChanged`, and `OnCursorUpdated` callbacks.
 
 ### Conflict Resolution
 
@@ -908,9 +898,9 @@ builder.Services.AddStore(
 ```csharp
 public class MyPlugin : StorePluginBase<AppState>
 {
-    public override Task OnStoreCreatedAsync() { /* Store initialized */ }
-    public override Task OnBeforeUpdateAsync(AppState state, string action) { /* Pre-update */ }
-    public override Task OnAfterUpdateAsync(AppState prev, AppState next, string action) { /* Post-update */ }
+    public override Task OnStoreCreatedAsync(IStore<AppState> store) { /* Store initialized */ }
+    public override Task OnBeforeUpdateAsync(AppState currentState, string? action) { /* Pre-update */ }
+    public override Task OnAfterUpdateAsync(AppState prev, AppState next, string? action) { /* Post-update */ }
     public override Task OnStoreDisposingAsync() { /* Cleanup */ }
     public override IMiddleware<AppState>? GetMiddleware() => null; // Custom middleware
 }
@@ -924,7 +914,7 @@ public class MyPlugin : StorePluginBase<AppState>
 
 | Profile | DevTools | Validation | Message Signing | Use Case |
 |---------|----------|------------|-----------------|----------|
-| `Development` | Enabled (DEBUG) | Optional | Optional | Local development |
+| `Development` | Enabled (debugger-gated) | Optional | Optional | Local development |
 | `Production` | Disabled | Warnings | Required | Deployed apps |
 | `Strict` | Disabled | Required | Required | High-security apps |
 | `Custom` | Manual | Manual | Manual | Fine-grained control |
@@ -1017,7 +1007,7 @@ Use `TransformOnSave` to exclude sensitive fields from localStorage:
 
 | Mistake | Solution |
 |---------|----------|
-| DevTools in production | Use `#if DEBUG` or `AddSecureStore` |
+| DevTools in production | Leave `DevToolsOptions.Enabled` unset (debugger-gated) or use `AddSecureStore` |
 | Secrets in localStorage | Use `TransformOnSave` to exclude |
 | Missing state validation | Register `IStateValidator<T>` |
 | TabSync without signing | Enable `EnableMessageSigning` |
@@ -1087,7 +1077,7 @@ builder.Services.AddScopedStore(
 
 ### Redux DevTools
 
-Included with `WithDefaults()` in DEBUG builds. Features:
+Included with `WithDefaults()` and `WithDevTools()`. Activation is gated at runtime: DevTools turn on when a debugger is attached, or when explicitly enabled via `DevToolsOptions<TState>.Enabled = true`. Never enable in production. Features:
 - Time-travel debugging
 - State inspection
 - Action replay
@@ -1095,13 +1085,11 @@ Included with `WithDefaults()` in DEBUG builds. Features:
 
 Install: [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools)
 
-### Diagnostics (DEBUG only)
+### Diagnostics
 
 ```csharp
-#if DEBUG
 builder.Services.AddSingleton<IDiagnosticsService, DiagnosticsService>();
 builder.Services.AddStore(state, (store, sp) => store.WithDiagnostics(sp));
-#endif
 
 // Query in components
 @inject IDiagnosticsService Diagnostics
@@ -1149,14 +1137,14 @@ public class LoggingMiddleware<TState> : IMiddleware<TState> where TState : notn
 
 | Middleware | Purpose |
 |------------|---------|
-| DevToolsMiddleware | Redux DevTools (DEBUG only) |
+| DevToolsMiddleware | Redux DevTools (debugger-attached or opt-in) |
 | PersistenceMiddleware | LocalStorage |
 | LoggingMiddleware | Console logging |
 | HistoryMiddleware | Undo/redo |
 | TabSyncMiddleware | Cross-tab sync |
 | ServerSyncMiddleware | SignalR sync |
 | PluginMiddleware | Plugin lifecycle |
-| DiagnosticsMiddleware | Performance (DEBUG) |
+| DiagnosticsMiddleware | Performance metrics |
 
 ---
 
@@ -1238,7 +1226,7 @@ builder.Services.AddSecurityAuditLogger(opts => ...);
 ```csharp
 store
     // Core
-    .WithDefaults(sp, "Name")              // DevTools + Logging (DEBUG)
+    .WithDefaults(sp, "Name")              // DevTools (debugger-gated) + Logging
     .WithLogging()                         // Logging only
     .WithMiddleware(middleware)            // Custom middleware
     .WithStateValidator(validator)         // State validation
@@ -1252,7 +1240,7 @@ store
     .WithServerSync(sp, opts => ...)       // SignalR
     .WithPlugin<TState, TPlugin>(sp)       // Plugin
     .WithPlugins(assembly, sp)             // Auto-discover plugins
-    .WithDiagnostics(sp)                   // DEBUG only
+    .WithDiagnostics(sp)                   // Performance diagnostics
 ```
 
 ---
@@ -1399,7 +1387,7 @@ Not by default. Enable cross-tab synchronization with `WithTabSync`:
 
 ### How do I debug state changes?
 
-Install the [Redux DevTools browser extension](https://github.com/reduxjs/redux-devtools). State changes are automatically logged in DEBUG builds when using `WithDefaults()` or `WithDevTools()`.
+Install the [Redux DevTools browser extension](https://github.com/reduxjs/redux-devtools). State changes are logged when using `WithDefaults()` or `WithDevTools()` while a debugger is attached (or when explicitly enabled via `DevToolsOptions<TState>.Enabled = true`).
 
 ### Can multiple components share the same state?
 
