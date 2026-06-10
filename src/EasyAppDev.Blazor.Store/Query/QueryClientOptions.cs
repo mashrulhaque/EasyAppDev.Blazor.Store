@@ -27,14 +27,20 @@ public class QueryClientOptions
     public int DefaultRetry { get; set; } = 3;
 
     /// <summary>
-    /// Gets or sets whether to refetch on window focus by default.
-    /// Reserved for future use — window-focus refetching is not yet implemented.
+    /// Gets or sets whether queries refetch when the browser window regains
+    /// focus by default. Applies to queries that do not set
+    /// <see cref="QueryOptions{T}.RefetchOnWindowFocus"/> explicitly; only
+    /// enabled queries with stale data are refetched.
+    /// Default is true.
     /// </summary>
     public bool DefaultRefetchOnWindowFocus { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets whether to refetch on reconnect by default.
-    /// Reserved for future use — reconnect refetching is not yet implemented.
+    /// Gets or sets whether queries refetch when the network reconnects
+    /// (window <c>online</c> event) by default. Applies to queries that do not
+    /// set <see cref="QueryOptions{T}.RefetchOnReconnect"/> explicitly; only
+    /// enabled queries with stale data are refetched.
+    /// Default is true.
     /// </summary>
     public bool DefaultRefetchOnReconnect { get; set; } = true;
 

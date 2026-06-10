@@ -507,7 +507,7 @@ public class QueryBugFixTests
         var query = new Query<string>(options, client, () => { });
 
         var field = typeof(QueryClient).GetField("_queryRefetchers", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var refetchers = (ConcurrentDictionary<string, List<Func<Task>>>)field.GetValue(client)!;
+        var refetchers = (ConcurrentDictionary<string, List<QueryClient.QueryRegistration>>)field.GetValue(client)!;
 
         refetchers.ContainsKey("refetcher-cleanup").Should().BeTrue();
 

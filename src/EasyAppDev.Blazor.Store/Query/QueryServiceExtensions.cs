@@ -2,6 +2,9 @@
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.JSInterop;
 
 namespace EasyAppDev.Blazor.Store.Query;
 
@@ -45,7 +48,7 @@ public static class QueryServiceExtensions
         ArgumentNullException.ThrowIfNull(configure);
 
         services.Configure(configure);
-        services.AddScoped<IQueryClient, QueryClient>();
+        services.AddScoped<IQueryClient>(CreateQueryClient);
 
         return services;
     }
@@ -69,8 +72,20 @@ public static class QueryServiceExtensions
         ArgumentNullException.ThrowIfNull(options);
 
         services.AddSingleton(Microsoft.Extensions.Options.Options.Create(options));
-        services.AddScoped<IQueryClient, QueryClient>();
+        services.AddScoped<IQueryClient>(CreateQueryClient);
 
         return services;
     }
+
+    /// <summary>
+    /// Creates the scoped <see cref="QueryClient"/>, resolving the optional
+    /// <see cref="IJSRuntime"/> when available so window-focus / reconnect
+    /// refetching works in browser hosts. In non-browser environments (unit
+    /// tests, console apps) the JS runtime is simply absent and the client
+    /// works without window-event refetching.
+    /// </summary>
+    private static QueryClient CreateQueryClient(IServiceProvider sp) => new(
+        sp.GetService<IOptions<QueryClientOptions>>(),
+        sp.GetService<ILogger<QueryClient>>(),
+        sp.GetService<IJSRuntime>());
 }

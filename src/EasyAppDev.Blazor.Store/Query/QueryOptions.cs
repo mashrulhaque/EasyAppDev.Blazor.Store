@@ -11,6 +11,8 @@ public class QueryOptions<T>
 {
     private TimeSpan? _staleTime;
     private int? _retry;
+    private bool? _refetchOnWindowFocus;
+    private bool? _refetchOnReconnect;
 
     /// <summary>
     /// Gets or sets the unique key for this query. Used for caching and invalidation.
@@ -45,10 +47,22 @@ public class QueryOptions<T>
     public TimeSpan CacheTime { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    /// Gets or sets whether to refetch when the window regains focus.
-    /// Reserved for future use — window-focus refetching is not yet implemented.
+    /// Gets or sets whether to refetch when the browser window regains focus
+    /// (window <c>focus</c> / document <c>visibilitychange</c> events).
+    /// The refetch only happens when the query is enabled and its data is stale.
+    /// When not set explicitly, <see cref="QueryClientOptions.DefaultRefetchOnWindowFocus"/> applies.
+    /// Default is true.
     /// </summary>
-    public bool RefetchOnWindowFocus { get; set; } = true;
+    public bool RefetchOnWindowFocus
+    {
+        get => _refetchOnWindowFocus ?? true;
+        set => _refetchOnWindowFocus = value;
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="RefetchOnWindowFocus"/> was set explicitly (used to resolve client-level defaults).
+    /// </summary>
+    internal bool HasExplicitRefetchOnWindowFocus => _refetchOnWindowFocus.HasValue;
 
     /// <summary>
     /// Gets or sets the interval for automatic refetching.
@@ -57,10 +71,22 @@ public class QueryOptions<T>
     public TimeSpan? RefetchInterval { get; set; }
 
     /// <summary>
-    /// Gets or sets whether to refetch when network reconnects.
-    /// Reserved for future use — reconnect refetching is not yet implemented.
+    /// Gets or sets whether to refetch when the network reconnects
+    /// (window <c>online</c> event).
+    /// The refetch only happens when the query is enabled and its data is stale.
+    /// When not set explicitly, <see cref="QueryClientOptions.DefaultRefetchOnReconnect"/> applies.
+    /// Default is true.
     /// </summary>
-    public bool RefetchOnReconnect { get; set; } = true;
+    public bool RefetchOnReconnect
+    {
+        get => _refetchOnReconnect ?? true;
+        set => _refetchOnReconnect = value;
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="RefetchOnReconnect"/> was set explicitly (used to resolve client-level defaults).
+    /// </summary>
+    internal bool HasExplicitRefetchOnReconnect => _refetchOnReconnect.HasValue;
 
     /// <summary>
     /// Gets or sets the number of retry attempts for failed queries.

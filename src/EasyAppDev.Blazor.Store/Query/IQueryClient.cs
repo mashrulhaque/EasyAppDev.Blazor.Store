@@ -83,7 +83,18 @@ public interface IQueryClient
     /// <summary>
     /// Registers a query for refetch notifications.
     /// </summary>
-    internal void RegisterQuery(string key, Func<Task> refetch);
+    /// <param name="key">The query key.</param>
+    /// <param name="refetch">Delegate that refetches the query. Also serves as the
+    /// registration identity for <see cref="UnregisterQuery"/>.</param>
+    /// <param name="shouldRefetchOnFocus">Optional predicate that decides whether the
+    /// query should refetch when the window regains focus. Null means never.</param>
+    /// <param name="shouldRefetchOnReconnect">Optional predicate that decides whether the
+    /// query should refetch when the network reconnects. Null means never.</param>
+    internal void RegisterQuery(
+        string key,
+        Func<Task> refetch,
+        Func<bool>? shouldRefetchOnFocus = null,
+        Func<bool>? shouldRefetchOnReconnect = null);
 
     /// <summary>
     /// Unregisters a query from refetch notifications.

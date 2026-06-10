@@ -18,6 +18,8 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     private readonly SynchronizationContext? _syncContext;
     private readonly TimeSpan _staleTime;
     private readonly int _retry;
+    private readonly bool _refetchOnWindowFocus;
+    private readonly bool _refetchOnReconnect;
     private CancellationTokenSource? _fetchCts;
     private Timer? _refetchTimer;
     private volatile bool _disposed;
@@ -49,6 +51,12 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         _retry = _options.HasExplicitRetry || clientOptions is null
             ? _options.Retry
             : clientOptions.DefaultRetry;
+        _refetchOnWindowFocus = _options.HasExplicitRefetchOnWindowFocus || clientOptions is null
+            ? _options.RefetchOnWindowFocus
+            : clientOptions.DefaultRefetchOnWindowFocus;
+        _refetchOnReconnect = _options.HasExplicitRefetchOnReconnect || clientOptions is null
+            ? _options.RefetchOnReconnect
+            : clientOptions.DefaultRefetchOnReconnect;
 
         // Create refetch delegate for registration.
         // Invalidation-triggered refetches must respect Enabled() (TanStack semantics):
@@ -56,8 +64,14 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         // still forces a fetch.
         _refetchDelegate = () => _options.Enabled() ? FetchAsync(forceRefetch: true) : Task.CompletedTask;
 
-        // Register with QueryClient for invalidation support
-        _queryClient.RegisterQuery(_options.Key, _refetchDelegate);
+        // Register with QueryClient for invalidation support and for
+        // window-focus / reconnect refetching (TanStack semantics: only stale,
+        // enabled queries are refetched by those events).
+        _queryClient.RegisterQuery(
+            _options.Key,
+            _refetchDelegate,
+            ShouldRefetchOnWindowFocus,
+            ShouldRefetchOnReconnect);
 
         // Initialize with initial data or placeholder
         if (_options.InitialData is not null)
@@ -395,6 +409,15 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
 
     private bool IsCurrentFetch(CancellationTokenSource cts) =>
         ReferenceEquals(Volatile.Read(ref _fetchCts), cts);
+
+    // Window-event participation predicates, evaluated by QueryClient when the
+    // browser window regains focus or the network reconnects. Only stale,
+    // enabled, non-disposed queries with the corresponding flag refetch.
+    private bool ShouldRefetchOnWindowFocus() =>
+        !_disposed && _refetchOnWindowFocus && _options.Enabled() && IsStale;
+
+    private bool ShouldRefetchOnReconnect() =>
+        !_disposed && _refetchOnReconnect && _options.Enabled() && IsStale;
 
     private void SetupRefetchInterval()
     {
