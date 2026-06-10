@@ -125,19 +125,7 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
         _subscription = Store.Subscribe(state =>
         {
             DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
-            // Use try-catch to handle component disposal during async invoke
-            try
-            {
-                InvokeAsync(StateHasChanged);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Component was disposed during notification - this is expected
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogWarning(ex, "Error invoking StateHasChanged in {ComponentType}", GetType().Name);
-            }
+            InvokeStateHasChangedSafely();
         });
     }
 
@@ -153,20 +141,34 @@ public abstract class StoreComponent<TState> : ComponentBase, IDisposable
             value =>
             {
                 callback?.Invoke(value);
-                // Use try-catch to handle component disposal during async invoke
-                try
-                {
-                    InvokeAsync(StateHasChanged);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Component was disposed during notification - this is expected
-                }
-                catch (Exception ex)
-                {
-                    Logger?.LogWarning(ex, "Error invoking StateHasChanged in {ComponentType}", GetType().Name);
-                }
+                InvokeStateHasChangedSafely();
             });
+    }
+
+    /// <summary>
+    /// Queues a re-render on the Blazor dispatcher. The catch only covers synchronous
+    /// queuing failures (e.g. the renderer was disposed while a notification was in
+    /// flight); async failures are observed and logged via a fault continuation so
+    /// they are not silently swallowed by the discarded task.
+    /// </summary>
+    private void InvokeStateHasChangedSafely()
+    {
+        try
+        {
+            var task = InvokeAsync(StateHasChanged);
+            _ = task.ContinueWith(
+                t => Logger?.LogWarning(
+                    t.Exception?.GetBaseException(),
+                    "Error invoking StateHasChanged in {ComponentType}",
+                    GetType().Name),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was disposed during notification - this is expected
+        }
     }
 
     /// <inheritdoc />

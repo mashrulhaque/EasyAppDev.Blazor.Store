@@ -14,8 +14,12 @@ namespace EasyAppDev.Blazor.Store.Blazor.UrlSync;
 /// <para><b>INCOMPATIBLE WITH:</b></para>
 /// <list type="bullet">
 /// <item>TabSync middleware (tabs must maintain independent URLs)</item>
-/// <item>Multiple UrlSyncStoreComponent instances per store</item>
 /// </list>
+/// <para><b>Multiple components per store:</b> Only one UrlSyncStoreComponent per store
+/// should be active at a time. When more than one is detected (e.g. two pages syncing
+/// the same store), a warning is logged. Note that during normal navigation Blazor
+/// initializes the new page before disposing the old one, so a transient overlap is
+/// expected and harmless.</para>
 /// <para><b>SECURITY WARNING:</b> URL parameters are user-controlled input.
 /// Always validate state using IStateValidator when syncing security-sensitive properties.</para>
 /// <para><b>Phase 3 Features:</b></para>
@@ -132,8 +136,15 @@ public abstract class UrlSyncStoreComponent<TState> : StoreComponent<TState>
                 GetType().Name);
         }
 
-        // Create and start URL sync manager
-        _urlSyncManager = new UrlSyncManager<TState>(Store, Navigation, config, Logger);
+        // Create and start URL sync manager.
+        // The marshaling delegate ensures NavigateTo runs on the Blazor dispatcher
+        // (debounced syncs would otherwise execute on a thread-pool thread).
+        _urlSyncManager = new UrlSyncManager<TState>(
+            Store,
+            Navigation,
+            config,
+            Logger,
+            work => InvokeAsync(work));
         _urlSyncManager.Start();
 
         Logger?.LogDebug("UrlSyncStoreComponent initialized for {ComponentType}", GetType().Name);
@@ -189,8 +200,11 @@ public abstract class UrlSyncStoreComponent<TState> : StoreComponent<TState>
     }
 
     /// <summary>
-    /// Detects if another UrlSyncStoreComponent is already using this store.
-    /// Throws InvalidOperationException if a duplicate is detected.
+    /// Detects if another UrlSyncStoreComponent is already using this store and logs a
+    /// warning if so. This is intentionally NOT an exception: during normal navigation
+    /// Blazor initializes the new page before disposing the old one, so two components
+    /// briefly overlap on every navigation between pages sharing a store. Throwing here
+    /// would also crash unrelated circuits when a singleton store is shared across users.
     /// </summary>
     private void DetectMultipleComponents()
     {
@@ -198,28 +212,25 @@ public abstract class UrlSyncStoreComponent<TState> : StoreComponent<TState>
 
         if (!_activeComponents.TryAdd(Store, weakRef))
         {
-            // Another component already exists
             if (_activeComponents.TryGetValue(Store, out var existingRef) &&
-                existingRef.TryGetTarget(out var existingComponent))
+                existingRef.TryGetTarget(out var existingComponent) &&
+                !ReferenceEquals(existingComponent, this))
             {
-                throw new InvalidOperationException(
-                    $"Only ONE UrlSyncStoreComponent per store is allowed.\n\n" +
-                    $"Another component ({existingComponent.GetType().Name}) is already " +
-                    $"syncing {typeof(TState).Name} to the URL.\n\n" +
-                    $"Solution: Use UrlSync in only one component per page " +
-                    $"(typically the page component, not child components).\n\n" +
-                    $"If you need different components to manage different URL params, " +
-                    $"consider using separate stores or manual URL management."
-                );
+                Logger?.LogWarning(
+                    "Multiple UrlSyncStoreComponent instances detected for store {StateType}: " +
+                    "{ExistingComponent} is already syncing this store to the URL and {NewComponent} " +
+                    "is now registering as well. This is expected transiently during navigation " +
+                    "(Blazor initializes the new page before disposing the old one), but if both " +
+                    "components stay alive they will compete over the URL. " +
+                    "Use UrlSync in only one component per page, or use separate stores.",
+                    typeof(TState).Name,
+                    existingComponent.GetType().Name,
+                    GetType().Name);
             }
-            else
-            {
-                // Existing component was GC'd, replace with new one
-                if (existingRef != null)
-                {
-                    _activeComponents.TryUpdate(Store, weakRef, existingRef);
-                }
-            }
+
+            // Track the most recently initialized component (existing entry may also be a
+            // GC'd weak reference). Bookkeeping keeps the warning accurate.
+            _activeComponents[Store] = weakRef;
         }
     }
 
@@ -231,7 +242,14 @@ public abstract class UrlSyncStoreComponent<TState> : StoreComponent<TState>
             _urlSyncManager?.Dispose();
             _urlSyncManager = null;
 
-            _activeComponents.TryRemove(Store, out _);
+            // Only remove the registration if it still points at this instance.
+            // During navigation the new page registers before the old page disposes,
+            // and the old page must not wipe out the new page's registration.
+            if (_activeComponents.TryGetValue(Store, out var registeredRef) &&
+                (!registeredRef.TryGetTarget(out var registered) || ReferenceEquals(registered, this)))
+            {
+                _activeComponents.TryRemove(Store, out _);
+            }
 
             Logger?.LogDebug("UrlSyncStoreComponent disposed for {ComponentType}", GetType().Name);
         }

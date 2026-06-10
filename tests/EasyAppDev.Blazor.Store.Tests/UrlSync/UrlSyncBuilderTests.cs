@@ -339,6 +339,32 @@ public class UrlSyncBuilderTests
             .WithParameterName("handler");
     }
 
+    [Fact]
+    public void OnConversionError_RegisteredAfterSyncQueryParam_IsStillInvoked()
+    {
+        // The natural fluent order registers mappings BEFORE the error handler
+        // (and auto-discovered attribute mappings are always created first).
+        // The handler must be looked up at conversion time, not captured.
+        var builder = new UrlSyncBuilder<TestState>();
+        int page = 1;
+        var conversionErrors = new List<string>();
+
+        builder
+            .SyncQueryParam(() => page, s => s.Page, "page")
+            .OnConversionError((p, ex) => conversionErrors.Add(p));
+
+        var config = builder.Build();
+
+        var urlParams = new ParameterDictionary(new Dictionary<string, string?>
+        {
+            ["page"] = "not-a-number"
+        });
+
+        config.ExtractUrlValues(urlParams);
+
+        conversionErrors.Should().ContainSingle().Which.Should().Be("not-a-number");
+    }
+
     #endregion
 
     #region Build

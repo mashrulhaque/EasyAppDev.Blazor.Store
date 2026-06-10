@@ -7,7 +7,7 @@ namespace EasyAppDev.Blazor.Store.Blazor.UrlSync;
 /// </summary>
 internal sealed class UrlSyncBuilder<TState> : IUrlSyncBuilder<TState> where TState : notnull
 {
-    private readonly List<object> _propertyMappings = new();
+    private readonly List<IPropertyMapping<TState>> _propertyMappings = new();
     private TimeSpan _debounce = TimeSpan.FromMilliseconds(300); // Default 300ms
     private UrlSyncNavigationMode _navigationMode = UrlSyncNavigationMode.Replace; // Default Replace
     private readonly HashSet<string> _excludedActions = new();
@@ -35,8 +35,11 @@ internal sealed class UrlSyncBuilder<TState> : IUrlSyncBuilder<TState> where TSt
         var componentGetter = componentProperty.Compile();
         var stateSelector = stateProperty.Compile();
 
-        // Create converter
-        var converter = new DefaultUrlValueConverter<TParam>(_onConversionError);
+        // Create converter with a provider that reads the builder's CURRENT handler at
+        // conversion time. Capturing _onConversionError's value here would ignore handlers
+        // registered after this call (the natural fluent order, and all auto-discovered
+        // attribute mappings which are created before manual configuration runs).
+        var converter = new DefaultUrlValueConverter<TParam>(() => _onConversionError);
 
         // Create mapping
         var mapping = new PropertyMapping<TState, TParam>(

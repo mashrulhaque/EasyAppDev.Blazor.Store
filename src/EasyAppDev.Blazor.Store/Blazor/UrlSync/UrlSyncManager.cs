@@ -16,18 +16,27 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
     private readonly UrlSyncConfiguration<TState> _config;
     private readonly ILogger? _logger;
 
+    /// <summary>
+    /// Marshals work onto the Blazor dispatcher (e.g. ComponentBase.InvokeAsync).
+    /// NavigateTo must run on the dispatcher; debounce continuations run on the thread pool.
+    /// </summary>
+    private readonly Func<Func<Task>, Task> _invokeAsync;
+
     private IDisposable? _storeSubscription;
     private CancellationTokenSource? _debounceCts;
+    private readonly object _debounceLock = new();
     private TState? _lastSyncedState;
     private bool _isApplyingUrlToState;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     // Default actions to exclude from URL sync
     private static readonly HashSet<string> DefaultExcludedActions = new()
     {
         "@@URL_SYNC",           // Prevent circular updates
         "@@URL_SYNC/FROM_URL",
-        "SERVER_SYNC",          // ServerSync updates
+        "@@SYNC",               // ServerSync conflict-resolution updates
+        "@@SYNC_FULL",          // ServerSync full-state updates
+        "SERVER_SYNC",          // ServerSync updates (legacy names)
         "SERVER_UPDATE",
         "CURSOR_UPDATE",        // Collaborative editing
         "CURSOR_MOVE",
@@ -41,23 +50,34 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
         IStore<TState> store,
         NavigationManager navigationManager,
         UrlSyncConfiguration<TState> config,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        Func<Func<Task>, Task>? invokeAsync = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _navigationManager = navigationManager ?? throw new ArgumentNullException(nameof(navigationManager));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger;
+        _invokeAsync = invokeAsync ?? (work => work());
         _lastSyncedState = store.GetState();
     }
 
     /// <summary>
     /// Starts the URL sync manager by subscribing to store changes.
+    /// Uses the action-aware subscription so excluded actions are filtered out.
     /// </summary>
     public void Start()
     {
-        // Subscribe to store with action tracking (requires extended Subscribe overload)
-        // For Phase 1, we'll use the standard Subscribe and infer action from context
-        _storeSubscription = _store.Subscribe(OnStateChanged);
+        _storeSubscription = _store.Subscribe((TState state, string? action) =>
+        {
+            // Layer 1: action filtering (excluded/system actions never sync to the URL)
+            if (!ShouldSyncToUrl(action))
+            {
+                _logger?.LogTrace("Skipping URL sync - action {Action} is excluded", action);
+                return;
+            }
+
+            OnStateChanged(state);
+        });
 
         _logger?.LogDebug("UrlSyncManager started for {StateType}", typeof(TState).Name);
     }
@@ -65,6 +85,8 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
     /// <summary>
     /// Syncs component parameters to state (URL → State direction).
     /// Called from OnParametersSetAsync in the component.
+    /// Only mappings whose query parameter is actually present in the current URL
+    /// are applied, so absent query params never clobber existing state.
     /// </summary>
     public async Task SyncFromComponentParametersAsync()
     {
@@ -75,7 +97,8 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
             _isApplyingUrlToState = true;
 
             var currentState = _store.GetState();
-            var newState = _config.ApplyComponentParamsToState(currentState);
+            var presentQueryParams = GetPresentQueryParamNames();
+            var newState = _config.ApplyComponentParamsToState(currentState, presentQueryParams, _logger);
 
             // Only update if state actually changed
             if (!EqualityComparer<TState>.Default.Equals(currentState, newState))
@@ -95,6 +118,34 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
         {
             _isApplyingUrlToState = false;
         }
+    }
+
+    /// <summary>
+    /// Parses the current URI and returns the set of query parameter names present in it.
+    /// </summary>
+    private HashSet<string> GetPresentQueryParamNames()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var uri = new Uri(_navigationManager.Uri);
+            var query = HttpUtility.ParseQueryString(uri.Query);
+
+            foreach (var key in query.AllKeys)
+            {
+                if (key != null)
+                {
+                    result.Add(key);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to parse query string from current URI");
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -129,33 +180,61 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
     /// </summary>
     private void SyncToUrlDebounced(TState newState)
     {
-        // Cancel previous debounce
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = new CancellationTokenSource();
+        CancellationToken token;
 
-        var cts = _debounceCts;
-        var debounceMs = (int)_config.Debounce.TotalMilliseconds;
-
-        _ = Task.Delay(debounceMs, cts.Token).ContinueWith(task =>
+        lock (_debounceLock)
         {
-            if (!cts.IsCancellationRequested && !_disposed)
+            if (_disposed) return;
+
+            // Cancel and dispose the old CTS to coalesce pending updates (last write wins).
+            var oldCts = _debounceCts;
+            _debounceCts = new CancellationTokenSource();
+            token = _debounceCts.Token;
+
+            oldCts?.Cancel();
+            oldCts?.Dispose();
+        }
+
+        _ = RunDebouncedSyncAsync(newState, token);
+    }
+
+    /// <summary>
+    /// Waits out the debounce window and then performs the URL sync on the
+    /// Blazor dispatcher (NavigateTo must not run on a thread-pool thread).
+    /// </summary>
+    private async Task RunDebouncedSyncAsync(TState newState, CancellationToken token)
+    {
+        try
+        {
+            var debounceMs = (int)_config.Debounce.TotalMilliseconds;
+            await Task.Delay(debounceMs, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return; // Superseded by a newer update or disposed
+        }
+
+        if (token.IsCancellationRequested || _disposed) return;
+
+        try
+        {
+            await _invokeAsync(() =>
             {
-                try
-                {
-                    SyncToUrl(newState);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Error syncing state to URL");
-                    _config.OnError?.Invoke(ex);
-                }
-            }
-        }, TaskScheduler.Default);
+                SyncToUrl(newState);
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error syncing state to URL");
+            _config.OnError?.Invoke(ex);
+        }
     }
 
     /// <summary>
     /// Performs the actual navigation to update URL.
+    /// Rebuilds from the full current URI so unrelated query parameters and the
+    /// fragment survive, and emits null values so stale parameters are removed.
     /// </summary>
     private void SyncToUrl(TState newState)
     {
@@ -163,20 +242,25 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
 
         try
         {
-            // Build query parameters from state
+            // Build query parameters from state. Null values remove the parameter,
+            // so stale query params are cleaned up (an all-null dictionary must
+            // still navigate to clear them).
             var queryParams = _config.BuildUrlQueryParams(newState);
 
-            if (queryParams.Count == 0)
+            // Rebuild from the FULL current URI so unrelated query params (utm_*, etc.)
+            // are preserved. GetUriWithQueryParameters merges with the existing query.
+            var currentUri = _navigationManager.Uri;
+
+            // GetUriWithQueryParameters drops the fragment - preserve it manually.
+            var fragment = string.Empty;
+            var fragmentIndex = currentUri.IndexOf('#');
+            if (fragmentIndex >= 0)
             {
-                _logger?.LogTrace("No query params to sync");
-                return;
+                fragment = currentUri[fragmentIndex..];
+                currentUri = currentUri[..fragmentIndex];
             }
 
-            // Build new URL
-            var currentUri = new Uri(_navigationManager.Uri);
-            var basePath = currentUri.GetLeftPart(UriPartial.Path);
-
-            var newUrl = _navigationManager.GetUriWithQueryParameters(basePath, queryParams);
+            var newUrl = _navigationManager.GetUriWithQueryParameters(currentUri, queryParams) + fragment;
 
             // Check if URL actually changed
             if (string.Equals(_navigationManager.Uri, newUrl, StringComparison.Ordinal))
@@ -228,7 +312,9 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
             return false;
 
         // Check prefix patterns
+        // ("SYNC_" matches TabSyncMiddleware which dispatches "SYNC_{action}")
         if (action.StartsWith("SERVER_", StringComparison.Ordinal) ||
+            action.StartsWith("SYNC_", StringComparison.Ordinal) ||
             action.StartsWith("CURSOR_", StringComparison.Ordinal) ||
             action.StartsWith("PRESENCE_", StringComparison.Ordinal) ||
             action.StartsWith("@@URL_SYNC", StringComparison.Ordinal))
@@ -246,9 +332,20 @@ internal sealed class UrlSyncManager<TState> : IDisposable where TState : notnul
         _storeSubscription?.Dispose();
         _storeSubscription = null;
 
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = null;
+        lock (_debounceLock)
+        {
+            try
+            {
+                _debounceCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed - nothing to cancel
+            }
+
+            _debounceCts?.Dispose();
+            _debounceCts = null;
+        }
 
         _logger?.LogDebug("UrlSyncManager disposed for {StateType}", typeof(TState).Name);
     }

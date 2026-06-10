@@ -341,6 +341,44 @@ public class DefaultUrlValueConverterTests
 
     #endregion
 
+    #region Thousands Separators (must fail cleanly, not silently parse "1,5" as 15)
+
+    [Fact]
+    public void FromUrl_Double_WithThousandsSeparator_FailsCleanlyAndInvokesErrorCallback()
+    {
+        string? capturedParam = null;
+        var converter = new DefaultUrlValueConverter<double>((param, _) => capturedParam = param);
+
+        var result = converter.FromUrl("1,5");
+
+        result.Should().Be(0.0, "\"1,5\" must not silently parse as 15");
+        capturedParam.Should().Be("1,5");
+    }
+
+    [Fact]
+    public void FromUrl_Float_WithThousandsSeparator_FailsCleanly()
+    {
+        var converter = new DefaultUrlValueConverter<float>();
+        converter.FromUrl("1,5").Should().Be(0.0f);
+    }
+
+    [Fact]
+    public void FromUrl_Decimal_WithThousandsSeparator_FailsCleanly()
+    {
+        var converter = new DefaultUrlValueConverter<decimal>();
+        converter.FromUrl("1,5").Should().Be(0m);
+    }
+
+    [Fact]
+    public void FromUrl_Double_PlainDecimalValue_StillParses()
+    {
+        var converter = new DefaultUrlValueConverter<double>();
+        converter.FromUrl("1.5").Should().Be(1.5);
+        converter.FromUrl("-2.75e2").Should().Be(-275.0);
+    }
+
+    #endregion
+
     #region Error Handling
 
     [Fact]
@@ -360,6 +398,25 @@ public class DefaultUrlValueConverterTests
         result.Should().Be(0);
         capturedParam.Should().Be("not-a-number");
         capturedException.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void FromUrl_ErrorCallbackProvider_IsReadAtConversionTime()
+    {
+        // The provider must be consulted at CONVERSION time, not captured at
+        // construction time, so handlers registered later are honored.
+        Action<string, Exception>? handler = null;
+        var converter = new DefaultUrlValueConverter<int>(() => handler);
+
+        // No handler registered yet - conversion fails silently
+        converter.FromUrl("bad").Should().Be(0);
+
+        // Handler registered AFTER the converter was created
+        string? capturedParam = null;
+        handler = (param, _) => capturedParam = param;
+
+        converter.FromUrl("still-bad").Should().Be(0);
+        capturedParam.Should().Be("still-bad");
     }
 
     #endregion

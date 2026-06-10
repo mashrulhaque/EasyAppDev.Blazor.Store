@@ -210,6 +210,27 @@ public class StoreServiceExtensionsTests
     }
 
     [Fact]
+    public void AddTransientStore_DoesNotRegisterInterfaceAliases()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddTransientStore<TestState>(sp => new TestState(0, "Transient"));
+        var provider = services.BuildServiceProvider();
+
+        // Assert - transient aliases cannot share an instance by definition:
+        // each resolution would create a brand-new store, so writes through one
+        // alias would be invisible to readers resolved through another.
+        provider.GetService<IStateReader<TestState>>().Should().BeNull();
+        provider.GetService<IStateWriter<TestState>>().Should().BeNull();
+        provider.GetService<IStateObservable<TestState>>().Should().BeNull();
+
+        // The store itself is still resolvable
+        provider.GetService<IStore<TestState>>().Should().NotBeNull();
+    }
+
+    [Fact]
     public void AddStore_ReturnsServicesForChaining()
     {
         // Arrange

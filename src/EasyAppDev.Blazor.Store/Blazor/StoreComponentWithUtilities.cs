@@ -21,6 +21,17 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     private readonly HashSet<string> _registeredThrottleKeys = new();
     private readonly object _keysLock = new();
 
+    // Per-instance discriminator so two instances of the same component type do not
+    // cancel/replace each other's pending debounce/throttle operations on the
+    // circuit-scoped managers (and disposing one doesn't cancel the other's).
+    private readonly string _instanceId = Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>
+    /// Builds a debounce/throttle key that is unique per component instance and action.
+    /// </summary>
+    private string BuildOperationKey(string? action)
+        => $"{GetType().Name}_{_instanceId}_{action ?? "update"}";
+
     /// <summary>
     /// Gets the injected debounce manager.
     /// </summary>
@@ -72,7 +83,7 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     {
         ArgumentNullException.ThrowIfNull(updater);
 
-        var key = $"{GetType().Name}_{action ?? "update"}";
+        var key = BuildOperationKey(action);
         TrackDebounceKey(key);
         return DebounceManager.Debounce(key, async () =>
         {
@@ -107,7 +118,7 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     {
         ArgumentNullException.ThrowIfNull(asyncUpdater);
 
-        var key = $"{GetType().Name}_{action ?? "update"}";
+        var key = BuildOperationKey(action);
         TrackDebounceKey(key);
         return DebounceManager.Debounce(key, async () =>
         {
@@ -142,7 +153,7 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     {
         ArgumentNullException.ThrowIfNull(updater);
 
-        var key = $"{GetType().Name}_{action ?? "update"}";
+        var key = BuildOperationKey(action);
         TrackThrottleKey(key);
         return ThrottleManager.Throttle(key, async () =>
         {
@@ -177,7 +188,7 @@ public abstract class StoreComponentWithUtilities<TState> : StoreComponent<TStat
     {
         ArgumentNullException.ThrowIfNull(asyncUpdater);
 
-        var key = $"{GetType().Name}_{action ?? "update"}";
+        var key = BuildOperationKey(action);
         TrackThrottleKey(key);
         return ThrottleManager.Throttle(key, async () =>
         {

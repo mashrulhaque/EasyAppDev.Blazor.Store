@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using EasyAppDev.Blazor.Store.Core;
 using EasyAppDev.Blazor.Store.Diagnostics;
 using EasyAppDev.Blazor.Store.Diagnostics.Models;
@@ -35,10 +36,9 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
     private IDisposable? _subscription;
     private bool _disposed;
     private volatile object? _selectedValue;
-    private object? _lastRenderedValue;
-    private int _isFirstRender = 1; // 1 = true, 0 = false (for thread-safe access)
     private readonly object _valueLock = new();
     private Guid _subscriptionId;
+    private ILogger? _logger;
 
     /// <summary>
     /// Gets the injected store instance.
@@ -127,54 +127,23 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
 
         // Try to resolve diagnostics service if available
         DiagnosticsService = ServiceProvider.GetService(typeof(IDiagnosticsService)) as IDiagnosticsService;
+        _logger = ServiceProvider.GetService(typeof(ILogger<SelectorStoreComponent<TState>>)) as ILogger;
 
         SubscribeToStore();
     }
 
-    /// <inheritdoc />
-    protected override bool ShouldRender()
-    {
-        // Always render on first render (thread-safe read using Volatile)
-        if (Volatile.Read(ref _isFirstRender) == 1)
-        {
-            return true;
-        }
-
-        // Only render if the selected value has actually changed since last render
-        // This prevents duplicate renders from Blazor's internal rendering mechanism
-        object? currentSelected;
-        lock (_valueLock)
-        {
-            currentSelected = _selectedValue;
-        }
-
-        if (currentSelected == null && _lastRenderedValue == null)
-        {
-            return false;
-        }
-
-        if (currentSelected == null || _lastRenderedValue == null)
-        {
-            return true;
-        }
-
-        return !currentSelected.Equals(_lastRenderedValue);
-    }
+    // Note: This component intentionally does NOT override ShouldRender().
+    // Render-skipping for unchanged selected values is handled at the subscription
+    // level (the selector subscription only fires when the selected value changes).
+    // Overriding ShouldRender() here would also suppress legitimate renders caused
+    // by parameter changes, event handlers, and manual StateHasChanged() calls.
 
     /// <inheritdoc />
     protected override void OnAfterRender(bool firstRender)
     {
         base.OnAfterRender(firstRender);
 
-        // Thread-safe write using Volatile
-        Volatile.Write(ref _isFirstRender, 0);
-        lock (_valueLock)
-        {
-            _lastRenderedValue = _selectedValue;
-        }
-
         // Record render event for diagnostics
-        // This is now safe with ShouldRender() optimization preventing cascade renders
         if (DiagnosticsService is not null)
         {
             DiagnosticsService.RecordRender(new RenderEvent
@@ -183,7 +152,7 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
                 Timestamp = DateTime.UtcNow,
                 IsFirstRender = firstRender,
                 StateType = typeof(TState),
-                Reason = firstRender ? "Initial Render" : "Selector Value Changed"
+                Reason = firstRender ? "Initial Render" : "State or Parameter Change"
             });
         }
     }
@@ -218,17 +187,27 @@ public abstract class SelectorStoreComponent<TState> : ComponentBase, IDisposabl
             callback: value =>
             {
                 // Record subscription notification for diagnostics
-                // This is now safe with ShouldRender() optimization preventing cascade renders
                 DiagnosticsService?.RecordSubscriptionNotification(_subscriptionId);
                 // Thread-safe write to _selectedValue
                 lock (_valueLock)
                 {
                     _selectedValue = value;
                 }
-                // Use try-catch to handle component disposal during async invoke
+
+                // The catch only covers synchronous queuing failures (e.g. the renderer
+                // was disposed while the notification was in flight). Async failures are
+                // observed via the fault continuation below.
                 try
                 {
-                    InvokeAsync(StateHasChanged);
+                    var task = InvokeAsync(StateHasChanged);
+                    _ = task.ContinueWith(
+                        t => _logger?.LogWarning(
+                            t.Exception?.GetBaseException(),
+                            "Error invoking StateHasChanged in {ComponentType}",
+                            GetType().Name),
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
                 }
                 catch (ObjectDisposedException)
                 {

@@ -291,13 +291,21 @@ public static class StoreServiceExtensions
     /// <summary>
     /// Adds a transient store to the service collection.
     /// Creates a new store instance each time it's requested.
-    /// Also registers IStateReader, IStateWriter, and IStateObservable as aliases.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="stateFactory">Factory to create the initial state.</param>
     /// <param name="configure">Optional configuration for the store builder.</param>
     /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// Unlike <see cref="AddStore{TState}(IServiceCollection, TState, Func{StoreBuilder{TState}, IServiceProvider, StoreBuilder{TState}})"/>
+    /// and <see cref="AddScopedStore{TState}(IServiceCollection, TState, Func{StoreBuilder{TState}, IServiceProvider, StoreBuilder{TState}})"/>,
+    /// this method does NOT register <see cref="IStateReader{TState}"/>, <see cref="IStateWriter{TState}"/>,
+    /// or <see cref="IStateObservable{TState}"/> aliases. Transient aliases cannot share a store
+    /// instance by definition: each resolution would create a brand-new store, so writes through
+    /// one alias would be invisible to readers resolved through another. Inject
+    /// <see cref="IStore{TState}"/> directly instead.
+    /// </remarks>
     public static IServiceCollection AddTransientStore<TState>(
         this IServiceCollection services,
         Func<IServiceProvider, TState> stateFactory,
@@ -312,10 +320,9 @@ public static class StoreServiceExtensions
             return builder.Build();
         });
 
-        // Register interface aliases (required by AsyncActionExecutor and for interface segregation)
-        services.AddTransient<IStateReader<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
-        services.AddTransient<IStateWriter<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
-        services.AddTransient<IStateObservable<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+        // Interface aliases (IStateReader/IStateWriter/IStateObservable) are intentionally NOT
+        // registered for transient stores: each transient resolution creates a distinct store,
+        // so aliases would each resolve a brand-new store and writes would be invisible to readers.
 
         return services;
     }

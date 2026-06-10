@@ -1,4 +1,6 @@
-using System.Linq.Expressions;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Blazor.UrlSync;
 
@@ -8,7 +10,7 @@ namespace EasyAppDev.Blazor.Store.Blazor.UrlSync;
 /// </summary>
 internal sealed class UrlSyncConfiguration<TState> where TState : notnull
 {
-    private readonly List<object> _propertyMappings;
+    private readonly List<IPropertyMapping<TState>> _propertyMappings;
     public TimeSpan Debounce { get; }
     public UrlSyncNavigationMode NavigationMode { get; }
     public HashSet<string> ExcludedActions { get; }
@@ -16,7 +18,7 @@ internal sealed class UrlSyncConfiguration<TState> where TState : notnull
     public Action<Exception>? OnError { get; }
 
     public UrlSyncConfiguration(
-        List<object> propertyMappings,
+        List<IPropertyMapping<TState>> propertyMappings,
         TimeSpan debounce,
         UrlSyncNavigationMode navigationMode,
         HashSet<string> excludedActions,
@@ -41,7 +43,7 @@ internal sealed class UrlSyncConfiguration<TState> where TState : notnull
 
         foreach (var mapping in _propertyMappings)
         {
-            ExtractValue((dynamic)mapping, urlParams, values);
+            mapping.ExtractUrlValue(urlParams, values);
         }
 
         return values;
@@ -57,7 +59,7 @@ internal sealed class UrlSyncConfiguration<TState> where TState : notnull
 
         foreach (var mapping in _propertyMappings)
         {
-            ExtractComponentValue((dynamic)mapping, values);
+            mapping.ExtractComponentValue(values);
         }
 
         return values;
@@ -73,7 +75,7 @@ internal sealed class UrlSyncConfiguration<TState> where TState : notnull
 
         foreach (var mapping in _propertyMappings)
         {
-            AddQueryParam((dynamic)mapping, state, queryParams);
+            mapping.AddQueryParam(state, queryParams);
         }
 
         return queryParams;
@@ -86,107 +88,179 @@ internal sealed class UrlSyncConfiguration<TState> where TState : notnull
     {
         foreach (var mapping in _propertyMappings)
         {
-            if (HasMappingChanged((dynamic)mapping, oldState, newState))
+            if (mapping.HasChanged(oldState, newState))
                 return true;
         }
 
         return false;
     }
 
-    // Dynamic dispatch methods (called via dynamic keyword)
-
-    private void ExtractValue<TParam>(PropertyMapping<TState, TParam> mapping, ParameterDictionary urlParams, Dictionary<string, object?> values)
+    /// <summary>
+    /// Applies component parameter values to state using reflection.
+    /// Returns a NEW state instance with the mapped values overlaid on the current
+    /// property values - all unmapped properties retain their current values.
+    /// </summary>
+    /// <param name="currentState">The current store state.</param>
+    /// <param name="presentQueryParams">
+    /// The set of query parameter names actually present in the current URL.
+    /// Mappings whose query parameter is absent are NOT applied, so hydrated/persisted
+    /// state is not clobbered by component-parameter default values.
+    /// </param>
+    /// <param name="logger">Optional logger for diagnostics.</param>
+    public TState ApplyComponentParamsToState(
+        TState currentState,
+        IReadOnlySet<string> presentQueryParams,
+        ILogger? logger = null)
     {
-        var urlValue = urlParams.Get(mapping.QueryParamName);
-        var convertedValue = mapping.Converter.FromUrl(urlValue);
-        values[mapping.QueryParamName] = convertedValue;
-    }
+        var stateType = typeof(TState);
+        var properties = stateType
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetMethod != null && p.GetIndexParameters().Length == 0)
+            .ToArray();
 
-    private void ExtractComponentValue<TParam>(PropertyMapping<TState, TParam> mapping, Dictionary<string, object?> values)
-    {
-        var value = mapping.ComponentParameterGetter();
-        values[mapping.QueryParamName] = value;
-    }
-
-    private void AddQueryParam<TParam>(PropertyMapping<TState, TParam> mapping, TState state, Dictionary<string, object?> queryParams)
-    {
-        var value = mapping.StateSelector(state);
-        var urlValue = mapping.Converter.ToUrl(value);
-
-        if (urlValue != null)
+        // 1. Collect current property values from the existing state.
+        var mergedValues = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var prop in properties)
         {
-            queryParams[mapping.QueryParamName] = urlValue;
+            mergedValues[prop.Name] = prop.GetValue(currentState);
         }
-    }
 
-    private bool HasMappingChanged<TParam>(PropertyMapping<TState, TParam> mapping, TState oldState, TState newState)
-    {
-        var oldValue = mapping.StateSelector(oldState);
-        var newValue = mapping.StateSelector(newState);
+        // 2. Overlay the mapped component-parameter values (presence-checked).
+        //    Only mappings whose query parameter is actually present in the URL are
+        //    applied - absent query params must not clobber state with component defaults.
+        var overlaidNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mapping in _propertyMappings)
+        {
+            if (!presentQueryParams.Contains(mapping.QueryParamName))
+                continue;
 
-        return !EqualityComparer<TParam>.Default.Equals(oldValue, newValue);
+            if (mapping.StatePropertyName is { } propertyName)
+            {
+                mergedValues[propertyName] = mapping.GetComponentParameterValue();
+                overlaidNames.Add(propertyName);
+            }
+        }
+
+        if (overlaidNames.Count == 0)
+            return currentState;
+
+        // Skip the rebuild entirely if every overlaid value already equals the current value.
+        var anyChanged = false;
+        foreach (var name in overlaidNames)
+        {
+            var prop = properties.FirstOrDefault(p =>
+                string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (prop == null)
+                continue;
+
+            var currentValue = prop.GetValue(currentState);
+            if (!Equals(currentValue, mergedValues[name]))
+            {
+                anyChanged = true;
+                break;
+            }
+        }
+
+        if (!anyChanged)
+            return currentState;
+
+        // 3. Pick the constructor whose parameters best match property names (case-insensitive).
+        //    Every parameter must be resolvable from a property value or an optional default.
+        ConstructorInfo? bestCtor = null;
+        var bestScore = -1;
+        foreach (var ctor in stateType.GetConstructors())
+        {
+            var ctorParameters = ctor.GetParameters();
+            var feasible = ctorParameters.All(p =>
+                (p.Name != null && mergedValues.ContainsKey(p.Name)) || p.IsOptional);
+            if (!feasible)
+                continue;
+
+            var score = ctorParameters.Count(p => p.Name != null && mergedValues.ContainsKey(p.Name));
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCtor = ctor;
+            }
+        }
+
+        if (bestCtor == null)
+        {
+            logger?.LogDebug(
+                "UrlSync: no usable constructor found on {StateType}; state left unchanged",
+                stateType.Name);
+            return currentState;
+        }
+
+        // 4. Construct the new instance. For each ctor parameter use the merged
+        //    (current-overlaid-with-parameters) property value when available,
+        //    otherwise the parameter's default when optional. Never DBNull.
+        var ctorParams = bestCtor.GetParameters();
+        var ctorArgs = new object?[ctorParams.Length];
+        var consumedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < ctorParams.Length; i++)
+        {
+            var param = ctorParams[i];
+            if (param.Name != null && mergedValues.TryGetValue(param.Name, out var mergedValue))
+            {
+                ctorArgs[i] = mergedValue;
+                consumedNames.Add(param.Name);
+            }
+            else
+            {
+                // Feasibility check above guarantees the parameter is optional here.
+                ctorArgs[i] = param.HasDefaultValue && param.DefaultValue != DBNull.Value
+                    ? param.DefaultValue
+                    : (param.ParameterType.IsValueType
+                        ? Activator.CreateInstance(param.ParameterType)
+                        : null);
+            }
+        }
+
+        var newState = (TState)bestCtor.Invoke(ctorArgs);
+
+        // 5. Apply every remaining merged value through a writable setter so properties
+        //    not covered by the constructor keep their current (or overlaid) values.
+        foreach (var prop in properties)
+        {
+            if (consumedNames.Contains(prop.Name))
+                continue;
+
+            if (!mergedValues.TryGetValue(prop.Name, out var value))
+                continue;
+
+            if (prop.SetMethod == null)
+                continue;
+
+            if (IsInitOnly(prop))
+            {
+                // Init-only properties not covered by the constructor cannot be set safely.
+                logger?.LogDebug(
+                    "UrlSync: skipping init-only property {Property} on {StateType} - " +
+                    "it is not covered by the selected constructor",
+                    prop.Name,
+                    stateType.Name);
+                continue;
+            }
+
+            prop.SetValue(newState, value);
+        }
+
+        return newState;
     }
 
     /// <summary>
-    /// Applies component parameter values to state using reflection.
-    /// This creates a new state instance with updated property values.
+    /// Determines whether a property setter is init-only (init accessor).
     /// </summary>
-    public TState ApplyComponentParamsToState(TState currentState)
+    private static bool IsInitOnly(PropertyInfo property)
     {
-        var stateType = typeof(TState);
-        var properties = stateType.GetProperties();
-        var propertyValues = new Dictionary<string, object?>();
+        var setMethod = property.SetMethod;
+        if (setMethod == null)
+            return false;
 
-        // Get current state property values
-        foreach (var prop in properties)
-        {
-            propertyValues[prop.Name] = prop.GetValue(currentState);
-        }
-
-        // Update with component parameter values
-        foreach (var mapping in _propertyMappings)
-        {
-            UpdatePropertyValue((dynamic)mapping, propertyValues);
-        }
-
-        // Create new state instance using primary constructor
-        var constructors = stateType.GetConstructors();
-        var primaryConstructor = constructors
-            .OrderByDescending(c => c.GetParameters().Length)
-            .FirstOrDefault();
-
-        if (primaryConstructor == null)
-            return currentState;
-
-        var ctorParams = primaryConstructor.GetParameters();
-        var ctorArgs = new object?[ctorParams.Length];
-
-        for (int i = 0; i < ctorParams.Length; i++)
-        {
-            var paramName = ctorParams[i].Name;
-            // Match case-insensitive (records use lowercase param names)
-            var matchingKey = propertyValues.Keys.FirstOrDefault(k =>
-                string.Equals(k, paramName, StringComparison.OrdinalIgnoreCase));
-
-            ctorArgs[i] = matchingKey != null
-                ? propertyValues[matchingKey]
-                : ctorParams[i].DefaultValue;
-        }
-
-        return (TState)primaryConstructor.Invoke(ctorArgs);
-    }
-
-    private void UpdatePropertyValue<TParam>(PropertyMapping<TState, TParam> mapping, Dictionary<string, object?> propertyValues)
-    {
-        // Get property name from state selector expression
-        var expression = mapping.StateSelectorExpression;
-        var body = expression.Body;
-
-        if (body is MemberExpression memberExpr)
-        {
-            var propertyName = memberExpr.Member.Name;
-            var componentValue = mapping.ComponentParameterGetter();
-            propertyValues[propertyName] = componentValue;
-        }
+        return setMethod.ReturnParameter
+            .GetRequiredCustomModifiers()
+            .Contains(typeof(IsExternalInit));
     }
 }

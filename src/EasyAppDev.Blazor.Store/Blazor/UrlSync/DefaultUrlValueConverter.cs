@@ -9,11 +9,28 @@ namespace EasyAppDev.Blazor.Store.Blazor.UrlSync;
 /// <typeparam name="T">The type to convert. Must be a supported type.</typeparam>
 internal sealed class DefaultUrlValueConverter<T> : IUrlValueConverter<T>
 {
-    private readonly Action<string, Exception>? _onConversionError;
+    // Explicit numeric styles WITHOUT AllowThousands so e.g. "1,5" fails cleanly
+    // (triggering OnConversionError) instead of silently parsing as 15.
+    private const NumberStyles FloatStyles = NumberStyles.Float & ~NumberStyles.AllowThousands;
 
-    public DefaultUrlValueConverter(Action<string, Exception>? onConversionError = null)
+    /// <summary>
+    /// Provider that returns the CURRENT conversion-error handler at conversion time.
+    /// A provider (rather than a captured handler value) is used so handlers registered
+    /// AFTER the mapping is created (the natural fluent order, and all auto-discovered
+    /// attribute mappings) are still honored.
+    /// </summary>
+    private readonly Func<Action<string, Exception>?>? _onConversionErrorProvider;
+
+    private Action<string, Exception>? OnConversionError => _onConversionErrorProvider?.Invoke();
+
+    public DefaultUrlValueConverter(Func<Action<string, Exception>?>? onConversionErrorProvider = null)
     {
-        _onConversionError = onConversionError;
+        _onConversionErrorProvider = onConversionErrorProvider;
+    }
+
+    public DefaultUrlValueConverter(Action<string, Exception>? onConversionError)
+        : this(onConversionError == null ? null : () => onConversionError)
+    {
     }
 
     public T? FromUrl(string? urlValue)
@@ -39,15 +56,15 @@ internal sealed class DefaultUrlValueConverter<T> : IUrlValueConverter<T>
             if (underlyingType == typeof(byte))
                 return (T)(object)byte.Parse(urlValue, CultureInfo.InvariantCulture);
 
-            // Floating point
+            // Floating point (explicit styles without AllowThousands - see FloatStyles)
             if (underlyingType == typeof(float))
-                return (T)(object)float.Parse(urlValue, CultureInfo.InvariantCulture);
+                return (T)(object)float.Parse(urlValue, FloatStyles, CultureInfo.InvariantCulture);
 
             if (underlyingType == typeof(double))
-                return (T)(object)double.Parse(urlValue, CultureInfo.InvariantCulture);
+                return (T)(object)double.Parse(urlValue, FloatStyles, CultureInfo.InvariantCulture);
 
             if (underlyingType == typeof(decimal))
-                return (T)(object)decimal.Parse(urlValue, CultureInfo.InvariantCulture);
+                return (T)(object)decimal.Parse(urlValue, FloatStyles, CultureInfo.InvariantCulture);
 
             // Boolean
             if (underlyingType == typeof(bool))
@@ -79,7 +96,7 @@ internal sealed class DefaultUrlValueConverter<T> : IUrlValueConverter<T>
         }
         catch (Exception ex)
         {
-            _onConversionError?.Invoke(urlValue, ex);
+            OnConversionError?.Invoke(urlValue, ex);
             return default;
         }
     }
@@ -147,7 +164,7 @@ internal sealed class DefaultUrlValueConverter<T> : IUrlValueConverter<T>
         }
         catch (Exception ex)
         {
-            _onConversionError?.Invoke(stateValue.ToString() ?? "null", ex);
+            OnConversionError?.Invoke(stateValue.ToString() ?? "null", ex);
             return null;
         }
     }

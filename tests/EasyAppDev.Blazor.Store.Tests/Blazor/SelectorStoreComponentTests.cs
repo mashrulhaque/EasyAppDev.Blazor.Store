@@ -204,7 +204,76 @@ public class SelectorStoreComponentTests : TestContext
         cut.RenderCount.Should().Be(initialRenderCount + 1);
     }
 
+    [Fact]
+    public void Component_ReRendersWhenParameterChanges_EvenIfSelectedValueUnchanged()
+    {
+        // Arrange
+        var store = StoreTestHelpers.CreateStore(new TestState(5, "Hello", true));
+        Services.AddSingleton<IStore<TestState>>(store);
+
+        var cut = RenderComponent<TestParameterizedSelectorComponent>(ps => ps
+            .Add(p => p.Label, "First"));
+
+        cut.Find("p").TextContent.Should().Be("First: 5");
+
+        // Act - change ONLY the parameter; the store-selected value (Counter) is unchanged
+        cut.SetParametersAndRender(ps => ps.Add(p => p.Label, "Second"));
+
+        // Assert - the component must re-render with the new parameter value
+        cut.Find("p").TextContent.Should().Be("Second: 5");
+    }
+
+    [Fact]
+    public void Component_ReRendersOnEventHandler_EvenIfSelectedValueUnchanged()
+    {
+        // Arrange
+        var store = StoreTestHelpers.CreateStore(new TestState(5, "Hello", true));
+        Services.AddSingleton<IStore<TestState>>(store);
+
+        var cut = RenderComponent<TestLocalStateSelectorComponent>();
+        cut.Find("span").TextContent.Should().Be("Clicks: 0");
+
+        // Act - click only mutates component-local state, not the store
+        cut.Find("button").Click();
+
+        // Assert - event-handler re-render must not be suppressed
+        cut.Find("span").TextContent.Should().Be("Clicks: 1");
+    }
+
     // Test Components
+
+    private class TestParameterizedSelectorComponent : SelectorStoreComponent<TestState>
+    {
+        [Parameter] public string Label { get; set; } = string.Empty;
+
+        protected override object SelectState(TestState state) => state.Counter;
+
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddContent(1, $"{Label}: {State.Counter}");
+            builder.CloseElement();
+        }
+    }
+
+    private class TestLocalStateSelectorComponent : SelectorStoreComponent<TestState>
+    {
+        private int _clicks;
+
+        protected override object SelectState(TestState state) => state.Counter;
+
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "button");
+            builder.AddAttribute(1, "onclick", EventCallback.Factory.Create(this, () => _clicks++));
+            builder.AddContent(2, "Click");
+            builder.CloseElement();
+
+            builder.OpenElement(3, "span");
+            builder.AddContent(4, $"Clicks: {_clicks}");
+            builder.CloseElement();
+        }
+    }
 
     private class TestSelectorComponent : SelectorStoreComponent<TestState>
     {
