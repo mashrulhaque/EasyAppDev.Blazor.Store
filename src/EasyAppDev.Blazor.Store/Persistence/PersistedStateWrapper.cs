@@ -1,6 +1,7 @@
 // Copyright (c) EasyAppDev. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace EasyAppDev.Blazor.Store.Persistence;
@@ -100,7 +101,7 @@ public sealed class StateSizeExceededException : InvalidOperationException
     /// <param name="actualSize">The actual size of the state.</param>
     /// <param name="maxSize">The maximum allowed size.</param>
     public StateSizeExceededException(int actualSize, int maxSize)
-        : base($"State size ({actualSize:N0} bytes) exceeds maximum allowed size ({maxSize:N0} bytes).")
+        : base(FormatMessage(actualSize, maxSize))
     {
         ActualSize = actualSize;
         MaxSize = maxSize;
@@ -113,11 +114,22 @@ public sealed class StateSizeExceededException : InvalidOperationException
     /// <param name="maxSize">The maximum allowed size.</param>
     /// <param name="innerException">The inner exception.</param>
     public StateSizeExceededException(int actualSize, int maxSize, Exception innerException)
-        : base($"State size ({actualSize:N0} bytes) exceeds maximum allowed size ({maxSize:N0} bytes).", innerException)
+        : base(FormatMessage(actualSize, maxSize), innerException)
     {
         ActualSize = actualSize;
         MaxSize = maxSize;
     }
+
+    /// <summary>
+    /// Formats the exception message using the invariant culture so the message
+    /// is stable regardless of the current thread's locale.
+    /// </summary>
+    private static string FormatMessage(int actualSize, int maxSize) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            "State size ({0:N0} bytes) exceeds maximum allowed size ({1:N0} bytes).",
+            actualSize,
+            maxSize);
 }
 
 /// <summary>

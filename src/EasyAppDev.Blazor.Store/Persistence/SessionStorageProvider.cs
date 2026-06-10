@@ -76,7 +76,7 @@ public class SessionStorageProvider : IPersistenceProvider
 
             _logger?.LogDebug("Successfully saved to sessionStorage key: {Key}", key);
         }
-        catch (JSException jsEx) when (jsEx.Message.Contains("QuotaExceededError") || jsEx.Message.Contains("quota"))
+        catch (JSException jsEx) when (StorageQuotaDetection.IsQuotaExceededException(jsEx))
         {
             _logger?.LogError(jsEx, "sessionStorage quota exceeded for key: {Key}. Size: {Size:N0} bytes. " +
                 "Consider reducing state size or clearing old data.", key, value.Length);

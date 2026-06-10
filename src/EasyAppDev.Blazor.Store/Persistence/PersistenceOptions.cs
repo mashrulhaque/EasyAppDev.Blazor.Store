@@ -100,15 +100,18 @@ public class PersistenceOptions<TState> where TState : notnull
     /// Security implications:
     /// - Enabled (recommended): Detects tampered state, prevents loading compromised data
     /// - Disabled: Allows any state to load, vulnerable to XSS-based state injection
-    /// The signing key is auto-generated per session by default. For persistent keys across sessions,
-    /// provide a custom key via SigningKey property.
+    /// When enabled, a stable <see cref="SigningKey"/> is REQUIRED. The persistence middleware
+    /// throws an <see cref="InvalidOperationException"/> at construction if no key is provided,
+    /// because a random per-process key would make all persisted state fail verification (and be
+    /// silently discarded) after an application restart.
     /// </remarks>
     public bool EnableIntegrityCheck { get; init; } = true;
 
     /// <summary>
     /// Gets or sets the HMAC signing key for integrity verification.
-    /// If null, a random key is generated per session (state won't be recoverable after app reload).
-    /// Provide a consistent key if you need to verify state across sessions.
+    /// Required when <see cref="EnableIntegrityCheck"/> is true; the persistence middleware
+    /// throws at construction if it is null in that case.
+    /// Use a consistent key across sessions, e.g. <c>MessageSigner.DeriveKeyFromSeed("MyApp")</c>.
     /// </summary>
     /// <remarks>
     /// Key requirements:

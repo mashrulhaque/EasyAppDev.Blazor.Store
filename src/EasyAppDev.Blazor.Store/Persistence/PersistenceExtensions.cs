@@ -20,15 +20,29 @@ public static class PersistenceExtensions
     /// <param name="provider">The persistence provider.</param>
     /// <param name="key">The storage key.</param>
     /// <param name="maxSizeBytes">Maximum allowed state size in bytes (default: 1 MB).</param>
-    /// <param name="signingKey">Optional custom signing key for integrity checks. If null, a random key is generated.</param>
+    /// <param name="signingKey">
+    /// The signing key used for integrity checks (must be at least 32 bytes).
+    /// A stable key is REQUIRED when integrity checking is enabled: a random per-process key
+    /// would make every persisted state fail verification after an application restart, silently
+    /// discarding it. Derive a stable key with <c>MessageSigner.DeriveKeyFromSeed("your-app-name")</c>
+    /// or supply a key provisioned by your server. If null, an <see cref="InvalidOperationException"/>
+    /// is thrown when the persistence middleware is constructed. To persist without integrity
+    /// checking, use <see cref="WithSecurePersistence{TState}(StoreBuilder{TState}, IPersistenceProvider, string, Action{PersistenceOptionsBuilder{TState}})"/>
+    /// with <see cref="WithoutIntegrityCheck{TState}"/>.
+    /// </param>
     /// <returns>The configured builder for chaining.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when <paramref name="signingKey"/> is null, because integrity checking without a
+    /// stable key would discard all persisted state on every reload.
+    /// </exception>
     /// <example>
     /// <code>
     /// builder.Services.AddStore(
     ///     new AppState(),
     ///     (store, sp) => store.WithSecurePersistence(
     ///         new LocalStorageProvider(sp.GetRequiredService&lt;IJSRuntime&gt;()),
-    ///         "app-state"
+    ///         "app-state",
+    ///         signingKey: MessageSigner.DeriveKeyFromSeed("MyApp")
     ///     )
     /// );
     /// </code>
@@ -104,7 +118,12 @@ public static class PersistenceExtensions
     }
 
     /// <summary>
-    /// Enables integrity checking with an auto-generated key.
+    /// Enables integrity checking. A stable signing key must still be supplied
+    /// (e.g. via <see cref="WithIntegrityCheck{TState}(PersistenceOptionsBuilder{TState}, byte[])"/>
+    /// or by setting <see cref="PersistenceOptionsBuilder{TState}.SigningKey"/>) before the
+    /// store is built; otherwise the persistence middleware throws an
+    /// <see cref="InvalidOperationException"/> at construction, because integrity checking
+    /// with a random per-process key would silently discard all persisted state on reload.
     /// </summary>
     /// <typeparam name="TState">The type of state.</typeparam>
     /// <param name="builder">The options builder.</param>
@@ -114,7 +133,6 @@ public static class PersistenceExtensions
         where TState : notnull
     {
         builder.EnableIntegrityCheck = true;
-        builder.SigningKey = null;
         return builder;
     }
 

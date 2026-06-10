@@ -16,7 +16,7 @@ namespace EasyAppDev.Blazor.Store.TabSync;
 /// Only works in WebAssembly. In Blazor Server, state is already
 /// shared at the server level.
 /// </remarks>
-public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
+public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IStoreAwareMiddleware<TState>, IAsyncDisposable
     where TState : notnull
 {
     private const string JsModulePath = "./_content/EasyAppDev.Blazor.Store/tabsync.js";
@@ -37,6 +37,7 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     private bool _isInitialized;
     private bool _jsModuleLoaded;
     private CancellationTokenSource? _debounceCts;
+    private readonly object _debounceLock = new();
     private MessageSigner? _messageSigner;
 
     /// <summary>
@@ -84,12 +85,32 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     }
 
     /// <summary>
+    /// Attaches the store this middleware syncs. Called automatically by
+    /// <see cref="StoreBuilder{TState}.Build"/> after the store is constructed,
+    /// enabling the receive path for cross-tab messages.
+    /// </summary>
+    /// <param name="store">The store this middleware is attached to.</param>
+    public void AttachStore(IStore<TState> store)
+    {
+        Initialize(store);
+    }
+
+    /// <summary>
     /// Initializes the middleware with the store reference.
+    /// Idempotent: subsequent calls after the store is attached are no-ops.
     /// </summary>
     /// <param name="store">The store to sync.</param>
     internal void Initialize(IStore<TState> store)
     {
-        _store = store ?? throw new ArgumentNullException(nameof(store));
+        ArgumentNullException.ThrowIfNull(store);
+
+        // Idempotent: keep the first attached store
+        if (_store != null)
+        {
+            return;
+        }
+
+        _store = store;
     }
 
     private async Task EnsureJsModuleLoadedAsync()
@@ -132,7 +153,9 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
             }
 
             dotNetRef = DotNetObjectReference.Create(this);
-            _channelName = _options.ChannelName ?? $"store-{typeof(TState).Name}";
+            // Use the full type name to avoid channel collisions between state
+            // types that share a simple name in different namespaces.
+            _channelName = _options.ChannelName ?? $"store-{typeof(TState).FullName ?? typeof(TState).Name}";
 
             // Try to load JS module first
             await EnsureJsModuleLoadedAsync().ConfigureAwait(false);
@@ -399,25 +422,62 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
         await EnsureInitializedAsync().ConfigureAwait(false);
         if (!_isInitialized || _jsRuntime == null || _channelName == null) return;
 
-        try
+        if (_options.DebounceMs > 0)
         {
-            if (_options.DebounceMs > 0)
+            CancellationToken token;
+
+            lock (_debounceLock)
             {
-                // Cancel and dispose previous debounced sync to prevent memory leak
+                // Cancel and dispose previous debounced sync to prevent memory leak.
+                // Cancelling coalesces pending broadcasts so only the latest state
+                // is posted (last write wins).
                 var oldCts = _debounceCts;
                 _debounceCts = new CancellationTokenSource();
-                var cts = _debounceCts;
+                token = _debounceCts.Token;
 
                 oldCts?.Cancel();
                 oldCts?.Dispose();
-
-                await Task.Delay(_options.DebounceMs, cts.Token).ConfigureAwait(false);
-
-                if (cts.Token.IsCancellationRequested) return;
             }
 
+            // Schedule the delayed broadcast in the background so this method
+            // returns promptly and does not stall store updates for the
+            // debounce duration (updates run under the store lock).
+            _ = RunDebouncedBroadcastAsync(currentState, action, token);
+            return;
+        }
+
+        await BroadcastAsync(currentState, action).ConfigureAwait(false);
+    }
+
+    private async Task RunDebouncedBroadcastAsync(TState state, string? action, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(_options.DebounceMs, token).ConfigureAwait(false);
+
+            if (token.IsCancellationRequested) return;
+
+            await BroadcastAsync(state, action).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Debounce cancelled, a newer update superseded this broadcast
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[TabSync] Error in debounced broadcast for action: {Action}", action);
+            _options.OnSyncError?.Invoke(ex);
+        }
+    }
+
+    private async Task BroadcastAsync(TState state, string? action)
+    {
+        if (_jsRuntime == null || _channelName == null) return;
+
+        try
+        {
             var stateJson = _options.SyncFullState
-                ? JsonSerializer.Serialize(currentState, _jsonOptions)
+                ? JsonSerializer.Serialize(state, _jsonOptions)
                 : null;
             var timestamp = DateTime.UtcNow;
 
@@ -450,8 +510,12 @@ public sealed class TabSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDispo
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
+        lock (_debounceLock)
+        {
+            _debounceCts?.Cancel();
+            _debounceCts?.Dispose();
+            _debounceCts = null;
+        }
 
         // Dispose the channel in JavaScript
         if (_jsRuntime != null && _channelName != null && _isInitialized)

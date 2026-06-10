@@ -10,7 +10,7 @@ namespace EasyAppDev.Blazor.Store.Persistence;
 /// Middleware that automatically persists state changes to storage.
 /// </summary>
 /// <typeparam name="TState">The type of state to persist.</typeparam>
-public class PersistenceMiddleware<TState> : IMiddleware<TState>
+public class PersistenceMiddleware<TState> : IMiddleware<TState>, IDisposable
     where TState : notnull
 {
     private readonly IPersistenceProvider _provider;
@@ -77,9 +77,19 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         // Initialize message signer if integrity check is enabled
         if (options.EnableIntegrityCheck)
         {
-            _messageSigner = options.SigningKey != null
-                ? new MessageSigner(options.SigningKey)
-                : new MessageSigner();
+            if (options.SigningKey == null)
+            {
+                throw new InvalidOperationException(
+                    "PersistenceOptions.EnableIntegrityCheck is enabled but no SigningKey was provided. " +
+                    "A random per-process key would be generated, so every persisted state would fail " +
+                    "integrity verification after an application restart and be silently discarded. " +
+                    "Either supply a stable signing key of at least 32 bytes " +
+                    "(e.g. options.SigningKey = MessageSigner.DeriveKeyFromSeed(\"your-app-name\") " +
+                    "or a key provisioned by your server), or disable integrity checking " +
+                    "(options.EnableIntegrityCheck = false / builder.WithoutIntegrityCheck()).");
+            }
+
+            _messageSigner = new MessageSigner(options.SigningKey);
         }
 
         // Initialize filtered JSON options if sensitive data filtering is enabled
@@ -126,13 +136,15 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
         }
     }
 
-    private async Task DebouncedSaveAsync(TState state)
+    private Task DebouncedSaveAsync(TState state)
     {
         CancellationToken token;
 
         lock (_debounceLock)
         {
-            // Cancel and dispose old CTS to prevent memory leak
+            // Cancel and dispose old CTS to prevent memory leak.
+            // Cancelling the previous token coalesces pending saves so only
+            // the latest state is written (last write wins).
             var oldCts = _debounceCts;
             _debounceCts = new CancellationTokenSource();
             token = _debounceCts.Token;
@@ -141,14 +153,33 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
             oldCts?.Dispose();
         }
 
+        // Schedule the delayed save in the background so OnAfterUpdateAsync
+        // returns promptly and does not stall store updates for the debounce
+        // duration (updates run under the store lock).
+        _ = RunDebouncedSaveAsync(state, token);
+        return Task.CompletedTask;
+    }
+
+    private async Task RunDebouncedSaveAsync(TState state, CancellationToken token)
+    {
         try
         {
             await Task.Delay(_debounceMs, token).ConfigureAwait(false);
+
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
             await SaveStateAsync(state).ConfigureAwait(false);
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
-            // Debounce cancelled, next update will trigger save
+            // Debounce cancelled, a newer update superseded this save
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error in debounced persistence save for key: {Key}", _key);
         }
     }
 
@@ -519,5 +550,44 @@ public class PersistenceMiddleware<TState> : IMiddleware<TState>
 
         _options?.OnHydrationSuccess?.Invoke(transformedState);
         return transformedState;
+    }
+
+    /// <summary>
+    /// Disposes the middleware, cancelling any pending debounced save and
+    /// releasing the message signer and debounce cancellation token source.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Disposes managed resources held by this middleware.
+    /// </summary>
+    /// <param name="disposing">True when called from <see cref="Dispose()"/>.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        lock (_debounceLock)
+        {
+            try
+            {
+                _debounceCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Already disposed - nothing to cancel
+            }
+
+            _debounceCts?.Dispose();
+            _debounceCts = null;
+        }
+
+        _messageSigner?.Dispose();
     }
 }

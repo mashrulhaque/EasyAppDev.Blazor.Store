@@ -112,13 +112,17 @@ public sealed class AlwaysIncludeAttribute : Attribute
 /// in DevTools, diagnostics, persistence, and synchronization features.
 /// </summary>
 /// <remarks>
-/// When enabled, properties will be replaced with the <see cref="ReplacementValue"/> if:
+/// When enabled, properties will be filtered if:
 /// <list type="bullet">
 /// <item>They are marked with <see cref="SensitiveDataAttribute"/></item>
 /// <item>Their name matches any entry in <see cref="FilteredPropertyNames"/></item>
-/// <item>Their name contains any keyword from <see cref="FilteredPropertyNames"/> (case-insensitive) when <see cref="UseExactMatch"/> is false</item>
+/// <item>Their name contains any keyword from <see cref="FilteredPropertyNames"/> as a whole
+/// camelCase/underscore token (case-insensitive) when <see cref="UseExactMatch"/> is false</item>
 /// <item>Their name matches any pattern in <see cref="FilteredPropertyPatterns"/> (regex)</item>
 /// </list>
+/// Filtered string properties are replaced with <see cref="ReplacementValue"/>; filtered
+/// non-string properties are replaced with the default value of their type so the produced
+/// JSON always deserializes back into the original state type.
 /// Filtering applies recursively to nested objects during serialization, up to <see cref="MaxRecursionDepth"/>.
 /// Properties marked with <see cref="AlwaysIncludeAttribute"/> are never filtered.
 /// </remarks>
@@ -133,7 +137,12 @@ public sealed class SensitiveDataFilterOptions
     /// <summary>
     /// Gets or sets additional property names to filter.
     /// Property names are matched case-insensitively.
-    /// When <see cref="UseExactMatch"/> is false (default), partial matching is used.
+    /// When <see cref="UseExactMatch"/> is false (default), token-boundary matching is used:
+    /// the property name is split on camelCase/underscore boundaries and a keyword matches
+    /// whole tokens or consecutive token sequences. For example "Pin" matches "Pin" and
+    /// "UserPin" but NOT "ShippingAddress"; "CardNumber" matches "CreditCardNumber".
+    /// Note this is deliberately conservative: "TokenCount" contains the token "Token" and
+    /// IS filtered - use <see cref="AlwaysIncludeAttribute"/> to opt such properties out.
     /// Default list includes common sensitive field names.
     /// </summary>
     public HashSet<string> FilteredPropertyNames { get; set; } = new(StringComparer.OrdinalIgnoreCase)
@@ -164,7 +173,8 @@ public sealed class SensitiveDataFilterOptions
     /// <summary>
     /// Gets or sets whether to use exact match for property names.
     /// When true, property names must exactly match entries in <see cref="FilteredPropertyNames"/>.
-    /// When false (default), partial matching is used (property name contains keyword).
+    /// When false (default), token-boundary matching is used (keywords match whole
+    /// camelCase/underscore tokens or consecutive token sequences within the property name).
     /// </summary>
     public bool UseExactMatch { get; set; } = false;
 
