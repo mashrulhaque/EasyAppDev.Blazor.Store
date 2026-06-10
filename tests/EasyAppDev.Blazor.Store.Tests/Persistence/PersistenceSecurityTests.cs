@@ -27,6 +27,14 @@ public class PersistenceSecurityTests
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    private static byte[] CreateTestSigningKey()
+    {
+        var key = new byte[32];
+        for (var i = 0; i < key.Length; i++)
+            key[i] = (byte)(i + 1);
+        return key;
+    }
+
     [Fact]
     public async Task SaveStateAsync_WithIntegrityCheck_StoresSignedState()
     {
@@ -36,6 +44,7 @@ public class PersistenceSecurityTests
         {
             Key = "test-key",
             EnableIntegrityCheck = true,
+            SigningKey = CreateTestSigningKey(),
             FilterSensitiveData = false
         };
 
@@ -175,6 +184,7 @@ public class PersistenceSecurityTests
         {
             Key = "test-key",
             EnableIntegrityCheck = true,
+            SigningKey = CreateTestSigningKey(),
             FilterSensitiveData = false
         };
 
@@ -285,10 +295,74 @@ public class PersistenceSecurityTests
         var configuredBuilder = builder.WithSecurePersistence(
             mockProvider.Object,
             "test-key",
-            maxSizeBytes: 2_097_152);
+            maxSizeBytes: 2_097_152,
+            signingKey: CreateTestSigningKey());
 
         // Assert
         configuredBuilder.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void WithSecurePersistence_WithoutSigningKey_ThrowsActionableException()
+    {
+        // Arrange - integrity checking without a stable key would silently
+        // discard all persisted state on every reload, so it must fail fast.
+        var mockProvider = new Mock<IPersistenceProvider>();
+        var builder = StoreBuilder<TestState>.Create(new TestState { Count = 0 });
+
+        // Act
+        var act = () => builder.WithSecurePersistence(mockProvider.Object, "test-key");
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*SigningKey*")
+            .WithMessage("*EnableIntegrityCheck*");
+    }
+
+    [Fact]
+    public void PersistenceMiddleware_IntegrityCheckWithoutKey_ThrowsAtConstruction()
+    {
+        // Arrange
+        var mockProvider = new Mock<IPersistenceProvider>();
+        var options = new PersistenceOptions<TestState>
+        {
+            Key = "test-key",
+            EnableIntegrityCheck = true,
+            SigningKey = null
+        };
+
+        // Act
+        var act = () => new PersistenceMiddleware<TestState>(mockProvider.Object, options);
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*stable signing key*");
+    }
+
+    [Fact]
+    public void PersistenceMiddleware_Dispose_ReleasesResourcesWithoutThrowing()
+    {
+        // Arrange
+        var mockProvider = new Mock<IPersistenceProvider>();
+        var options = new PersistenceOptions<TestState>
+        {
+            Key = "test-key",
+            EnableIntegrityCheck = true,
+            SigningKey = CreateTestSigningKey(),
+            DebounceMs = 100
+        };
+
+        var middleware = new PersistenceMiddleware<TestState>(mockProvider.Object, options);
+
+        // Act - dispose must release the signer and debounce CTS; double-dispose is safe
+        var act = () =>
+        {
+            middleware.Dispose();
+            middleware.Dispose();
+        };
+
+        // Assert
+        act.Should().NotThrow();
     }
 
     [Fact]

@@ -24,6 +24,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             ShouldPersist = (prev, curr, action) => action != "TEMP_UPDATE"
         };
 
@@ -56,6 +58,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             TransformOnSave = state => state with { Name = "REDACTED" }
         };
 
@@ -93,6 +97,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             TransformOnLoad = state => state with { IsActive = false },
             OnHydrationSuccess = state => loadedState = state
         };
@@ -128,6 +134,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             OnHydrationSuccess = state => loadedState = state
         };
 
@@ -154,6 +162,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             OnHydrationSkipped = () => skippedCalled = true
         };
 
@@ -181,6 +191,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             OnHydrationFailure = ex => capturedError = ex
         };
 
@@ -208,6 +220,8 @@ public class PersistenceOptionsTests
         var options = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
             DebounceMs = 100
         };
 
@@ -227,6 +241,63 @@ public class PersistenceOptionsTests
         // Assert - debounce means fewer saves than updates (at least shows debounce is configured)
         // With 3 updates and debounce, we should get fewer than 3 saves
         saveCount.Should().BeLessOrEqualTo(3);
+
+        store.Dispose();
+    }
+
+    [Fact]
+    public async Task WithPersistenceOptions_Debounce_CoalescesRapidUpdatesIntoSingleSaveWithFinalState()
+    {
+        // Arrange
+        var providerMock = new Mock<IPersistenceProvider>();
+        var saveCount = 0;
+        string? lastSavedJson = null;
+        providerMock.Setup(p => p.SaveAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Callback<string, string>((_, json) =>
+            {
+                Interlocked.Increment(ref saveCount);
+                Volatile.Write(ref lastSavedJson, json);
+            })
+            .Returns(Task.CompletedTask);
+
+        var options = new PersistenceOptions<PersistenceOptionsTestState>
+        {
+            Key = "test-state",
+            // No stable signing key in these tests; integrity checking now requires one
+            EnableIntegrityCheck = false,
+            FilterSensitiveData = false,
+            DebounceMs = 100
+        };
+
+        var store = StoreBuilder<PersistenceOptionsTestState>
+            .Create(new PersistenceOptionsTestState(0, "Initial"))
+            .WithPersistence(providerMock.Object, options)
+            .Build();
+
+        // Act - N rapid updates; debounced saves must coalesce (last write wins)
+        // and updates must not be stalled for the debounce duration.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        for (var i = 1; i <= 10; i++)
+        {
+            await store.UpdateAsync(s => s with { Count = i });
+        }
+        sw.Stop();
+
+        // With the old inline-await debounce, 10 updates would take >= 10 * 100ms.
+        sw.ElapsedMilliseconds.Should().BeLessThan(500,
+            "OnAfterUpdateAsync must return promptly instead of awaiting the debounce inline");
+
+        // Wait for the single trailing debounced save to fire
+        await Task.Delay(500);
+
+        // Assert
+        saveCount.Should().Be(1, "intermediate saves must be coalesced into a single trailing save");
+        lastSavedJson.Should().NotBeNull();
+
+        // The saved payload is a wrapper whose "state" property holds the state JSON
+        using var doc = JsonDocument.Parse(lastSavedJson!);
+        var stateJson = doc.RootElement.GetProperty("state").GetString();
+        stateJson.Should().Contain("\"count\":10", "the final state must win");
 
         store.Dispose();
     }
@@ -252,12 +323,14 @@ public class PersistenceOptionsTests
         var optionsWithHydration = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test",
+            EnableIntegrityCheck = false,
             HydrateOnInit = true
         };
 
         var optionsWithoutHydration = new PersistenceOptions<PersistenceOptionsTestState>
         {
             Key = "test",
+            EnableIntegrityCheck = false,
             HydrateOnInit = false
         };
 

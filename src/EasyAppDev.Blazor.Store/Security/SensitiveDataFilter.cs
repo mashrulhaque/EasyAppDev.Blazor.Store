@@ -117,6 +117,41 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
 
         var type = value.GetType();
 
+        // Handle dictionaries BEFORE the generic IEnumerable branch so they
+        // round-trip as JSON objects (serializing them as arrays of
+        // KeyValuePair objects breaks deserialization on hydration).
+        if (value is System.Collections.IDictionary dictionary)
+        {
+            writer.WriteStartObject();
+            foreach (System.Collections.DictionaryEntry entry in dictionary)
+            {
+                var keyName = entry.Key?.ToString() ?? string.Empty;
+                if (options.DictionaryKeyPolicy != null)
+                {
+                    keyName = options.DictionaryKeyPolicy.ConvertName(keyName);
+                }
+
+                writer.WritePropertyName(keyName);
+
+                if (IsSensitiveName(keyName) && entry.Value is string)
+                {
+                    // Only string values can safely carry the replacement marker
+                    writer.WriteStringValue(_options.ReplacementValue);
+                }
+                else if (entry.Value == null)
+                {
+                    writer.WriteNullValue();
+                }
+                else
+                {
+                    // Serialize with the same options so nested objects stay filtered
+                    JsonSerializer.Serialize(writer, entry.Value, entry.Value.GetType(), options);
+                }
+            }
+            writer.WriteEndObject();
+            return;
+        }
+
         // Handle collections
         if (value is System.Collections.IEnumerable enumerable && type != typeof(string))
         {
@@ -151,7 +186,7 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
             // Check if property should be filtered
             if (ShouldFilter(prop))
             {
-                writer.WriteString(propName, _options.ReplacementValue);
+                WriteFilteredValue(writer, propName, prop, propValue, options);
                 continue;
             }
 
@@ -170,6 +205,38 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
         }
 
         writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Writes a type-aware replacement for a filtered property. String properties get the
+    /// replacement marker; non-string properties get the type's default value so the
+    /// produced JSON always round-trips back into the original state type.
+    /// </summary>
+    private void WriteFilteredValue(
+        Utf8JsonWriter writer,
+        string propName,
+        PropertyInfo prop,
+        object? propValue,
+        JsonSerializerOptions options)
+    {
+        writer.WritePropertyName(propName);
+
+        // Only string-typed properties (or object-typed properties currently holding a
+        // string) can safely carry the replacement marker.
+        if (prop.PropertyType == typeof(string) || propValue is string)
+        {
+            writer.WriteStringValue(_options.ReplacementValue);
+            return;
+        }
+
+        // Non-string sensitive property: write the type's default value
+        // (0 for numbers, false for bool, null for reference/nullable types)
+        // so deserialization never fails on a "[FILTERED]" string.
+        var defaultValue = prop.PropertyType.IsValueType && Nullable.GetUnderlyingType(prop.PropertyType) == null
+            ? Activator.CreateInstance(prop.PropertyType)
+            : null;
+
+        JsonSerializer.Serialize(writer, defaultValue, prop.PropertyType, options);
     }
 
     private static long EstimateSerializationSize(T value)
@@ -213,27 +280,48 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
             return true;
         }
 
-        // Check property name against filter list
-        if (_options.UseExactMatch)
-        {
-            // Exact match only
-            if (_options.FilteredPropertyNames.Contains(prop.Name))
-            {
-                return true;
-            }
-        }
-        else
-        {
-            // Exact match first
-            if (_options.FilteredPropertyNames.Contains(prop.Name))
-            {
-                return true;
-            }
+        return IsSensitiveName(prop.Name);
+    }
 
-            // Then partial match (contains keyword)
+    /// <summary>
+    /// Determines whether a property or dictionary key name matches the configured
+    /// sensitive keywords or regex patterns.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When <see cref="SensitiveDataFilterOptions.UseExactMatch"/> is false, names are split
+    /// into tokens on camelCase/PascalCase and underscore/separator boundaries and keywords
+    /// are matched against consecutive token sequences instead of raw substrings.
+    /// This prevents innocent names from being corrupted by accidental substring hits
+    /// (e.g. "ShippingAddress" does NOT match the keyword "Pin").
+    /// </para>
+    /// <para>
+    /// Token matching is deliberately conservative: any name containing a sensitive keyword
+    /// as a whole token is filtered. For example "TokenCount" contains the token "Token" and
+    /// IS filtered. Use <see cref="AlwaysIncludeAttribute"/> on such properties to opt out.
+    /// </para>
+    /// </remarks>
+    private bool IsSensitiveName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        // Exact match always applies (HashSet uses OrdinalIgnoreCase)
+        if (_options.FilteredPropertyNames.Contains(name))
+        {
+            return true;
+        }
+
+        if (!_options.UseExactMatch)
+        {
+            // Token-boundary match: split the name on camelCase/underscore boundaries
+            // and match keywords against consecutive whole-token sequences.
+            var tokens = Tokenize(name);
             foreach (var keyword in _options.FilteredPropertyNames)
             {
-                if (prop.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                if (MatchesTokenSequence(tokens, keyword))
                 {
                     return true;
                 }
@@ -245,7 +333,7 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
         {
             try
             {
-                if (regex.IsMatch(prop.Name))
+                if (regex.IsMatch(name))
                 {
                     return true;
                 }
@@ -253,6 +341,109 @@ public sealed class SensitiveDataFilterConverter<T> : JsonConverter<T>
             catch (RegexMatchTimeoutException)
             {
                 // Pattern timed out (possible ReDoS), skip it
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Splits a property name into tokens on underscore/hyphen/space/dot separators,
+    /// camelCase/PascalCase transitions, acronym boundaries (e.g. "HTTPSProxy" =>
+    /// "HTTPS", "Proxy") and digit runs.
+    /// </summary>
+    private static List<string> Tokenize(string name)
+    {
+        var tokens = new List<string>();
+        var start = -1;
+
+        void Flush(int end)
+        {
+            if (start >= 0 && end > start)
+            {
+                tokens.Add(name[start..end]);
+            }
+            start = -1;
+        }
+
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+
+            if (c is '_' or '-' or ' ' or '.')
+            {
+                Flush(i);
+                continue;
+            }
+
+            if (start < 0)
+            {
+                start = i;
+                continue;
+            }
+
+            var prev = name[i - 1];
+
+            // Boundary: lower/digit -> Upper (e.g. "userPin" => "user", "Pin")
+            if (char.IsUpper(c) && (char.IsLower(prev) || char.IsDigit(prev)))
+            {
+                Flush(i);
+                start = i;
+                continue;
+            }
+
+            // Boundary: letter <-> digit transition
+            if (char.IsDigit(c) != char.IsDigit(prev))
+            {
+                Flush(i);
+                start = i;
+                continue;
+            }
+
+            // Acronym boundary: "HTTPSProxy" => split before "Proxy"
+            if (char.IsLower(c) && char.IsUpper(prev) && i - start > 1)
+            {
+                Flush(i - 1);
+                start = i - 1;
+            }
+        }
+
+        Flush(name.Length);
+        return tokens;
+    }
+
+    /// <summary>
+    /// Checks whether the keyword equals the concatenation of any consecutive
+    /// run of tokens (case-insensitive). Multi-token keywords like "CardNumber"
+    /// match consecutive token sequences ("Card", "Number").
+    /// </summary>
+    private static bool MatchesTokenSequence(List<string> tokens, string keyword)
+    {
+        for (var startIndex = 0; startIndex < tokens.Count; startIndex++)
+        {
+            var matchedLength = 0;
+
+            for (var endIndex = startIndex; endIndex < tokens.Count; endIndex++)
+            {
+                var token = tokens[endIndex];
+
+                if (matchedLength + token.Length > keyword.Length)
+                {
+                    break;
+                }
+
+                if (string.Compare(keyword, matchedLength, token, 0, token.Length,
+                        StringComparison.OrdinalIgnoreCase) != 0)
+                {
+                    break;
+                }
+
+                matchedLength += token.Length;
+
+                if (matchedLength == keyword.Length)
+                {
+                    return true;
+                }
             }
         }
 
