@@ -249,15 +249,15 @@ public class StoreBuilder<TState> where TState : notnull
     /// <summary>
     /// Enables Redux DevTools integration with lazy IJSRuntime resolution.
     /// Works in all render modes: Server, WebAssembly, and Auto (Server → WASM).
-    /// WARNING: DevTools are only available in DEBUG builds. In Release builds, this method is a no-op.
-    /// DevTools expose your application state and should never be used in production.
+    /// DevTools activation is gated at runtime: enabled when a debugger is attached,
+    /// or when explicitly enabled via <c>DevToolsOptions&lt;TState&gt;.Enabled</c>.
+    /// DevTools expose your application state and should never be enabled in production.
     /// </summary>
     /// <param name="serviceProvider">Service provider to resolve IJSRuntime on-demand.</param>
     /// <param name="storeName">The name to display in DevTools. Defaults to the state type name.</param>
     /// <returns>The builder instance for chaining.</returns>
     public StoreBuilder<TState> WithDevTools(IServiceProvider serviceProvider, string? storeName = null)
     {
-#if DEBUG
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
         var devToolsMiddleware = new DevToolsMiddleware<TState>(
@@ -265,10 +265,6 @@ public class StoreBuilder<TState> where TState : notnull
             storeName ?? typeof(TState).Name);
 
         return WithMiddleware(devToolsMiddleware);
-#else
-        // No-op in Release builds for security
-        return this;
-#endif
     }
 
     /// <summary>
