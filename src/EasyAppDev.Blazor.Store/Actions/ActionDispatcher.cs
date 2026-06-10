@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using EasyAppDev.Blazor.Store.Core;
+using Microsoft.Extensions.Logging;
 
 namespace EasyAppDev.Blazor.Store.Actions;
 
@@ -42,17 +44,24 @@ public interface IActionDispatcher<TState> where TState : notnull
 public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where TState : notnull
 {
     private readonly IStore<TState> _store;
-    private readonly Dictionary<Type, Func<TState, IAction, TState>> _reducers = new();
-    private readonly List<IReducer<TState>> _patternReducers = new();
+    private readonly ILogger<ActionDispatcher<TState>>? _logger;
+
+    // Thread-safe reads: typed reducers live in a ConcurrentDictionary; pattern
+    // reducers use copy-on-write (the list reference is replaced under _lock and
+    // readers take a snapshot of the reference).
+    private readonly ConcurrentDictionary<Type, Func<TState, IAction, TState>> _reducers = new();
+    private volatile IReadOnlyList<IReducer<TState>> _patternReducers = Array.Empty<IReducer<TState>>();
     private readonly object _lock = new();
 
     /// <summary>
     /// Creates a new action dispatcher for the specified store.
     /// </summary>
     /// <param name="store">The store to dispatch actions to.</param>
-    public ActionDispatcher(IStore<TState> store)
+    /// <param name="logger">Optional logger used to surface failures from fire-and-forget dispatches.</param>
+    public ActionDispatcher(IStore<TState> store, ILogger<ActionDispatcher<TState>>? logger = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _logger = logger;
     }
 
     /// <summary>
@@ -66,10 +75,7 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
     {
         ArgumentNullException.ThrowIfNull(reducer);
 
-        lock (_lock)
-        {
-            _reducers[typeof(TAction)] = (state, action) => reducer(state, (TAction)action);
-        }
+        _reducers[typeof(TAction)] = (state, action) => reducer(state, (TAction)action);
 
         return this;
     }
@@ -85,10 +91,7 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
     {
         ArgumentNullException.ThrowIfNull(reducer);
 
-        lock (_lock)
-        {
-            _reducers[typeof(TAction)] = (state, action) => reducer.Reduce(state, (TAction)action);
-        }
+        _reducers[typeof(TAction)] = (state, action) => reducer.Reduce(state, (TAction)action);
 
         return this;
     }
@@ -104,7 +107,10 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
 
         lock (_lock)
         {
-            _patternReducers.Add(reducer);
+            // Copy-on-write: replace the list reference so concurrent readers can
+            // safely snapshot it without locking.
+            var updated = new List<IReducer<TState>>(_patternReducers) { reducer };
+            _patternReducers = updated;
         }
 
         return this;
@@ -119,12 +125,7 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
     {
         ArgumentNullException.ThrowIfNull(reducer);
 
-        lock (_lock)
-        {
-            _patternReducers.Add(new FunctionalReducer<TState>(reducer));
-        }
-
-        return this;
+        return RegisterPattern(new FunctionalReducer<TState>(reducer));
     }
 
     /// <inheritdoc />
@@ -135,23 +136,35 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
         var actionType = action.GetType();
         var actionName = actionType.Name;
 
+        // Resolve the typed reducer, walking up the inheritance chain so derived
+        // action types are handled by reducers registered for their base type.
+        var reducer = ResolveReducer(actionType);
+
+        // Snapshot the pattern reducer list (copy-on-write reference)
+        var patternReducers = _patternReducers;
+
+        if (reducer == null && patternReducers.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No reducer is registered for action type '{actionType.Name}'. " +
+                $"Register a reducer via Register<{actionType.Name}>(...) or RegisterPattern(...) before dispatching.");
+        }
+
         await _store.UpdateAsync(state =>
         {
             // Try specific reducer first
-            if (_reducers.TryGetValue(actionType, out var reducer))
+            if (reducer != null)
             {
                 return reducer(state, action);
             }
 
             // Fall back to pattern reducers
             var currentState = state;
-            foreach (var patternReducer in _patternReducers)
+            foreach (var patternReducer in patternReducers)
             {
                 currentState = patternReducer.Reduce(currentState, action);
             }
 
-            // If no reducers handled this and the state didn't change,
-            // that's fine - actions without effects are valid
             return currentState;
         }, actionName).ConfigureAwait(false);
     }
@@ -159,16 +172,38 @@ public sealed class ActionDispatcher<TState> : IActionDispatcher<TState> where T
     /// <inheritdoc />
     public void Dispatch<TAction>(TAction action) where TAction : IAction
     {
-        _ = DispatchAsync(action);
+        _ = DispatchAsync(action).ContinueWith(
+            t => _logger?.LogError(
+                t.Exception?.GetBaseException(),
+                "Fire-and-forget dispatch of action {ActionType} failed",
+                typeof(TAction).Name),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
     }
 
     /// <inheritdoc />
     public bool CanHandle<TAction>() where TAction : IAction
     {
-        lock (_lock)
+        return ResolveReducer(typeof(TAction)) != null || _patternReducers.Count > 0;
+    }
+
+    /// <summary>
+    /// Resolves a typed reducer for the action type, walking up the inheritance
+    /// chain (base types) so reducers registered for a base action type handle
+    /// derived action instances.
+    /// </summary>
+    private Func<TState, IAction, TState>? ResolveReducer(Type actionType)
+    {
+        for (var type = actionType; type != null && type != typeof(object); type = type.BaseType)
         {
-            return _reducers.ContainsKey(typeof(TAction)) || _patternReducers.Count > 0;
+            if (_reducers.TryGetValue(type, out var reducer))
+            {
+                return reducer;
+            }
         }
+
+        return null;
     }
 
     private sealed class FunctionalReducer<TStateInner> : IReducer<TStateInner> where TStateInner : notnull

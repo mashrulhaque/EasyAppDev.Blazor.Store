@@ -15,7 +15,7 @@ namespace EasyAppDev.Blazor.Store.ServerSync;
 /// Supports full state sync, operation-based sync, cursor tracking, and offline queuing.
 /// </summary>
 /// <typeparam name="TState">The type of state.</typeparam>
-public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
+public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IStoreAwareMiddleware<TState>, IAsyncDisposable
     where TState : notnull
 {
     private readonly ServerSyncOptions<TState> _options;
@@ -134,12 +134,64 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     }
 
     /// <summary>
-    /// Connects to the server hub.
+    /// Attaches the store this middleware belongs to. Called automatically by
+    /// <see cref="StoreBuilder{TState}.Build"/>. Idempotent: a second call with
+    /// the same store is a no-op. When <see cref="ServerSyncOptions{TState}.AutoConnect"/>
+    /// is true and a HubUrl is configured, the connection is started in the background.
+    /// </summary>
+    /// <param name="store">The store this middleware is attached to.</param>
+    public void AttachStore(IStore<TState> store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        if (ReferenceEquals(_store, store))
+            return;
+
+        SetStore(store);
+
+        if (_options.AutoConnect && !string.IsNullOrEmpty(_options.HubUrl))
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await ConnectAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // ConnectAsync already invokes OnError and logs; this guard prevents
+                    // the background task from surfacing an unobserved exception.
+                    _logger?.LogWarning(ex, "Auto-connect to server sync hub failed: {Url}", _options.HubUrl);
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Connects to the server hub. If a previous connection exists but has been
+    /// permanently closed, it is disposed and a fresh connection is established.
     /// </summary>
     public async Task ConnectAsync()
     {
         if (_hubConnection != null)
-            return;
+        {
+            // Already connected, connecting, or reconnecting - nothing to do
+            if (_hubConnection.State != HubConnectionState.Disconnected)
+                return;
+
+            // The previous connection was permanently closed (e.g., reconnect
+            // attempts exhausted). Dispose it and build a fresh connection.
+            var staleConnection = _hubConnection;
+            _hubConnection = null;
+            try
+            {
+                await staleConnection.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogDebug(ex, "Error disposing stale hub connection before reconnect");
+            }
+        }
 
         try
         {
@@ -153,7 +205,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             // Register handlers
             _hubConnection.On<StateUpdate>("ReceiveUpdate", HandleReceiveUpdate);
             _hubConnection.On<StateOperation>("ReceiveOperation", HandleReceiveOperation);
-            _hubConnection.On<string, long>("ReceiveFullState", HandleReceiveFullState);
+            _hubConnection.On<string, long, string?>("ReceiveFullState", HandleReceiveFullState);
             _hubConnection.On<PresenceInfo>("UserJoined", HandleUserJoined);
             _hubConnection.On<PresenceInfo>("UserLeft", HandleUserLeft);
             _hubConnection.On<IReadOnlyList<PresenceInfo>>("PresenceUpdated", HandlePresenceUpdated);
@@ -398,7 +450,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         {
             try
             {
-                await _hubConnection!.InvokeAsync("SendUpdate", updates[i]).ConfigureAwait(false);
+                await SendUpdateCoreAsync(updates[i]).ConfigureAwait(false);
                 flushedCount++;
             }
             catch (Exception ex)
@@ -421,7 +473,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         {
             try
             {
-                await _hubConnection!.InvokeAsync("SendOperation", operations[i]).ConfigureAwait(false);
+                await SendOperationCoreAsync(operations[i]).ConfigureAwait(false);
                 flushedCount++;
             }
             catch (Exception ex)
@@ -475,13 +527,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
         try
         {
-            // Sign message if enabled
-            if (_options.EnableMessageSigning && _messageSigner != null)
-            {
-                update.Signature = _messageSigner.Sign(update.StateJson);
-            }
-
-            await _hubConnection.InvokeAsync("SendUpdate", update).ConfigureAwait(false);
+            await SendUpdateCoreAsync(update).ConfigureAwait(false);
             _logger?.LogDebug("Sent state update: {Action}", update.Action);
         }
         catch (Exception ex)
@@ -526,7 +572,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
 
         try
         {
-            await _hubConnection.InvokeAsync("SendOperation", operation).ConfigureAwait(false);
+            await SendOperationCoreAsync(operation).ConfigureAwait(false);
             _logger?.LogDebug("Sent operation: {Type} at {Path}", operation.OperationType, operation.Path);
         }
         catch (Exception ex)
@@ -538,6 +584,35 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             }
             _options.OnError?.Invoke(ex);
         }
+    }
+
+    /// <summary>
+    /// Signs (when signing is enabled) and sends a state update over the hub connection.
+    /// Used by both the live send path and the offline-queue flush path so that
+    /// queued updates are signed exactly like directly-sent ones.
+    /// </summary>
+    private async Task SendUpdateCoreAsync(StateUpdate update)
+    {
+        if (_options.EnableMessageSigning && _messageSigner != null)
+        {
+            update.Signature = _messageSigner.Sign(update.StateJson);
+        }
+
+        await _hubConnection!.InvokeAsync("SendUpdate", update).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Signs (when signing is enabled) and sends an operation over the hub connection.
+    /// Used by both the live send path and the offline-queue flush path.
+    /// </summary>
+    private async Task SendOperationCoreAsync(StateOperation operation)
+    {
+        if (_options.EnableMessageSigning && _messageSigner != null)
+        {
+            operation.Signature = _messageSigner.Sign(operation.GetSignaturePayload());
+        }
+
+        await _hubConnection!.InvokeAsync("SendOperation", operation).ConfigureAwait(false);
     }
 
     private async void SendPendingCursor()
@@ -626,23 +701,29 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
     }
 
     private bool VerifyMessageSignature(StateUpdate update)
+        => VerifySignature(update.StateJson, update.Signature, "StateUpdate");
+
+    private bool VerifyOperationSignature(StateOperation operation)
+        => VerifySignature(operation.GetSignaturePayload(), operation.Signature, "StateOperation");
+
+    private bool VerifySignature(string payload, string? signature, string messageType)
     {
         if (!_options.EnableMessageSigning || _messageSigner == null)
             return true; // Signing not enabled
 
-        if (string.IsNullOrEmpty(update.Signature))
+        if (string.IsNullOrEmpty(signature))
         {
-            _logger?.LogWarning("Message signature missing but signing is enabled");
-            _options.OnSignatureVerificationFailed?.Invoke("Missing signature");
+            _logger?.LogWarning("{MessageType} signature missing but signing is enabled", messageType);
+            _options.OnSignatureVerificationFailed?.Invoke($"Missing signature ({messageType})");
             return false;
         }
 
-        var isValid = _messageSigner.Verify(update.StateJson, update.Signature);
+        var isValid = _messageSigner.Verify(payload, signature);
 
         if (!isValid)
         {
-            _logger?.LogWarning("Message signature verification failed");
-            _options.OnSignatureVerificationFailed?.Invoke("Invalid signature");
+            _logger?.LogWarning("{MessageType} signature verification failed", messageType);
+            _options.OnSignatureVerificationFailed?.Invoke($"Invalid signature ({messageType})");
         }
 
         return isValid;
@@ -728,6 +809,19 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         if (operation.SenderId == _hubConnection?.ConnectionId)
             return Task.CompletedTask;
 
+        // Check rate limit
+        if (!CheckRateLimit())
+            return Task.CompletedTask;
+
+        // Validate payload size before any further processing
+        if (operation.ValueJson != null && !ValidateMessageSize(operation.ValueJson, "StateOperation"))
+            return Task.CompletedTask;
+
+        // Verify message signature when signing is enabled
+        if (!VerifyOperationSignature(operation))
+            return Task.CompletedTask;
+
+        // Never move the version backwards
         UpdateVersionMax(operation.Version);
         _options.OnOperationReceived?.Invoke(operation);
 
@@ -792,10 +886,34 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
         }
     }
 
-    private async Task HandleReceiveFullState(string stateJson, long version)
+    private async Task HandleReceiveFullState(string stateJson, long version, string? signature)
     {
         if (_store == null)
             return;
+
+        // Check rate limit
+        if (!CheckRateLimit())
+            return;
+
+        // Validate message size BEFORE deserialization to prevent DoS
+        if (!ValidateMessageSize(stateJson, "FullState"))
+            return;
+
+        // Verify message signature when signing is enabled
+        if (!VerifySignature(stateJson, signature, "FullState"))
+            return;
+
+        // Never move the version backwards: only apply full state when it is
+        // at least as new as our current version.
+        var currentVersion = Volatile.Read(ref _currentVersion);
+        if (version < currentVersion)
+        {
+            _logger?.LogWarning(
+                "Ignoring full state with stale version {Remote} (current: {Current})",
+                version,
+                currentVersion);
+            return;
+        }
 
         try
         {
@@ -823,7 +941,7 @@ public class ServerSyncMiddleware<TState> : IMiddleware<TState>, IAsyncDisposabl
             }
 
             _isReceivingUpdate = true;
-            Interlocked.Exchange(ref _currentVersion, version);
+            UpdateVersionMax(version);
 
             await _store.UpdateAsync(_ => newState, "@@SYNC_FULL").ConfigureAwait(false);
             _logger?.LogDebug("Applied full state sync, version: {Version}", version);

@@ -18,6 +18,19 @@ public class DevToolsOptions<TState> where TState : notnull
     public string? Name { get; set; }
 
     /// <summary>
+    /// Gets or sets whether DevTools integration is enabled at runtime.
+    /// <list type="bullet">
+    /// <item><c>null</c> (default): enabled only when a debugger is attached
+    /// (<see cref="System.Diagnostics.Debugger.IsAttached"/>).</item>
+    /// <item><c>true</c>: always enabled (use with care - DevTools expose application state).</item>
+    /// <item><c>false</c>: always disabled.</item>
+    /// </list>
+    /// This replaces the previous compile-time <c>#if DEBUG</c> gating so the real
+    /// implementation ships in the published (Release-built) package.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
     /// Gets or sets whether time-travel debugging is enabled.
     /// Default is false for security. Time-travel allows jumping to previous states,
     /// which can expose historical sensitive data.

@@ -293,4 +293,116 @@ public class PluginTests
         // Assert
         plugin.MiddlewareExecuted.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task WithPlugin_UpdateHooks_ShouldFire()
+    {
+        // Arrange - WithPlugin must wrap the plugin in a PluginMiddleware so the
+        // OnBeforeUpdateAsync/OnAfterUpdateAsync lifecycle hooks actually fire.
+        var plugin = new TestPlugin();
+        var builder = StoreBuilder<PluginTestState>.Create(new PluginTestState(0));
+        builder.WithPlugin(plugin, _serviceProvider);
+        var store = builder.Build();
+
+        // Act
+        await store.UpdateAsync(s => s with { Count = 1 });
+
+        // Assert
+        plugin.OnBeforeUpdateCalled.Should().BeTrue();
+        plugin.OnAfterUpdateCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task WithPlugin_AnalyticsPlugin_RecordsActions()
+    {
+        // Arrange
+        var plugin = new EasyAppDev.Blazor.Store.Plugins.BuiltInPlugins.AnalyticsPlugin<PluginTestState>();
+        var builder = StoreBuilder<PluginTestState>.Create(new PluginTestState(0));
+        builder.WithPlugin(plugin, _serviceProvider);
+        var store = builder.Build();
+
+        // Act
+        await store.UpdateAsync(s => s with { Count = 1 }, "INCREMENT");
+        await store.UpdateAsync(s => s with { Count = 2 }, "INCREMENT");
+
+        // Assert
+        var metrics = plugin.GetMetrics();
+        metrics.TotalActions.Should().Be(2);
+        metrics.RecentActions.Should().HaveCount(2);
+        metrics.RecentActions[0].Action.Should().Be("INCREMENT");
+    }
+
+    [Fact]
+    public async Task PluginMiddleware_AttachStore_FiresOnStoreCreated()
+    {
+        // Arrange
+        var plugin = new TestPlugin();
+        var middleware = new PluginMiddleware<PluginTestState>(plugin);
+        var store = StoreBuilder<PluginTestState>.Create(new PluginTestState(0)).Build();
+
+        // Act
+        middleware.AttachStore(store);
+
+        // Assert - OnStoreCreatedAsync is fired in the background; wait for it
+        await WaitForAsync(() => plugin.OnStoreCreatedCalled);
+        plugin.OnStoreCreatedCalled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task PluginMiddleware_AttachStore_IsIdempotent()
+    {
+        // Arrange
+        var plugin = new CountingPlugin();
+        var middleware = new PluginMiddleware<PluginTestState>(plugin);
+        var store = StoreBuilder<PluginTestState>.Create(new PluginTestState(0)).Build();
+
+        // Act
+        middleware.AttachStore(store);
+        middleware.AttachStore(store);
+        middleware.AttachStore(store);
+
+        await WaitForAsync(() => plugin.StoreCreatedCount > 0);
+        await Task.Delay(100); // give any spurious extra invocations time to surface
+
+        // Assert
+        plugin.StoreCreatedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PluginMiddleware_DisposeAsync_FiresOnStoreDisposing()
+    {
+        // Arrange
+        var plugin = new TestPlugin();
+        var middleware = new PluginMiddleware<PluginTestState>(plugin);
+
+        // Act
+        await middleware.DisposeAsync();
+
+        // Assert
+        plugin.OnStoreDisposingCalled.Should().BeTrue();
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition, int timeoutMs = 2000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+    }
+
+    private class CountingPlugin : StorePluginBase<PluginTestState>
+    {
+        private int _storeCreatedCount;
+
+        public int StoreCreatedCount => Volatile.Read(ref _storeCreatedCount);
+
+        public override string Name => "CountingPlugin";
+
+        public override Task OnStoreCreatedAsync(IStore<PluginTestState> store)
+        {
+            Interlocked.Increment(ref _storeCreatedCount);
+            return Task.CompletedTask;
+        }
+    }
 }

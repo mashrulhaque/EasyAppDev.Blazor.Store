@@ -70,6 +70,13 @@ public class ServerSyncOptions<TState> where TState : notnull
     public string? UserCursorColor { get; set; }
 
     /// <summary>
+    /// Gets or sets whether to automatically connect to the hub when the
+    /// middleware is attached to a store. Default is true.
+    /// When false, call <see cref="ServerSyncMiddleware{TState}.ConnectAsync"/> manually.
+    /// </summary>
+    public bool AutoConnect { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets whether to automatically reconnect on disconnection.
     /// Default is true.
     /// </summary>

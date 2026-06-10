@@ -1,6 +1,9 @@
-#if DEBUG
+// Copyright (c) EasyAppDev. All rights reserved.
+// Licensed under the MIT License.
+
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using System.Diagnostics;
 using System.Text.Json;
 using EasyAppDev.Blazor.Store.Middleware;
 using EasyAppDev.Blazor.Store.Security;
@@ -11,8 +14,13 @@ namespace EasyAppDev.Blazor.Store.DevTools;
 /// Middleware that integrates with Redux DevTools browser extension.
 /// Uses lazy IJSRuntime resolution via IServiceProvider for compatibility
 /// with Blazor Server, WebAssembly, and Auto render modes.
-/// IMPORTANT: This middleware is only available in DEBUG builds for security reasons.
-/// DevTools expose your application state and should never be used in production.
+/// <para>
+/// Activation is gated at RUNTIME via <see cref="DevToolsOptions{TState}.Enabled"/>:
+/// by default DevTools are only active when a debugger is attached, but they can be
+/// explicitly enabled or disabled. The implementation is always compiled, so the
+/// published package contains a working middleware (previously it was a dead stub
+/// in Release builds).
+/// </para>
 /// </summary>
 /// <typeparam name="TState">The type of state managed by the store.</typeparam>
 public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
@@ -25,6 +33,7 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
     private readonly JsonSerializerOptions? _filteredJsonOptions;
     private readonly DevToolsOptions<TState>? _options;
     private readonly ILogger<DevToolsMiddleware<TState>>? _logger;
+    private readonly bool _enabled;
     private IJSObjectReference? _devToolsModule;
     private bool _initialized;
     private bool _initializationFailed;
@@ -62,11 +71,22 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         _storeName = storeName;
         _options = options;
         _logger = logger;
+
+        // Runtime gate: enabled when explicitly requested, otherwise only when a
+        // debugger is attached. DevTools expose application state and should not
+        // be active in production by default.
+        _enabled = options?.Enabled ?? Debugger.IsAttached;
+
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = options?.SerializeIndented ?? false
         };
+
+        if (!_enabled)
+        {
+            return;
+        }
 
         // Create filtered JSON options if sensitive data filtering is enabled
         if (options?.SensitiveDataFilter?.Enabled == true)
@@ -117,11 +137,21 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
                 _initialized = true;
                 _logger?.LogInformation("Redux DevTools initialized for store: {StoreName}", _storeName);
             }
+            catch (InvalidOperationException ex)
+            {
+                // JS interop is not available yet (e.g. during Blazor Server
+                // prerendering). Do NOT latch the failure flag - the next state
+                // update will retry once interop becomes available.
+                _logger?.LogDebug(ex,
+                    "JS interop not yet available for store: {StoreName} (prerendering). Will retry on next update.",
+                    _storeName);
+            }
             catch (Exception ex)
             {
-                // DevTools not available, mark as failed and silently continue
+                // Genuine JS failure (module missing, extension errors, disconnected
+                // circuit, ...) - mark as failed and silently continue.
                 _initializationFailed = true;
-                _logger?.LogWarning(ex, "Redux DevTools not available for store: {StoreName}. This is expected in Blazor Server or during prerendering.", _storeName);
+                _logger?.LogWarning(ex, "Redux DevTools not available for store: {StoreName}.", _storeName);
             }
         }
         finally
@@ -133,6 +163,9 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
     /// <inheritdoc />
     public async Task OnBeforeUpdateAsync(TState currentState, string? action)
     {
+        if (!_enabled)
+            return;
+
         await EnsureInitializedAsync().ConfigureAwait(false);
     }
 
@@ -142,7 +175,7 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         TState currentState,
         string? action)
     {
-        if (!_initialized || _devToolsModule == null)
+        if (!_enabled || !_initialized || _devToolsModule == null)
             return;
 
         // Check if action should be filtered
@@ -172,6 +205,7 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
 
             await _devToolsModule.InvokeVoidAsync(
                 "sendToDevTools",
+                _storeName,
                 actionName,
                 stateJson).ConfigureAwait(false);
         }
@@ -188,6 +222,15 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         {
             try
             {
+                await _devToolsModule.InvokeVoidAsync("disconnect", _storeName).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Ignore disconnect errors during disposal
+            }
+
+            try
+            {
                 await _devToolsModule.DisposeAsync().ConfigureAwait(false);
             }
             catch
@@ -200,54 +243,3 @@ public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
         GC.SuppressFinalize(this);
     }
 }
-
-#else
-
-using EasyAppDev.Blazor.Store.Middleware;
-
-namespace EasyAppDev.Blazor.Store.DevTools;
-
-/// <summary>
-/// No-op DevTools middleware stub for Release builds.
-/// DevTools are disabled in production for security reasons.
-/// </summary>
-/// <typeparam name="TState">The type of state managed by the store.</typeparam>
-public class DevToolsMiddleware<TState> : IMiddleware<TState>, IAsyncDisposable
-    where TState : notnull
-{
-    /// <summary>
-    /// No-op constructor for Release builds.
-    /// </summary>
-    public DevToolsMiddleware(
-        IServiceProvider serviceProvider,
-        string storeName = "Store",
-        object? logger = null)
-    {
-    }
-
-    /// <summary>
-    /// No-op constructor for Release builds.
-    /// </summary>
-    public DevToolsMiddleware(
-        IServiceProvider serviceProvider,
-        string storeName,
-        object? options,
-        object? logger = null)
-    {
-    }
-
-    /// <inheritdoc />
-    public Task OnBeforeUpdateAsync(TState currentState, string? action) => Task.CompletedTask;
-
-    /// <inheritdoc />
-    public Task OnAfterUpdateAsync(TState previousState, TState currentState, string? action) => Task.CompletedTask;
-
-    /// <inheritdoc />
-    public ValueTask DisposeAsync()
-    {
-        GC.SuppressFinalize(this);
-        return ValueTask.CompletedTask;
-    }
-}
-
-#endif

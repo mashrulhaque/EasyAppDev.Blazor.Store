@@ -376,12 +376,12 @@ public interface IDraft<TState> where TState : notnull
 }
 
 /// <summary>
-/// Default implementation of IDraft that tracks and applies modifications.
+/// Default implementation of IDraft that applies modifications eagerly to a
+/// working copy, so <see cref="Current"/> always reflects prior Set/Update calls.
 /// </summary>
 internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
 {
     private TState _current;
-    private readonly List<Func<TState, TState>> _modifications = new();
 
     public Draft(TState initial)
     {
@@ -395,7 +395,7 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
         ArgumentNullException.ThrowIfNull(selector);
 
         var path = GetPropertyPath(selector);
-        _modifications.Add(state => SetNestedProperty(state, path, value));
+        _current = SetNestedProperty(_current, path, value);
         return this;
     }
 
@@ -405,13 +405,9 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
         ArgumentNullException.ThrowIfNull(updater);
 
         var path = GetPropertyPath(selector);
-        _modifications.Add(state =>
-        {
-            var compiled = selector.Compile();
-            var currentValue = compiled(state);
-            var newValue = updater(currentValue);
-            return SetNestedProperty(state, path, newValue);
-        });
+        var currentValue = selector.Compile()(_current);
+        var newValue = updater(currentValue);
+        _current = SetNestedProperty(_current, path, newValue);
         return this;
     }
 
@@ -588,12 +584,8 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
 
     public TState Produce()
     {
-        var result = _current;
-        foreach (var modification in _modifications)
-        {
-            result = modification(result);
-        }
-        return result;
+        // Modifications are applied eagerly, so the working copy IS the result.
+        return _current;
     }
 
     private static List<PropertyInfo> GetPropertyPath<TValue>(Expression<Func<TState, TValue>> selector)
@@ -698,9 +690,10 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
                 return (TObj)clone;
             }
 
-            // Try to find the backing field for init-only property
-            var backingField = type.GetField($"<{prop.Name}>k__BackingField",
-                BindingFlags.Instance | BindingFlags.NonPublic);
+            // Try to find the backing field for init-only/get-only properties.
+            // Walk the type hierarchy: private backing fields declared on base
+            // classes are not returned by GetField on the derived type.
+            var backingField = FindBackingField(type, prop.Name);
             if (backingField != null)
             {
                 backingField.SetValue(clone, value);
@@ -720,6 +713,26 @@ internal sealed class Draft<TState> : IDraft<TState> where TState : notnull
         throw new InvalidOperationException(
             $"Cannot set property '{prop.Name}' on type '{type.Name}'. " +
             "The property must be settable or the type must be a record with init properties.");
+    }
+
+    /// <summary>
+    /// Finds the compiler-generated backing field for a property, walking up the
+    /// type hierarchy because private fields declared on base classes are not
+    /// visible via GetField on the derived type.
+    /// </summary>
+    private static FieldInfo? FindBackingField(Type type, string propertyName)
+    {
+        for (Type? current = type; current != null; current = current.BaseType)
+        {
+            var field = current.GetField($"<{propertyName}>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            if (field != null)
+            {
+                return field;
+            }
+        }
+
+        return null;
     }
 
     private static TObj Clone<TObj>(TObj obj)

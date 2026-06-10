@@ -8,14 +8,17 @@ namespace EasyAppDev.Blazor.Store.Tests.DevTools;
 public record TestState(int Counter, string Message);
 
 /// <summary>
-/// Tests for DevToolsMiddleware. These tests only run in DEBUG builds since
-/// DevToolsMiddleware is a no-op stub in Release builds for security reasons.
+/// Tests for DevToolsMiddleware. DevTools are now gated at RUNTIME via
+/// DevToolsOptions.Enabled (default: only when a debugger is attached),
+/// so tests explicitly enable them.
 /// </summary>
-#if !DEBUG
-[System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-#endif
 public class DevToolsMiddlewareTests
 {
+    private static DevToolsOptions<TestState> EnabledOptions() => new()
+    {
+        Enabled = true
+    };
+
     private static (Mock<IServiceProvider>, Mock<IJSRuntime>, Mock<IJSObjectReference>) CreateMocks()
     {
         var jsRuntimeMock = new Mock<IJSRuntime>();
@@ -43,7 +46,8 @@ public class DevToolsMiddlewareTests
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         var previousState = new TestState(0, "Before");
         var currentState = new TestState(1, "After");
@@ -57,6 +61,113 @@ public class DevToolsMiddlewareTests
             x => x.InvokeAsync<IJSVoidResult>(
                 "sendToDevTools",
                 It.IsAny<object[]>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task OnAfterUpdateAsync_WhenDisabled_DoesNotTouchJsRuntime()
+    {
+        // Arrange
+        var (serviceProviderMock, jsRuntimeMock, jsModuleMock) = CreateMocks();
+
+        var middleware = new DevToolsMiddleware<TestState>(
+            serviceProviderMock.Object,
+            "TestStore",
+            new DevToolsOptions<TestState> { Enabled = false });
+
+        // Act
+        await middleware.OnBeforeUpdateAsync(new TestState(0, "Before"), "INCREMENT");
+        await middleware.OnAfterUpdateAsync(new TestState(0, "Before"), new TestState(1, "After"), "INCREMENT");
+
+        // Assert - no JS interaction at all when disabled
+        jsRuntimeMock.Verify(
+            x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object[]>()),
+            Times.Never);
+        jsModuleMock.Verify(
+            x => x.InvokeAsync<IJSVoidResult>("sendToDevTools", It.IsAny<object[]>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task EnsureInitialized_PrerenderInvalidOperation_RetriesOnNextUpdate()
+    {
+        // Arrange - first import throws InvalidOperationException (prerendering),
+        // subsequent calls succeed. The failure must NOT latch permanently.
+        var jsRuntimeMock = new Mock<IJSRuntime>();
+        var jsModuleMock = new Mock<IJSObjectReference>();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
+        var callCount = 0;
+        jsRuntimeMock
+            .Setup(x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object[]>()))
+            .Returns(() =>
+            {
+                callCount++;
+                if (callCount == 1)
+                {
+                    throw new InvalidOperationException(
+                        "JavaScript interop calls cannot be issued at this time (prerendering).");
+                }
+                return new ValueTask<IJSObjectReference>(jsModuleMock.Object);
+            });
+
+        serviceProviderMock
+            .Setup(x => x.GetService(typeof(IJSRuntime)))
+            .Returns(jsRuntimeMock.Object);
+
+        var middleware = new DevToolsMiddleware<TestState>(
+            serviceProviderMock.Object,
+            "TestStore",
+            EnabledOptions());
+
+        var prev = new TestState(0, "Before");
+        var curr = new TestState(1, "After");
+
+        // Act - first update happens during "prerendering"
+        await middleware.OnBeforeUpdateAsync(prev, "A");
+        await middleware.OnAfterUpdateAsync(prev, curr, "A");
+
+        // Second update: interop is now available, initialization should retry
+        await middleware.OnBeforeUpdateAsync(curr, "B");
+        await middleware.OnAfterUpdateAsync(curr, new TestState(2, "Later"), "B");
+
+        // Assert - retried and eventually sent an action
+        callCount.Should().Be(2);
+        jsModuleMock.Verify(
+            x => x.InvokeAsync<IJSVoidResult>("sendToDevTools", It.IsAny<object[]>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EnsureInitialized_GenuineJsFailure_LatchesAndDoesNotRetry()
+    {
+        // Arrange - JSException is a genuine failure and should latch
+        var jsRuntimeMock = new Mock<IJSRuntime>();
+        var serviceProviderMock = new Mock<IServiceProvider>();
+
+        jsRuntimeMock
+            .Setup(x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object[]>()))
+            .ThrowsAsync(new JSException("module not found"));
+
+        serviceProviderMock
+            .Setup(x => x.GetService(typeof(IJSRuntime)))
+            .Returns(jsRuntimeMock.Object);
+
+        var middleware = new DevToolsMiddleware<TestState>(
+            serviceProviderMock.Object,
+            "TestStore",
+            EnabledOptions());
+
+        var prev = new TestState(0, "Before");
+
+        // Act
+        await middleware.OnBeforeUpdateAsync(prev, "A");
+        await middleware.OnBeforeUpdateAsync(prev, "B");
+        await middleware.OnBeforeUpdateAsync(prev, "C");
+
+        // Assert - only attempted once, then latched
+        jsRuntimeMock.Verify(
+            x => x.InvokeAsync<IJSObjectReference>("import", It.IsAny<object[]>()),
             Times.Once);
     }
 
@@ -87,7 +198,8 @@ public class DevToolsMiddlewareTests
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         // Act & Assert - should not throw
         await middleware.OnBeforeUpdateAsync(new TestState(0, "Test"), null);
@@ -110,14 +222,16 @@ public class DevToolsMiddlewareTests
                 It.IsAny<object[]>()))
             .Callback<string, object[]>((method, args) =>
             {
-                if (args.Length > 0)
-                    capturedActionName = args[0]?.ToString();
+                // args: [storeName, actionName, stateJson]
+                if (args.Length > 1)
+                    capturedActionName = args[1]?.ToString();
             })
             .Returns(new ValueTask<IJSVoidResult>());
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         var previousState = new TestState(0, "Before");
         var currentState = new TestState(1, "After");
@@ -131,6 +245,37 @@ public class DevToolsMiddlewareTests
     }
 
     [Fact]
+    public async Task OnAfterUpdateAsync_PassesStoreNameToJs()
+    {
+        // Arrange - multi-store support: the JS module keys connections by store name
+        var (serviceProviderMock, jsRuntimeMock, jsModuleMock) = CreateMocks();
+        string? capturedStoreName = null;
+
+        jsModuleMock
+            .Setup(x => x.InvokeAsync<IJSVoidResult>(
+                "sendToDevTools",
+                It.IsAny<object[]>()))
+            .Callback<string, object[]>((method, args) =>
+            {
+                if (args.Length > 0)
+                    capturedStoreName = args[0]?.ToString();
+            })
+            .Returns(new ValueTask<IJSVoidResult>());
+
+        var middleware = new DevToolsMiddleware<TestState>(
+            serviceProviderMock.Object,
+            "MySecondStore",
+            EnabledOptions());
+
+        // Act
+        await middleware.OnBeforeUpdateAsync(new TestState(0, "Before"), "X");
+        await middleware.OnAfterUpdateAsync(new TestState(0, "Before"), new TestState(1, "After"), "X");
+
+        // Assert
+        capturedStoreName.Should().Be("MySecondStore");
+    }
+
+    [Fact]
     public async Task DisposeAsync_DisposesJSModuleGracefully()
     {
         // Arrange
@@ -138,7 +283,8 @@ public class DevToolsMiddlewareTests
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         // Initialize the middleware
         await middleware.OnBeforeUpdateAsync(new TestState(0, "Test"), "INIT");
@@ -161,22 +307,28 @@ public class DevToolsMiddlewareTests
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         // Act & Assert - should not throw
         await middleware.DisposeAsync();
     }
 
     [Fact]
-    public async Task WithDevTools_AddsDevToolsMiddleware()
+    public async Task WithMiddleware_EnabledDevTools_InitializesOnUpdate()
     {
         // Arrange
         var (serviceProviderMock, jsRuntimeMock, jsModuleMock) = CreateMocks();
 
+        var middleware = new DevToolsMiddleware<TestState>(
+            serviceProviderMock.Object,
+            "TestStore",
+            EnabledOptions());
+
         // Act
         var store = StoreBuilder<TestState>
             .Create(new TestState(0, "Initial"))
-            .WithDevTools(serviceProviderMock.Object, "TestStore")
+            .WithMiddleware(middleware)
             .Build();
 
         await store.UpdateAsync(
@@ -226,14 +378,16 @@ public class DevToolsMiddlewareTests
                 It.IsAny<object[]>()))
             .Callback<string, object[]>((method, args) =>
             {
-                if (args.Length > 1)
-                    capturedStateJson = args[1]?.ToString();
+                // args: [storeName, actionName, stateJson]
+                if (args.Length > 2)
+                    capturedStateJson = args[2]?.ToString();
             })
             .Returns(new ValueTask<IJSVoidResult>());
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         var previousState = new TestState(0, "Before");
         var currentState = new TestState(42, "After");
@@ -259,7 +413,8 @@ public class DevToolsMiddlewareTests
 
         var middleware = new DevToolsMiddleware<TestState>(
             serviceProviderMock.Object,
-            "TestStore");
+            "TestStore",
+            EnabledOptions());
 
         var previousState = new TestState(0, "Before");
         var currentState = new TestState(1, "After");

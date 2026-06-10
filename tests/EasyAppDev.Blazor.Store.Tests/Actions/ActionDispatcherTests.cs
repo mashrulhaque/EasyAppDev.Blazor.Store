@@ -269,20 +269,72 @@ public class ActionDispatcherTests : IDisposable
     }
 
     [Fact]
-    public async Task DispatchAsync_WithUnhandledAction_ReturnsUnchangedState()
+    public async Task DispatchAsync_WithUnhandledAction_ThrowsInvalidOperationException()
     {
-        // Arrange
+        // Arrange - per the documented IActionDispatcher contract, dispatching an
+        // action with no registered typed or pattern reducer throws.
+        // (Previously this was silently swallowed.)
         var dispatcher = _store.CreateDispatcher()
             .Register<Increment>((s, a) => s with { Count = s.Count + 1 });
 
         await dispatcher.DispatchAsync(new Increment());
 
-        // Act - dispatch unhandled action
-        await dispatcher.DispatchAsync(new Reset());
+        // Act
+        var act = async () => await dispatcher.DispatchAsync(new Reset());
 
-        // Assert - state unchanged from previous
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*No reducer*Reset*");
+
+        // State unchanged from previous
+        _store.GetState().Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DispatchAsync_WithDerivedActionType_UsesBaseTypeReducer()
+    {
+        // Arrange - reducer registered for the base type must handle derived actions
+        var dispatcher = _store.CreateDispatcher()
+            .Register<BaseCountAction>((s, a) => s with { Count = s.Count + a.Amount, LastAction = "BASE" });
+
+        // Act - dispatch a derived action instance
+        await dispatcher.DispatchAsync(new DerivedCountAction(7));
+
+        // Assert
         var state = _store.GetState();
-        state.Count.Should().Be(1);
+        state.Count.Should().Be(7);
+        state.LastAction.Should().Be("BASE");
+    }
+
+    [Fact]
+    public void CanHandle_WithDerivedActionType_ReturnsTrueForBaseTypeReducer()
+    {
+        // Arrange
+        var dispatcher = _store.CreateDispatcher()
+            .Register<BaseCountAction>((s, a) => s with { Count = s.Count + a.Amount });
+
+        // Assert
+        dispatcher.CanHandle<DerivedCountAction>().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RegisterAndDispatch_Concurrently_DoesNotThrow()
+    {
+        // Arrange - reads are now thread-safe (ConcurrentDictionary + copy-on-write)
+        var dispatcher = _store.CreateDispatcher()
+            .RegisterPattern((s, a) => a is Increment ? s with { Count = s.Count + 1 } : s);
+
+        // Act - interleave registrations and dispatches from multiple threads
+        var tasks = new List<Task>();
+        for (var i = 0; i < 20; i++)
+        {
+            tasks.Add(Task.Run(() => dispatcher.RegisterPattern((s, a) => s)));
+            tasks.Add(dispatcher.DispatchAsync(new Increment()));
+        }
+
+        // Assert
+        await Task.WhenAll(tasks);
+        _store.GetState().Count.Should().Be(20);
     }
 
     public void Dispose()
@@ -290,3 +342,7 @@ public class ActionDispatcherTests : IDisposable
         _store.Dispose();
     }
 }
+
+// Inheritance hierarchy for derived-action dispatch tests
+public record BaseCountAction(int Amount) : IAction;
+public record DerivedCountAction(int Amount) : BaseCountAction(Amount);

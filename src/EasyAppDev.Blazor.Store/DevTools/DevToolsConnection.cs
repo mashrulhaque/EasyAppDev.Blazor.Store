@@ -10,6 +10,7 @@ internal class DevToolsConnection : IAsyncDisposable
     private readonly IJSRuntime _jsRuntime;
     private IJSObjectReference? _module;
     private bool _connected;
+    private string? _storeName;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DevToolsConnection"/> class.
@@ -36,6 +37,7 @@ internal class DevToolsConnection : IAsyncDisposable
                 "import", "./_content/EasyAppDev.Blazor.Store/devtools.js");
 
             await _module.InvokeVoidAsync("initDevTools", storeName);
+            _storeName = storeName;
             _connected = true;
             return true;
         }
@@ -57,7 +59,7 @@ internal class DevToolsConnection : IAsyncDisposable
 
         try
         {
-            await _module.InvokeVoidAsync("sendToDevTools", actionType, stateJson);
+            await _module.InvokeVoidAsync("sendToDevTools", _storeName, actionType, stateJson);
         }
         catch (Exception ex)
         {

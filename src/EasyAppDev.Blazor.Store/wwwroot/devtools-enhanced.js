@@ -1,21 +1,25 @@
 // Enhanced DevTools integration with time-travel support
-
-let devToolsConnection = null;
-let dotNetRef = null;
-let storeOptions = null;
+// Per-store entries are kept in a Map keyed by store name so multiple stores in
+// the same app each get their own DevTools connection.
+const stores = new Map(); // storeName -> { connection, dotNetRef, options }
 
 export function initEnhancedDevTools(optionsJson, dotNetReference) {
     try {
-        storeOptions = JSON.parse(optionsJson);
-        dotNetRef = dotNetReference;
+        const storeOptions = JSON.parse(optionsJson);
+        const storeName = storeOptions.name;
 
         if (typeof window === 'undefined' || !window.__REDUX_DEVTOOLS_EXTENSION__) {
             console.debug('Redux DevTools extension not available');
             return;
         }
 
-        devToolsConnection = window.__REDUX_DEVTOOLS_EXTENSION__.connect({
-            name: storeOptions.name,
+        if (stores.has(storeName)) {
+            // Already connected for this store
+            return;
+        }
+
+        const connection = window.__REDUX_DEVTOOLS_EXTENSION__.connect({
+            name: storeName,
             maxAge: storeOptions.maxAge || 100,
             features: storeOptions.features || {
                 jump: true,
@@ -27,19 +31,26 @@ export function initEnhancedDevTools(optionsJson, dotNetReference) {
             }
         });
 
+        const entry = {
+            connection: connection,
+            dotNetRef: dotNetReference,
+            options: storeOptions
+        };
+        stores.set(storeName, entry);
+
         // Subscribe to DevTools events
-        devToolsConnection.subscribe(async (message) => {
+        connection.subscribe(async (message) => {
             if (!message) return;
 
             try {
                 switch (message.type) {
                     case 'DISPATCH':
-                        await handleDispatch(message.payload, message.state);
+                        await handleDispatch(entry, message.payload, message.state);
                         break;
                     case 'ACTION':
                         // Direct action from DevTools
-                        if (dotNetRef && storeOptions.features?.dispatch) {
-                            await dotNetRef.invokeMethodAsync('ReplayAction', message.payload);
+                        if (entry.dotNetRef && entry.options.features?.dispatch) {
+                            await entry.dotNetRef.invokeMethodAsync('ReplayAction', message.payload);
                         }
                         break;
                 }
@@ -49,38 +60,38 @@ export function initEnhancedDevTools(optionsJson, dotNetReference) {
         });
 
         // Send initial state
-        devToolsConnection.init({});
+        connection.init({});
 
-        console.debug(`Enhanced DevTools connected for store: ${storeOptions.name}`);
+        console.debug(`Enhanced DevTools connected for store: ${storeName}`);
     } catch (error) {
         console.error('Failed to initialize enhanced DevTools:', error);
     }
 }
 
-async function handleDispatch(payload, state) {
+async function handleDispatch(entry, payload, state) {
     if (!payload) return;
 
     switch (payload.type) {
         case 'JUMP_TO_ACTION':
         case 'JUMP_TO_STATE':
-            if (dotNetRef && storeOptions.features?.jump) {
-                await dotNetRef.invokeMethodAsync('JumpToStateAsync', payload.actionId);
+            if (entry.dotNetRef && entry.options.features?.jump) {
+                await entry.dotNetRef.invokeMethodAsync('JumpToStateAsync', payload.actionId);
             }
             break;
 
         case 'TOGGLE_ACTION':
             // Skip/unskip an action
-            if (dotNetRef && storeOptions.features?.skip) {
+            if (entry.dotNetRef && entry.options.features?.skip) {
                 console.debug('Toggle action:', payload.id);
             }
             break;
 
         case 'IMPORT_STATE':
-            if (dotNetRef && storeOptions.features?.import && state) {
+            if (entry.dotNetRef && entry.options.features?.import && state) {
                 const computedStates = JSON.parse(state).computedStates;
                 if (computedStates && computedStates.length > 0) {
                     const lastState = computedStates[computedStates.length - 1].state;
-                    await dotNetRef.invokeMethodAsync('ImportStateAsync', JSON.stringify(lastState));
+                    await entry.dotNetRef.invokeMethodAsync('ImportStateAsync', JSON.stringify(lastState));
                 }
             }
             break;
@@ -92,22 +103,23 @@ async function handleDispatch(payload, state) {
 
         case 'ROLLBACK':
             // Rollback to last committed state
-            if (dotNetRef) {
-                await dotNetRef.invokeMethodAsync('JumpToStateAsync', 0);
+            if (entry.dotNetRef) {
+                await entry.dotNetRef.invokeMethodAsync('JumpToStateAsync', 0);
             }
             break;
 
         case 'RESET':
             // Reset to initial state
-            if (dotNetRef) {
-                await dotNetRef.invokeMethodAsync('JumpToStateAsync', 0);
+            if (entry.dotNetRef) {
+                await entry.dotNetRef.invokeMethodAsync('JumpToStateAsync', 0);
             }
             break;
     }
 }
 
-export function sendEnhancedAction(actionJson, stateJson, performanceJson) {
-    if (!devToolsConnection) return;
+export function sendEnhancedAction(storeName, actionJson, stateJson, performanceJson) {
+    const entry = stores.get(storeName);
+    if (!entry) return;
 
     try {
         const action = JSON.parse(actionJson);
@@ -119,27 +131,43 @@ export function sendEnhancedAction(actionJson, stateJson, performanceJson) {
             action._performance = perf;
         }
 
-        devToolsConnection.send(action, state);
+        entry.connection.send(action, state);
     } catch (error) {
         console.error('Failed to send action to DevTools:', error);
     }
 }
 
-export function pauseRecording() {
-    if (devToolsConnection) {
-        devToolsConnection.pause();
+export function pauseRecording(storeName) {
+    const entry = stores.get(storeName);
+    if (entry) {
+        entry.connection.pause();
     }
 }
 
-export function resumeRecording() {
-    if (devToolsConnection) {
-        devToolsConnection.resume();
+export function resumeRecording(storeName) {
+    const entry = stores.get(storeName);
+    if (entry) {
+        entry.connection.resume();
     }
 }
 
-export function exportState() {
-    if (devToolsConnection) {
-        return devToolsConnection.export();
+export function exportState(storeName) {
+    const entry = stores.get(storeName);
+    if (entry) {
+        return entry.connection.export();
     }
     return null;
+}
+
+export function disconnect(storeName) {
+    const entry = stores.get(storeName);
+    if (entry) {
+        try {
+            entry.connection.unsubscribe?.();
+            entry.connection.disconnect?.();
+        } catch (error) {
+            console.error('Error disconnecting enhanced DevTools:', error);
+        }
+        stores.delete(storeName);
+    }
 }
