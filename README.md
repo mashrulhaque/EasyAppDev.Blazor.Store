@@ -613,56 +613,67 @@ Without a query system, every component manages its own loading states, error ha
 | Problem | Query System Solution |
 |---------|----------------------|
 | Duplicate API calls | Automatic request deduplication |
-| Stale data after mutations | `InvalidateQueries("user-*")` |
+| Stale data after mutations | `InvalidateQueries(k => k.StartsWith("user-"))` |
 | Loading spinners everywhere | Centralized loading/error states |
 | Manual retry logic | Built-in with exponential backoff |
 | Cache invalidation headaches | Configurable stale/cache times |
 
 ### Queries
 
+Inherit from `QueryComponent` — it injects `IQueryClient` for you (available as the `QueryClient` property), wires queries to re-render the component, and disposes them automatically.
+
 ```csharp
-@inject IQueryClient QueryClient
+@inherits QueryComponent
 
 @code {
-    private IQuery<User> userQuery = null!;
+    private Query<User> userQuery = null!;
 
     protected override void OnInitialized()
     {
-        userQuery = QueryClient.CreateQuery<User>(
-            "user-123",                                    // Cache key
-            async ct => await api.GetUserAsync(123, ct),   // Fetch function
-            opts => opts
-                .WithStaleTime(TimeSpan.FromMinutes(5))    // Fresh for 5 min
-                .WithCacheTime(TimeSpan.FromHours(1))      // Cache for 1 hour
-                .WithRetry(3)                              // Retry 3 times
-        );
+        userQuery = UseQuery(new QueryOptions<User>
+        {
+            Key = "user-123",                                       // Cache key
+            QueryFn = async ct => await api.GetUserAsync(123, ct),  // Fetch function
+            StaleTime = TimeSpan.FromMinutes(5),                    // Fresh for 5 min
+            CacheTime = TimeSpan.FromHours(1),                      // Cache for 1 hour
+            Retry = 3                                               // Retry 3 times
+        });
     }
 }
 
 @if (userQuery.IsLoading) { <Spinner /> }
-@if (userQuery.IsError) { <Error Message="@userQuery.Error" /> }
+@if (userQuery.IsError) { <Error Message="@userQuery.Error?.Message" /> }
 @if (userQuery.IsSuccess) { <UserCard User="@userQuery.Data" /> }
+```
+
+For simple cases, skip the options object:
+
+```csharp
+userQuery = UseQuery("user-123", async ct => await api.GetUserAsync(123, ct));
 ```
 
 ### Mutations with Auto-Invalidation
 
 ```csharp
+@inherits QueryComponent
+
 @code {
-    private IMutation<UpdateUserRequest, User> mutation = null!;
+    private Mutation<User, UpdateUserRequest> mutation = null!;
 
     protected override void OnInitialized()
     {
-        mutation = QueryClient.CreateMutation<UpdateUserRequest, User>(
-            async (req, ct) => await api.UpdateUserAsync(req, ct),
-            opts => opts.OnSuccess((_, _) =>
-                QueryClient.InvalidateQueries("user-*"))  // Refetch all user queries
-        );
+        mutation = UseMutation(new MutationOptions<User, UpdateUserRequest>
+        {
+            MutationFn = async (req, ct) => await api.UpdateUserAsync(req, ct),
+            OnSuccess = (_, _) => QueryClient.InvalidateQueries(
+                key => key.StartsWith("user-"))   // Refetch all user queries
+        });
     }
 
     async Task Save()
     {
         await mutation.MutateAsync(new UpdateUserRequest { Name = "John" });
-        // All "user-*" queries automatically refresh
+        // All "user-…" queries automatically refresh
     }
 }
 ```
