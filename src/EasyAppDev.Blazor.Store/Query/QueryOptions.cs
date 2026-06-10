@@ -9,6 +9,9 @@ namespace EasyAppDev.Blazor.Store.Query;
 /// <typeparam name="T">The type of data returned by the query.</typeparam>
 public class QueryOptions<T>
 {
+    private TimeSpan? _staleTime;
+    private int? _retry;
+
     /// <summary>
     /// Gets or sets the unique key for this query. Used for caching and invalidation.
     /// </summary>
@@ -21,9 +24,19 @@ public class QueryOptions<T>
 
     /// <summary>
     /// Gets or sets how long data is considered fresh (not stale).
+    /// When not set explicitly, <see cref="QueryClientOptions.DefaultStaleTime"/> applies.
     /// Default is 0 (immediately stale).
     /// </summary>
-    public TimeSpan StaleTime { get; set; } = TimeSpan.Zero;
+    public TimeSpan StaleTime
+    {
+        get => _staleTime ?? TimeSpan.Zero;
+        set => _staleTime = value;
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="StaleTime"/> was set explicitly (used to resolve client-level defaults).
+    /// </summary>
+    internal bool HasExplicitStaleTime => _staleTime.HasValue;
 
     /// <summary>
     /// Gets or sets how long unused data stays in the cache after unmounting.
@@ -33,7 +46,7 @@ public class QueryOptions<T>
 
     /// <summary>
     /// Gets or sets whether to refetch when the window regains focus.
-    /// Default is true.
+    /// Reserved for future use — window-focus refetching is not yet implemented.
     /// </summary>
     public bool RefetchOnWindowFocus { get; set; } = true;
 
@@ -45,15 +58,25 @@ public class QueryOptions<T>
 
     /// <summary>
     /// Gets or sets whether to refetch when network reconnects.
-    /// Default is true.
+    /// Reserved for future use — reconnect refetching is not yet implemented.
     /// </summary>
     public bool RefetchOnReconnect { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the number of retry attempts for failed queries.
+    /// When not set explicitly, <see cref="QueryClientOptions.DefaultRetry"/> applies.
     /// Default is 3.
     /// </summary>
-    public int Retry { get; set; } = 3;
+    public int Retry
+    {
+        get => _retry ?? 3;
+        set => _retry = value;
+    }
+
+    /// <summary>
+    /// Gets whether <see cref="Retry"/> was set explicitly (used to resolve client-level defaults).
+    /// </summary>
+    internal bool HasExplicitRetry => _retry.HasValue;
 
     /// <summary>
     /// Gets or sets the delay function between retries.

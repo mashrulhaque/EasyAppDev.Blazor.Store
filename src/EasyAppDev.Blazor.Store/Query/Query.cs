@@ -15,15 +15,18 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     private readonly Action _onStateChange;
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly Func<Task> _refetchDelegate;
+    private readonly SynchronizationContext? _syncContext;
+    private readonly TimeSpan _staleTime;
+    private readonly int _retry;
     private CancellationTokenSource? _fetchCts;
     private Timer? _refetchTimer;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private T? _data;
     private Exception? _error;
-    private QueryStatus _status = QueryStatus.Idle;
+    private int _status = (int)QueryStatus.Idle;
     private int _isFetching; // 0 = not fetching, 1 = fetching (using int for Interlocked)
-    private DateTime? _dataUpdatedAt;
+    private long _dataUpdatedAtTicks; // 0 = never updated; UTC ticks otherwise
     private int _failureCount;
     private bool _isPlaceholderData;
 
@@ -33,8 +36,25 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         _queryClient = queryClient ?? throw new ArgumentNullException(nameof(queryClient));
         _onStateChange = onStateChange ?? throw new ArgumentNullException(nameof(onStateChange));
 
-        // Create refetch delegate for registration
-        _refetchDelegate = () => RefetchAsync();
+        // Capture the current synchronization context (the Blazor dispatcher when
+        // constructed from a component) so user callbacks can be marshalled back to it.
+        _syncContext = SynchronizationContext.Current;
+
+        // Resolve client-level defaults: explicit per-query values win,
+        // otherwise fall back to the query client's configured defaults.
+        var clientOptions = _queryClient.Options;
+        _staleTime = _options.HasExplicitStaleTime || clientOptions is null
+            ? _options.StaleTime
+            : clientOptions.DefaultStaleTime;
+        _retry = _options.HasExplicitRetry || clientOptions is null
+            ? _options.Retry
+            : clientOptions.DefaultRetry;
+
+        // Create refetch delegate for registration.
+        // Invalidation-triggered refetches must respect Enabled() (TanStack semantics):
+        // a disabled query is not fetched by InvalidateQueries. Manual RefetchAsync()
+        // still forces a fetch.
+        _refetchDelegate = () => _options.Enabled() ? FetchAsync(forceRefetch: true) : Task.CompletedTask;
 
         // Register with QueryClient for invalidation support
         _queryClient.RegisterQuery(_options.Key, _refetchDelegate);
@@ -43,8 +63,8 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         if (_options.InitialData is not null)
         {
             _data = _options.InitialData;
-            _dataUpdatedAt = _options.InitialDataUpdatedAt ?? DateTime.UtcNow;
-            _status = QueryStatus.Success;
+            _dataUpdatedAtTicks = (_options.InitialDataUpdatedAt ?? DateTime.UtcNow).Ticks;
+            _status = (int)QueryStatus.Success;
         }
         else if (_options.PlaceholderData is not null)
         {
@@ -57,8 +77,8 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         if (cachedEntry is not null && !_queryClient.IsInvalidated(_options.Key))
         {
             _data = cachedEntry.Data;
-            _dataUpdatedAt = cachedEntry.UpdatedAt;
-            _status = QueryStatus.Success;
+            _dataUpdatedAtTicks = cachedEntry.UpdatedAt.Ticks;
+            _status = (int)QueryStatus.Success;
             _isPlaceholderData = false;
         }
     }
@@ -76,22 +96,22 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     /// <summary>
     /// Gets the current status of the query.
     /// </summary>
-    public QueryStatus Status => _status;
+    public QueryStatus Status => (QueryStatus)Volatile.Read(ref _status);
 
     /// <summary>
     /// Gets whether the query is in loading state (initial load).
     /// </summary>
-    public bool IsLoading => _status == QueryStatus.Loading;
+    public bool IsLoading => Status == QueryStatus.Loading;
 
     /// <summary>
     /// Gets whether the query has an error.
     /// </summary>
-    public bool IsError => _status == QueryStatus.Error;
+    public bool IsError => Status == QueryStatus.Error;
 
     /// <summary>
     /// Gets whether the query was successful.
     /// </summary>
-    public bool IsSuccess => _status == QueryStatus.Success;
+    public bool IsSuccess => Status == QueryStatus.Success;
 
     /// <summary>
     /// Gets whether any fetch is in progress (including background refetch).
@@ -101,8 +121,14 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     /// <summary>
     /// Gets whether the data is stale (older than staleTime).
     /// </summary>
-    public bool IsStale => _dataUpdatedAt is null ||
-        DateTime.UtcNow - _dataUpdatedAt > _options.StaleTime;
+    public bool IsStale
+    {
+        get
+        {
+            var updatedAt = DataUpdatedAt;
+            return updatedAt is null || DateTime.UtcNow - updatedAt > _staleTime;
+        }
+    }
 
     /// <summary>
     /// Gets whether the current data is placeholder data.
@@ -112,7 +138,14 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     /// <summary>
     /// Gets when the data was last updated.
     /// </summary>
-    public DateTime? DataUpdatedAt => _dataUpdatedAt;
+    public DateTime? DataUpdatedAt
+    {
+        get
+        {
+            var ticks = Volatile.Read(ref _dataUpdatedAtTicks);
+            return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+        }
+    }
 
     /// <summary>
     /// Gets the number of consecutive failures.
@@ -145,13 +178,13 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         if (_disposed) return;
 
         _data = data;
-        _dataUpdatedAt = DateTime.UtcNow;
-        _status = QueryStatus.Success;
         _error = null;
         _isPlaceholderData = false;
         _failureCount = 0;
+        Volatile.Write(ref _dataUpdatedAtTicks, DateTime.UtcNow.Ticks);
+        Volatile.Write(ref _status, (int)QueryStatus.Success);
 
-        _queryClient.SetQueryData(_options.Key, data);
+        _queryClient.SetQueryData(_options.Key, data, _options.CacheTime);
         NotifyStateChange();
     }
 
@@ -163,7 +196,7 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         }
 
         // If we have cached data and it's fresh, don't fetch
-        if (!IsStale && _status == QueryStatus.Success)
+        if (!IsStale && Status == QueryStatus.Success)
         {
             SetupRefetchInterval();
             return;
@@ -188,46 +221,120 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         if (forceRefetch)
             Interlocked.Exchange(ref _isFetching, 1);
 
-        // Cancel any existing fetch
-        _fetchCts?.Cancel();
-        _fetchCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
-
-        // Only set to Loading if we don't have data
-        if (_status != QueryStatus.Success && !_isPlaceholderData)
+        // Create THIS fetch's CTS and capture both it and its token as locals.
+        // The _fetchCts field may be swapped by a concurrent force refetch, so the
+        // field must never be re-read for cancellation decisions in this method.
+        CancellationTokenSource cts;
+        try
         {
-            _status = QueryStatus.Loading;
+            cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Query was disposed concurrently
+            return;
         }
 
-        NotifyStateChange();
+        var token = cts.Token;
 
-        var attempt = 0;
-        Exception? lastException = null;
-
-        while (attempt <= _options.Retry)
+        // Install our CTS and cancel any in-flight fetch. The superseded fetch
+        // owns (and will dispose) its own CTS in its finally block.
+        var previous = Interlocked.Exchange(ref _fetchCts, cts);
+        if (previous is not null)
         {
             try
             {
-                var result = await _options.QueryFn(_fetchCts.Token);
+                previous.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The owning fetch already completed and disposed it
+            }
+        }
 
-                if (_disposed || _fetchCts.Token.IsCancellationRequested)
+        try
+        {
+            // Only set to Loading if we don't have data
+            if (Status != QueryStatus.Success && !_isPlaceholderData)
+            {
+                Volatile.Write(ref _status, (int)QueryStatus.Loading);
+            }
+
+            NotifyStateChange();
+
+            var attempt = 0;
+            Exception? lastException = null;
+            var fetchSucceeded = false;
+            T? result = default;
+
+            while (attempt <= _retry)
+            {
+                try
                 {
-                    Interlocked.Exchange(ref _isFetching, 0);
+                    result = await _options.QueryFn(token);
+
+                    if (_disposed || token.IsCancellationRequested || !IsCurrentFetch(cts))
+                    {
+                        // Superseded by a newer fetch (or disposed) - never
+                        // overwrite state/cache with this (potentially stale) result.
+                        return;
+                    }
+
+                    fetchSucceeded = true;
+                    break;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // THIS fetch was cancelled (dispose or force refetch) - not a failure.
                     return;
                 }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    attempt++;
+                    _failureCount++;
 
-                // Apply transformation if specified
+                    if (attempt <= _retry)
+                    {
+                        var delay = _options.RetryDelay(attempt - 1);
+                        try
+                        {
+                            await Task.Delay(delay, token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (fetchSucceeded)
+            {
+                // Success path. User callbacks (Select/OnSuccess/OnSettled) run outside
+                // the retry loop so a callback exception can never be misclassified as a
+                // fetch failure (re-running a successful fetch and ending in Error state).
                 if (result is not null && _options.Select is not null)
                 {
-                    result = _options.Select(result);
+                    try
+                    {
+                        result = _options.Select(result);
+                    }
+                    catch
+                    {
+                        // Select threw - keep the untransformed result rather than
+                        // discarding a successful fetch.
+                    }
                 }
 
                 _data = result;
-                _dataUpdatedAt = DateTime.UtcNow;
-                _status = QueryStatus.Success;
                 _error = null;
                 _failureCount = 0;
                 _isPlaceholderData = false;
-                Interlocked.Exchange(ref _isFetching, 0);
+                Volatile.Write(ref _dataUpdatedAtTicks, DateTime.UtcNow.Ticks);
+                // Status is the last state write (release) so a reader observing
+                // Success also observes the _data write (acquire via Status getter).
+                Volatile.Write(ref _status, (int)QueryStatus.Success);
 
                 // Update cache
                 if (result is not null)
@@ -235,53 +342,59 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
                     _queryClient.SetQueryData(_options.Key, result, _options.CacheTime);
                 }
 
-                _options.OnSuccess?.Invoke(result!);
-                _options.OnSettled?.Invoke();
+                if (_options.OnSuccess is { } onSuccess)
+                {
+                    CallbackDispatcher.Invoke(_syncContext, () => onSuccess(result!));
+                }
+
+                if (_options.OnSettled is { } onSettled)
+                {
+                    CallbackDispatcher.Invoke(_syncContext, onSettled);
+                }
+
                 NotifyStateChange();
                 return;
             }
-            catch (OperationCanceledException) when (_fetchCts.Token.IsCancellationRequested)
+
+            // All retries exhausted
+            if (_disposed || !IsCurrentFetch(cts))
             {
-                Interlocked.Exchange(ref _isFetching, 0);
                 return;
             }
-            catch (Exception ex)
+
+            _error = lastException;
+            Volatile.Write(ref _status, (int)QueryStatus.Error);
+
+            if (_options.OnError is { } onError)
             {
-                lastException = ex;
-                attempt++;
-                _failureCount++;
-
-                if (attempt <= _options.Retry)
-                {
-                    var delay = _options.RetryDelay(attempt - 1);
-                    try
-                    {
-                        await Task.Delay(delay, _fetchCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        Interlocked.Exchange(ref _isFetching, 0);
-                        return;
-                    }
-                }
+                CallbackDispatcher.Invoke(_syncContext, () => onError(lastException!));
             }
-        }
 
-        // All retries exhausted
-        if (_disposed)
+            if (_options.OnSettled is { } onSettledAfterError)
+            {
+                CallbackDispatcher.Invoke(_syncContext, onSettledAfterError);
+            }
+
+            NotifyStateChange();
+        }
+        finally
         {
-            Interlocked.Exchange(ref _isFetching, 0);
-            return;
+            // Each FetchAsync invocation disposes ITS OWN CTS. Clear the field
+            // first (only if we're still the current fetch) so nobody can grab a
+            // reference to a CTS that is about to be disposed. Resetting _isFetching
+            // only when still current avoids clobbering a superseding fetch's flag,
+            // and runs after the cache write + callbacks above.
+            if (Interlocked.CompareExchange(ref _fetchCts, null, cts) == cts)
+            {
+                Interlocked.Exchange(ref _isFetching, 0);
+            }
+
+            cts.Dispose();
         }
-
-        _error = lastException;
-        _status = QueryStatus.Error;
-        Interlocked.Exchange(ref _isFetching, 0);
-
-        _options.OnError?.Invoke(lastException!);
-        _options.OnSettled?.Invoke();
-        NotifyStateChange();
     }
+
+    private bool IsCurrentFetch(CancellationTokenSource cts) =>
+        ReferenceEquals(Volatile.Read(ref _fetchCts), cts);
 
     private void SetupRefetchInterval()
     {
@@ -290,7 +403,19 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
 
         _refetchTimer?.Dispose();
         _refetchTimer = new Timer(
-            async _ => await RefetchAsync(),
+            async _ =>
+            {
+                try
+                {
+                    await RefetchAsync();
+                }
+                catch
+                {
+                    // Query disposed or fetch failed - never crash the timer
+                    // (an unhandled exception in an async-void timer callback
+                    // would crash the process on Blazor Server).
+                }
+            },
             null,
             _options.RefetchInterval.Value,
             _options.RefetchInterval.Value);
@@ -300,7 +425,15 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
     {
         if (!_disposed)
         {
-            _onStateChange();
+            try
+            {
+                _onStateChange();
+            }
+            catch
+            {
+                // The owning component may be tearing down - never let a render
+                // notification crash a background fetch or timer.
+            }
         }
     }
 
@@ -316,8 +449,21 @@ public sealed class Query<T> : IDisposable, IQueryInitializable
         _queryClient.UnregisterQuery(_options.Key, _refetchDelegate);
 
         _refetchTimer?.Dispose();
-        _fetchCts?.Cancel();
-        _fetchCts?.Dispose();
+
+        // Cancel any in-flight fetch; its FetchAsync owns and disposes the CTS.
+        var fetchCts = Interlocked.Exchange(ref _fetchCts, null);
+        if (fetchCts is not null)
+        {
+            try
+            {
+                fetchCts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The owning fetch already disposed it
+            }
+        }
+
         _disposeCts.Cancel();
         _disposeCts.Dispose();
     }

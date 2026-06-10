@@ -69,6 +69,13 @@ public interface IQueryClient
     void Clear();
 
     /// <summary>
+    /// Gets the client-level default options (internal use).
+    /// Used by queries to resolve defaults such as
+    /// <see cref="QueryClientOptions.DefaultStaleTime"/> and <see cref="QueryClientOptions.DefaultRetry"/>.
+    /// </summary>
+    internal QueryClientOptions? Options => null;
+
+    /// <summary>
     /// Gets the cache entry for a key (internal use).
     /// </summary>
     internal QueryCacheEntry<T>? GetCacheEntry<T>(string key);

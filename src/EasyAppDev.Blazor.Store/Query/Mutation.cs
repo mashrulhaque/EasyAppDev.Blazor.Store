@@ -15,8 +15,9 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
     private readonly IQueryClient _queryClient;
     private readonly Action _onStateChange;
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly SynchronizationContext? _syncContext;
     private CancellationTokenSource? _mutationCts;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private TResult? _data;
     private Exception? _error;
@@ -33,6 +34,7 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _queryClient = queryClient ?? throw new ArgumentNullException(nameof(queryClient));
         _onStateChange = onStateChange ?? throw new ArgumentNullException(nameof(onStateChange));
+        _syncContext = SynchronizationContext.Current;
     }
 
     /// <summary>
@@ -99,77 +101,141 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
     {
         if (_disposed) return default;
 
-        // Cancel any existing mutation
-        _mutationCts?.Cancel();
-        _mutationCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        // Create THIS invocation's CTS and capture it (and its token) as locals.
+        // The field may be swapped by a concurrent MutateAsync (double-click submit),
+        // so it must never be re-read for cancellation decisions.
+        CancellationTokenSource cts;
+        try
+        {
+            cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        }
+        catch (ObjectDisposedException)
+        {
+            return default;
+        }
 
-        _variables = variables;
-        _submittedAt = DateTime.UtcNow;
-        _status = MutationStatus.Loading;
-        _error = null;
-        _failureCount = 0;
+        var token = cts.Token;
 
-        _options.OnMutate?.Invoke(variables);
-        NotifyStateChange();
-
-        var attempt = 0;
-        Exception? lastException = null;
-
-        while (attempt <= _options.Retry)
+        // Install our CTS and cancel any in-flight mutation. The superseded
+        // mutation owns (and will dispose) its own CTS in its finally block.
+        var previous = Interlocked.Exchange(ref _mutationCts, cts);
+        if (previous is not null)
         {
             try
             {
-                var result = await _options.MutationFn(variables, _mutationCts.Token);
-
-                if (_disposed || _mutationCts.Token.IsCancellationRequested)
-                    return default;
-
-                _data = result;
-                _status = MutationStatus.Success;
-                _error = null;
-
-                _options.OnSuccess?.Invoke(result!, variables);
-                _options.OnSettled?.Invoke(variables);
-                NotifyStateChange();
-                return result;
+                previous.Cancel();
             }
-            catch (OperationCanceledException) when (_mutationCts.Token.IsCancellationRequested)
+            catch (ObjectDisposedException)
             {
-                return default;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                attempt++;
-                _failureCount++;
-
-                if (attempt <= _options.Retry)
-                {
-                    var delay = _options.RetryDelay(attempt - 1);
-                    try
-                    {
-                        await Task.Delay(delay, _mutationCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return default;
-                    }
-                }
+                // The owning mutation already completed and disposed it
             }
         }
 
-        // All retries exhausted
-        if (_disposed) return default;
+        try
+        {
+            _variables = variables;
+            _submittedAt = DateTime.UtcNow;
+            _status = MutationStatus.Loading;
+            _error = null;
+            _failureCount = 0;
 
-        _error = lastException;
-        _status = MutationStatus.Error;
+            if (_options.OnMutate is { } onMutate)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onMutate(variables));
+            }
 
-        _options.OnError?.Invoke(lastException!, variables);
-        _options.OnSettled?.Invoke(variables);
-        NotifyStateChange();
+            NotifyStateChange();
 
-        throw lastException!;
+            var attempt = 0;
+            Exception? lastException = null;
+
+            while (attempt <= _options.Retry)
+            {
+                try
+                {
+                    var result = await _options.MutationFn(variables, token);
+
+                    if (_disposed || token.IsCancellationRequested || !IsCurrentMutation(cts))
+                    {
+                        // Superseded by a newer mutation (or disposed) - never overwrite
+                        // its state or fire late callbacks.
+                        return default;
+                    }
+
+                    _data = result;
+                    _status = MutationStatus.Success;
+                    _error = null;
+
+                    if (_options.OnSuccess is { } onSuccess)
+                    {
+                        CallbackDispatcher.Invoke(_syncContext, () => onSuccess(result!, variables));
+                    }
+
+                    if (_options.OnSettled is { } onSettled)
+                    {
+                        CallbackDispatcher.Invoke(_syncContext, () => onSettled(variables));
+                    }
+
+                    NotifyStateChange();
+                    return result;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // THIS mutation was cancelled - not a failure, never retried.
+                    return default;
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    attempt++;
+                    _failureCount++;
+
+                    if (attempt <= _options.Retry)
+                    {
+                        var delay = _options.RetryDelay(attempt - 1);
+                        try
+                        {
+                            await Task.Delay(delay, token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return default;
+                        }
+                    }
+                }
+            }
+
+            // All retries exhausted
+            if (_disposed || !IsCurrentMutation(cts)) return default;
+
+            _error = lastException;
+            _status = MutationStatus.Error;
+
+            if (_options.OnError is { } onError)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onError(lastException!, variables));
+            }
+
+            if (_options.OnSettled is { } onSettledAfterError)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onSettledAfterError(variables));
+            }
+
+            NotifyStateChange();
+
+            throw lastException!;
+        }
+        finally
+        {
+            // Each MutateAsync invocation disposes ITS OWN CTS, clearing the field
+            // first if it is still the current one.
+            Interlocked.CompareExchange(ref _mutationCts, null, cts);
+            cts.Dispose();
+        }
     }
+
+    private bool IsCurrentMutation(CancellationTokenSource cts) =>
+        ReferenceEquals(Volatile.Read(ref _mutationCts), cts);
 
     /// <summary>
     /// Executes the mutation, ignoring exceptions.
@@ -194,7 +260,7 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
     {
         if (_disposed) return;
 
-        _mutationCts?.Cancel();
+        CancelInFlightMutation();
         _data = default;
         _error = null;
         _variables = default;
@@ -203,6 +269,22 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
         _submittedAt = null;
 
         NotifyStateChange();
+    }
+
+    private void CancelInFlightMutation()
+    {
+        var cts = Interlocked.Exchange(ref _mutationCts, null);
+        if (cts is not null)
+        {
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The owning mutation already disposed it
+            }
+        }
     }
 
     private void NotifyStateChange()
@@ -221,8 +303,8 @@ public sealed class Mutation<TResult, TVariables> : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _mutationCts?.Cancel();
-        _mutationCts?.Dispose();
+        // Cancel any in-flight mutation; its MutateAsync owns and disposes the CTS.
+        CancelInFlightMutation();
         _disposeCts.Cancel();
         _disposeCts.Dispose();
     }
@@ -238,8 +320,9 @@ public sealed class Mutation<TVariables> : IDisposable
     private readonly IQueryClient _queryClient;
     private readonly Action _onStateChange;
     private readonly CancellationTokenSource _disposeCts = new();
+    private readonly SynchronizationContext? _syncContext;
     private CancellationTokenSource? _mutationCts;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private Exception? _error;
     private TVariables? _variables;
@@ -255,6 +338,7 @@ public sealed class Mutation<TVariables> : IDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _queryClient = queryClient ?? throw new ArgumentNullException(nameof(queryClient));
         _onStateChange = onStateChange ?? throw new ArgumentNullException(nameof(onStateChange));
+        _syncContext = SynchronizationContext.Current;
     }
 
     /// <summary>
@@ -314,74 +398,137 @@ public sealed class Mutation<TVariables> : IDisposable
     {
         if (_disposed) return;
 
-        _mutationCts?.Cancel();
-        _mutationCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        // Create THIS invocation's CTS and capture it (and its token) as locals.
+        // The field may be swapped by a concurrent MutateAsync (double-click submit),
+        // so it must never be re-read for cancellation decisions.
+        CancellationTokenSource cts;
+        try
+        {
+            cts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
 
-        _variables = variables;
-        _submittedAt = DateTime.UtcNow;
-        _status = MutationStatus.Loading;
-        _error = null;
-        _failureCount = 0;
+        var token = cts.Token;
 
-        _options.OnMutate?.Invoke(variables);
-        NotifyStateChange();
-
-        var attempt = 0;
-        Exception? lastException = null;
-
-        while (attempt <= _options.Retry)
+        var previous = Interlocked.Exchange(ref _mutationCts, cts);
+        if (previous is not null)
         {
             try
             {
-                await _options.MutationFn(variables, _mutationCts.Token);
-
-                if (_disposed || _mutationCts.Token.IsCancellationRequested)
-                    return;
-
-                _status = MutationStatus.Success;
-                _error = null;
-
-                _options.OnSuccess?.Invoke(variables);
-                _options.OnSettled?.Invoke(variables);
-                NotifyStateChange();
-                return;
+                previous.Cancel();
             }
-            catch (OperationCanceledException) when (_mutationCts.Token.IsCancellationRequested)
+            catch (ObjectDisposedException)
             {
-                return;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                attempt++;
-                _failureCount++;
-
-                if (attempt <= _options.Retry)
-                {
-                    var delay = _options.RetryDelay(attempt - 1);
-                    try
-                    {
-                        await Task.Delay(delay, _mutationCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return;
-                    }
-                }
+                // The owning mutation already completed and disposed it
             }
         }
 
-        if (_disposed) return;
+        try
+        {
+            _variables = variables;
+            _submittedAt = DateTime.UtcNow;
+            _status = MutationStatus.Loading;
+            _error = null;
+            _failureCount = 0;
 
-        _error = lastException;
-        _status = MutationStatus.Error;
+            if (_options.OnMutate is { } onMutate)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onMutate(variables));
+            }
 
-        _options.OnError?.Invoke(lastException!, variables);
-        _options.OnSettled?.Invoke(variables);
-        NotifyStateChange();
+            NotifyStateChange();
 
-        throw lastException!;
+            var attempt = 0;
+            Exception? lastException = null;
+
+            while (attempt <= _options.Retry)
+            {
+                try
+                {
+                    await _options.MutationFn(variables, token);
+
+                    if (_disposed || token.IsCancellationRequested || !IsCurrentMutation(cts))
+                    {
+                        // Superseded by a newer mutation (or disposed) - never overwrite
+                        // its state or fire late callbacks.
+                        return;
+                    }
+
+                    _status = MutationStatus.Success;
+                    _error = null;
+
+                    if (_options.OnSuccess is { } onSuccess)
+                    {
+                        CallbackDispatcher.Invoke(_syncContext, () => onSuccess(variables));
+                    }
+
+                    if (_options.OnSettled is { } onSettled)
+                    {
+                        CallbackDispatcher.Invoke(_syncContext, () => onSettled(variables));
+                    }
+
+                    NotifyStateChange();
+                    return;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // THIS mutation was cancelled - not a failure, never retried.
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    attempt++;
+                    _failureCount++;
+
+                    if (attempt <= _options.Retry)
+                    {
+                        var delay = _options.RetryDelay(attempt - 1);
+                        try
+                        {
+                            await Task.Delay(delay, token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (_disposed || !IsCurrentMutation(cts)) return;
+
+            _error = lastException;
+            _status = MutationStatus.Error;
+
+            if (_options.OnError is { } onError)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onError(lastException!, variables));
+            }
+
+            if (_options.OnSettled is { } onSettledAfterError)
+            {
+                CallbackDispatcher.Invoke(_syncContext, () => onSettledAfterError(variables));
+            }
+
+            NotifyStateChange();
+
+            throw lastException!;
+        }
+        finally
+        {
+            // Each MutateAsync invocation disposes ITS OWN CTS, clearing the field
+            // first if it is still the current one.
+            Interlocked.CompareExchange(ref _mutationCts, null, cts);
+            cts.Dispose();
+        }
     }
+
+    private bool IsCurrentMutation(CancellationTokenSource cts) =>
+        ReferenceEquals(Volatile.Read(ref _mutationCts), cts);
 
     /// <summary>
     /// Executes the mutation, ignoring exceptions.
@@ -405,7 +552,7 @@ public sealed class Mutation<TVariables> : IDisposable
     {
         if (_disposed) return;
 
-        _mutationCts?.Cancel();
+        CancelInFlightMutation();
         _error = null;
         _variables = default;
         _status = MutationStatus.Idle;
@@ -413,6 +560,22 @@ public sealed class Mutation<TVariables> : IDisposable
         _submittedAt = null;
 
         NotifyStateChange();
+    }
+
+    private void CancelInFlightMutation()
+    {
+        var cts = Interlocked.Exchange(ref _mutationCts, null);
+        if (cts is not null)
+        {
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The owning mutation already disposed it
+            }
+        }
     }
 
     private void NotifyStateChange()
@@ -431,8 +594,8 @@ public sealed class Mutation<TVariables> : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _mutationCts?.Cancel();
-        _mutationCts?.Dispose();
+        // Cancel any in-flight mutation; its MutateAsync owns and disposes the CTS.
+        CancelInFlightMutation();
         _disposeCts.Cancel();
         _disposeCts.Dispose();
     }
