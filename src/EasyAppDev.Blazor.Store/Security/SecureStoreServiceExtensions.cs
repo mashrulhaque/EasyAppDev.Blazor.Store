@@ -99,13 +99,36 @@ public static class SecureStoreServiceExtensions
             services.AddScoped<IStateReader<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
             services.AddScoped<IStateWriter<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
             services.AddScoped<IStateObservable<TState>>(sp => sp.GetRequiredService<IStore<TState>>());
+
+            if (options.EnableHistory)
+            {
+                services.AddScoped<IStoreHistory<TState>>(ResolveHistoryFromStore<TState>);
+            }
         }
         else
         {
             services.AddStore(initialState, ConfigureStore);
+
+            if (options.EnableHistory)
+            {
+                services.AddSingleton<IStoreHistory<TState>>(ResolveHistoryFromStore<TState>);
+            }
         }
 
         return services;
+    }
+
+    private static IStoreHistory<TState> ResolveHistoryFromStore<TState>(IServiceProvider sp)
+        where TState : notnull
+    {
+        // The StoreHistory middleware is created inside the store factory; building
+        // the store wires it via IStoreAwareMiddleware, so resolving the store first
+        // guarantees an initialized history instance.
+        var store = sp.GetRequiredService<IStore<TState>>();
+        var history = (store as Store<TState>)?.Middlewares.OfType<IStoreHistory<TState>>().FirstOrDefault();
+        return history ?? throw new InvalidOperationException(
+            $"No history middleware was found on the store for '{typeof(TState).Name}'. " +
+            "Ensure SecureStoreOptions.EnableHistory is true for this store registration.");
     }
 
     private static StoreBuilder<TState> ApplySecureConfiguration<TState>(

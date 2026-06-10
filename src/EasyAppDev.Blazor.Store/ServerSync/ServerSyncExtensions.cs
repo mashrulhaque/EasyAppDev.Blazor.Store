@@ -77,4 +77,42 @@ public static class ServerSyncExtensions
             options.DocumentId = documentId;
         });
     }
+
+    /// <summary>
+    /// Enables server-side state synchronization and exposes the middleware instance
+    /// for manual connection control (<see cref="ServerSyncMiddleware{TState}.ConnectAsync"/> /
+    /// <see cref="ServerSyncMiddleware{TState}.DisconnectAsync"/>). Useful when
+    /// <see cref="ServerSyncOptions{TState}.AutoConnect"/> is disabled or the app needs to
+    /// reconnect on demand.
+    /// </summary>
+    /// <typeparam name="TState">The type of state.</typeparam>
+    /// <param name="builder">The store builder.</param>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="configure">Action to configure sync options.</param>
+    /// <param name="middleware">The created middleware instance.</param>
+    /// <returns>The builder for chaining.</returns>
+    public static StoreBuilder<TState> WithServerSync<TState>(
+        this StoreBuilder<TState> builder,
+        IServiceProvider serviceProvider,
+        Action<ServerSyncOptions<TState>> configure,
+        out ServerSyncMiddleware<TState> middleware)
+        where TState : notnull
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new ServerSyncOptions<TState> { HubUrl = "" };
+        configure(options);
+
+        if (string.IsNullOrEmpty(options.HubUrl))
+        {
+            throw new ArgumentException("HubUrl must be specified in server sync options");
+        }
+
+        var logger = serviceProvider.GetService<ILogger<ServerSyncMiddleware<TState>>>();
+        middleware = new ServerSyncMiddleware<TState>(options, logger);
+
+        return builder.WithMiddleware(middleware);
+    }
 }
